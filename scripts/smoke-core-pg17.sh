@@ -108,8 +108,16 @@ RELATIVE_PATH="$(
 
 HOST_PATH="$DATA_DIR/$RELATIVE_PATH"
 
+for _ in $(seq 1 10); do
+  if [[ -f "$HOST_PATH" ]]; then
+    break
+  fi
+  sleep 1
+done
+
 if [[ ! -f "$HOST_PATH" ]]; then
   echo "expected relation file not found: $HOST_PATH" >&2
+  find "$DATA_DIR/base" -maxdepth 2 -type f | sort | tail -n 50 >&2 || true
   exit 1
 fi
 

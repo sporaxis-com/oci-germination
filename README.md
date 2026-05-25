@@ -34,7 +34,7 @@ docker run --rm -d \
   -e PGDATA=/var/lib/postgresql/data \
   -v "$PWD/ociger-core-pg17-data:/var/lib/postgresql/data" \
   -p 15432:5432 \
-  ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.0
+  ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.1
 ```
 
 Then connect from the host:
@@ -216,8 +216,8 @@ Manual release example:
 
 ```bash
 git push origin main
-git tag core-pg17-v0.1.0
-git push origin core-pg17-v0.1.0
+git tag core-pg17-v0.1.1
+git push origin core-pg17-v0.1.1
 ```
 
 ## Why No Compose
