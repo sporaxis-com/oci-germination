@@ -8,6 +8,7 @@ CONTAINER="ociger-core-pg17-smoke"
 OWNERSHIP_LABEL="core-pg17-smoke"
 IMAGE="${1:-ociger-core-pg17-min:local}"
 RELATIVE_PATH=""
+RELATION_PROOF_METHOD=""
 
 ensure_repo_data_path() {
   case "$DATA_DIR" in
@@ -56,6 +57,14 @@ remove_owned_network() {
 cleanup() {
   remove_owned_container "$CONTAINER"
   remove_owned_network "$NETWORK"
+}
+
+relation_exists_via_helper() {
+  docker run --rm \
+    --entrypoint /bin/sh \
+    -v "$DATA_DIR:/mnt/pgdata:ro" \
+    postgres:17-bookworm \
+    -c "test -f '/mnt/pgdata/$RELATIVE_PATH'"
 }
 
 trap cleanup EXIT
@@ -110,16 +119,26 @@ HOST_PATH="$DATA_DIR/$RELATIVE_PATH"
 
 for _ in $(seq 1 10); do
   if [[ -f "$HOST_PATH" ]]; then
+    RELATION_PROOF_METHOD="host"
+    break
+  fi
+  if relation_exists_via_helper; then
+    RELATION_PROOF_METHOD="helper-container"
     break
   fi
   sleep 1
 done
 
-if [[ ! -f "$HOST_PATH" ]]; then
+if [[ -z "$RELATION_PROOF_METHOD" ]]; then
   echo "expected relation file not found: $HOST_PATH" >&2
-  find "$DATA_DIR/base" -maxdepth 2 -type f | sort | tail -n 50 >&2 || true
+  docker run --rm \
+    --entrypoint /bin/sh \
+    -v "$DATA_DIR:/mnt/pgdata:ro" \
+    postgres:17-bookworm \
+    -c "find /mnt/pgdata/base -maxdepth 2 -type f | sort | tail -n 50" >&2 || true
   exit 1
 fi
 
 echo "pg_relation_filepath(public.demo_rows)=$RELATIVE_PATH"
 echo "host_path=$HOST_PATH"
+echo "relation_proof_method=$RELATION_PROOF_METHOD"

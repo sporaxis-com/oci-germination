@@ -26,7 +26,7 @@ The critical next release target remains:
 
 ## One-Line Launch
 
-Versioned launch:
+Latest launch:
 
 ```bash
 docker run --rm -d \
@@ -34,7 +34,7 @@ docker run --rm -d \
   -e PGDATA=/var/lib/postgresql/data \
   -v "$PWD/ociger-core-pg17-data:/var/lib/postgresql/data" \
   -p 15432:5432 \
-  ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.1
+  ghcr.io/sporaxis-com/ociger-core-pg17-min:latest
 ```
 
 Then connect from the host:
@@ -48,6 +48,7 @@ Notes:
 - Host port `15432` avoids clobbering an existing local `5432`.
 - Current defaults are for local/dev use, not production hardening.
 - The image initializes its data directory on first boot if `PGDATA` is empty.
+- Replace `:latest` with any `core-pg17-vX.Y.Z` tag when you want a pinned release.
 
 ## Current Core Specification
 
@@ -216,8 +217,8 @@ Manual release example:
 
 ```bash
 git push origin main
-git tag core-pg17-v0.1.1
-git push origin core-pg17-v0.1.1
+git tag core-pg17-vX.Y.Z
+git push origin core-pg17-vX.Y.Z
 ```
 
 ## Why No Compose
