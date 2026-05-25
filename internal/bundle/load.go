@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,5 +16,6 @@ func Load(path string) (Spec, error) {
 	}
 
 	err = yaml.Unmarshal(data, &spec)
+	spec.BundleDir = filepath.ToSlash(filepath.Dir(path))
 	return spec, err
 }

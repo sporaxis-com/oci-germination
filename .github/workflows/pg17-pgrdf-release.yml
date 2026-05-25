@@ -1,4 +1,4 @@
-name: core-pg17-release
+name: pg17-pgrdf-release
 
 on:
   pull_request:
@@ -6,9 +6,9 @@ on:
     branches:
       - main
     tags:
-      - core-pg17-v*
+      - pg17-pgrdf-v*
   schedule:
-    - cron: '17 4 * * *'
+    - cron: '29 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: core-pg17-${{ github.ref }}
+  group: pg17-pgrdf-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -43,14 +43,14 @@ jobs:
       - name: Verify generated files are committed
         run: git diff --exit-code -- bundles/
 
-      - name: Build native smoke image
-        run: bash scripts/build-core-pg17.sh
+      - name: Build native pgRDF image
+        run: bash scripts/build-pg17-pgrdf.sh
 
-      - name: Smoke test native image
-        run: bash scripts/smoke-core-pg17.sh
+      - name: Smoke test native pgRDF image
+        run: bash scripts/smoke-pg17-pgrdf.sh
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-pg17-v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pg17-pgrdf-v')
     needs: verify
     runs-on: ubuntu-24.04
     steps:
@@ -78,18 +78,18 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
-          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-core-pg17-min" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-pg17-pgrdf" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME#pg17-pgrdf-}" >> "$GITHUB_OUTPUT"
 
       - name: Publish multi-arch image
         run: |
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file bundles/core-pg17/Dockerfile \
+            --file bundles/bundle-pg17-pgrdf/Dockerfile \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=${{ steps.meta.outputs.tag }}" \
-            --label "org.opencontainers.image.description=Minimal embedded PostgreSQL 17 runtime" \
+            --label "org.opencontainers.image.description=PostgreSQL 17 with pgRDF installed from upstream release artifacts" \
             --tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" \
             --tag "${{ steps.meta.outputs.image }}:latest" \
             --provenance=false \
@@ -102,7 +102,7 @@ jobs:
       - name: Make GHCR package public
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/ensure-ghcr-public.sh ociger-core-pg17-min
+        run: bash scripts/ensure-ghcr-public.sh ociger-pg17-pgrdf
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -114,9 +114,16 @@ jobs:
 
             ```bash
             docker run --rm -d \
-              --name ociger-core-pg17 \
+              --name ociger-pg17-pgrdf \
               -e PGDATA=/var/lib/postgresql/data \
-              -v "$PWD/ociger-core-pg17-data:/var/lib/postgresql/data" \
-              -p 15432:5432 \
+              -v "$PWD/ociger-pg17-pgrdf-data:/var/lib/postgresql/data" \
+              -p 15433:5432 \
               ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ```
+
+            Then:
+
+            ```bash
+            psql -h 127.0.0.1 -p 15433 -U postgres -d postgres \
+              -c 'CREATE EXTENSION pgrdf; SELECT pgrdf.version();'
             ```

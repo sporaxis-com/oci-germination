@@ -1,0 +1,15 @@
+name: bundle-pg17-pgrdf
+description: PostgreSQL 17 with pgRDF installed from upstream release artifacts
+image:
+  registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: gcr.io/distroless/base-debian12:latest
+platforms:
+  - linux/amd64
+  - linux/arm64
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-pg17-pgrdf-smoke/pgdata
+  network: ociger-pg17-pgrdf-net
+  container: ociger-pg17-pgrdf-smoke

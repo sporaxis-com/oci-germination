@@ -19,6 +19,21 @@ COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
+{{- if isPGRDF . }}
+FROM alpine:3.20 AS pgrdf_fetch
+ARG TARGETARCH
+RUN apk add --no-cache curl tar
+WORKDIR /work
+RUN set -eux; \
+  case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
+  curl -fsSL -o /tmp/pgrdf.tar.gz "https://github.com/styk-tv/pgRDF/releases/download/v0.5.1/pgrdf-0.5.1-pg{{ .Image.PGMajor }}-glibc-${TARGETARCH}.tar.gz"; \
+  mkdir -p /out; \
+  tar -xzf /tmp/pgrdf.tar.gz -C /out --strip-components=1; \
+  test -s /out/lib/pgrdf.so; \
+  test -s /out/share/extension/pgrdf.control; \
+  test -s /out/share/extension/pgrdf--0.5.1.sql
+{{ end }}
+
 FROM {{ .Image.BaseImage }} AS postgres_source
 RUN set -eux; \
   mkdir -p /out/bin /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql; \
@@ -30,6 +45,10 @@ RUN set -eux; \
   cp /etc/group /out/etc/group; \
   ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
+{{- if isPGRDF . }}
+COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgrdf.so
+COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/
+{{ end }}
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data
@@ -40,12 +59,12 @@ ENTRYPOINT ["/usr/local/bin/ociger-pg-launcher"]
 `
 
 const bakeTemplate = `group "default" {
-  targets = ["core-pg17"]
+  targets = ["{{ .Name }}"]
 }
 
-target "core-pg17" {
+target "{{ .Name }}" {
   context = "."
-  dockerfile = "bundles/core-pg17/Dockerfile"
+  dockerfile = "{{ .BundleDir }}/Dockerfile"
   tags = ["{{ .Image.Registry }}:dev"]
   platforms = [{{ range $i, $p := .Platforms }}{{ if $i }}, {{ end }}"{{ $p }}"{{ end }}]
 }
@@ -89,7 +108,11 @@ func Write(spec Spec, dockerfilePath string, bakePath string) error {
 }
 
 func executeTemplate(source string, spec Spec) (string, error) {
-	tpl, err := template.New("tpl").Parse(source)
+	tpl, err := template.New("tpl").Funcs(template.FuncMap{
+		"isPGRDF": func(spec Spec) bool {
+			return spec.Name == "bundle-pg17-pgrdf"
+		},
+	}).Parse(source)
 	if err != nil {
 		return "", err
 	}

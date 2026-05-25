@@ -20,6 +20,16 @@ The current shipped layer is `core-pg17-min`:
 - verified local bind-mount persistence
 - generator-driven Dockerfile and Bake output from `bundles/core-pg17/bundle.yaml`
 
+The next verified slice is `bundle-pg17-pgrdf`:
+
+- PostgreSQL 17 with `pgRDF v0.5.1` installed from upstream release artifacts
+- local smoke verified on `linux/arm64`
+- verified SQL version surfaces:
+  - `pg_available_extensions.default_version`
+  - `pg_extension.extversion`
+  - `pgrdf.version()`
+- generator-driven Dockerfile and Bake output from `bundles/bundle-pg17-pgrdf/bundle.yaml`
+
 The critical next release target remains:
 
 - `pg17 + pgRDF + pgCK` in one runnable bundle image
@@ -113,7 +123,7 @@ That is the current proof that data written by the container lands in the host-m
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `core-pg17-min` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 | extract runtime from `postgres:17-bookworm` into distroless final image | `139.5 MiB` uncompressed, `53.1 MiB` compressed local archive | active |
 | `core-pg17-debug` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 | larger debug/control image for inspection and diffing | TBD | planned |
-| `bundle-pg17-pgrdf` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 + `pgRDF` | pull upstream `pgRDF` OCI artifact during build | TBD | planned |
+| `bundle-pg17-pgrdf` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 + `pgRDF` | install pinned `pgRDF` release tarball during build; OCI source remains the intended follow-up once the anonymous artifact ref is confirmed | TBD | local smoke verified |
 | `bundle-pg17-pgrdf-pgck` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 + `pgRDF` + `pgCK` | pull upstream `pgRDF` and `pgCK` OCI artifacts during build | TBD | critical goal |
 | `bundle-index` | OCI index / artifact | no | n/a | bundle metadata only | future OCI root manifest for materialization | TBD | planned |
 
@@ -134,7 +144,7 @@ That is the current proof that data written by the container lands in the host-m
 | Artifact | First Boot | Auth Default | Persistence | Local Smoke Path | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `core-pg17-min` | runs `initdb` when `PGDATA` is empty | `trust` for zero-config local startup | bind mount verified | `bash scripts/smoke-core-pg17.sh` | local/dev only |
-| `bundle-pg17-pgrdf` | same pattern | TBD | planned | TBD | extension creation to be added |
+| `bundle-pg17-pgrdf` | runs `initdb` when `PGDATA` is empty | `trust` for zero-config local startup | bind mount available | `bash scripts/smoke-pg17-pgrdf.sh` | smoke proves `pg_available_extensions`, `pg_extension.extversion`, and `pgrdf.version()` all report `0.5.1` after `CREATE EXTENSION pgrdf` |
 | `bundle-pg17-pgrdf-pgck` | same pattern | TBD | planned | TBD | must be ready-to-go on first launch |
 
 ## Security Posture
@@ -158,7 +168,10 @@ Key files:
 - `cmd/ociger-pg-launcher/main.go`: first-boot launcher
 - `scripts/build-core-pg17.sh`: native-platform local build
 - `scripts/smoke-core-pg17.sh`: contained smoke test with host persistence proof
+- `scripts/build-pg17-pgrdf.sh`: native-platform local build for the `pgRDF` bundle
+- `scripts/smoke-pg17-pgrdf.sh`: contained smoke test for `pgRDF` version visibility
 - `.github/workflows/core-pg17-release.yml`: CI and GHCR publish workflow
+- `.github/workflows/pg17-pgrdf-release.yml`: CI and GHCR publish workflow for the `pgRDF` bundle
 
 ## Local Development
 
@@ -174,10 +187,31 @@ Build the local image for the native Docker architecture:
 bash scripts/build-core-pg17.sh
 ```
 
+Build the local `pgRDF` variant for the native Docker architecture:
+
+```bash
+bash scripts/build-pg17-pgrdf.sh
+```
+
 Run the full persistence smoke test:
 
 ```bash
 bash scripts/smoke-core-pg17.sh
+```
+
+Run the `pgRDF` version smoke test:
+
+```bash
+bash scripts/smoke-pg17-pgrdf.sh
+```
+
+Expected output:
+
+```text
+CREATE EXTENSION
+pg_available_extensions.default_version=0.5.1
+pg_extension.extversion=0.5.1
+pgrdf.version()=0.5.1
 ```
 
 If you need to force a specific local build platform:
@@ -201,6 +235,7 @@ The release workflow is tag-driven.
 Workflow trigger:
 
 - push a tag matching `core-pg17-v*`
+- push a tag matching `pg17-pgrdf-v*`
 
 What the workflow does:
 
@@ -218,7 +253,9 @@ Manual release example:
 ```bash
 git push origin main
 git tag core-pg17-vX.Y.Z
+git tag pg17-pgrdf-vX.Y.Z
 git push origin core-pg17-vX.Y.Z
+git push origin pg17-pgrdf-vX.Y.Z
 ```
 
 ## Why No Compose

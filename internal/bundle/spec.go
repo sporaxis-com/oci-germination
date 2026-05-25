@@ -3,6 +3,7 @@ package bundle
 type Spec struct {
 	Name        string    `yaml:"name"`
 	Description string    `yaml:"description"`
+	BundleDir   string    `yaml:"-"`
 	Image       ImageSpec `yaml:"image"`
 	Platforms   []string  `yaml:"platforms"`
 	Local       LocalSpec `yaml:"local"`

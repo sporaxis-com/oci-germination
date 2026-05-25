@@ -13,10 +13,10 @@ patch_visibility() {
   local accept="$1"
 
   gh api \
-    --method PATCH \
+    --method PUT \
     -H "Accept: ${accept}" \
     -H "X-GitHub-Api-Version: 2026-03-10" \
-    "/orgs/${OWNER}/packages/container/${PACKAGE_NAME}" \
+    "/orgs/${OWNER}/packages/container/${PACKAGE_NAME}/visibility" \
     -f visibility=public
 }
 
