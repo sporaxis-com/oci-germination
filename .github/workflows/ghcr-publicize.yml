@@ -1,0 +1,24 @@
+name: ghcr-publicize
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: GHCR container package name
+        required: true
+        default: ociger-core-pg17-min
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publicize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make GHCR package public
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ensure-ghcr-public.sh "${{ github.event.inputs.package }}"
