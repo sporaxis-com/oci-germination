@@ -112,3 +112,57 @@ func TestRenderPGRDFBundle(t *testing.T) {
 		t.Fatalf("Bake output missing pgrdf Dockerfile path:\n%s", bake)
 	}
 }
+
+func TestRenderPGRDFPGCKBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "bundle-pg17-pgrdf-pgck",
+		Description: "PostgreSQL 17 with pgRDF and pgCK installed from upstream published artifacts",
+		BundleDir:   "bundles/bundle-pg17-pgrdf-pgck",
+		Image: ImageSpec{
+			Registry:   "ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck",
+			PGMajor:    17,
+			BaseImage:  "postgres:17-bookworm",
+			FinalImage: "gcr.io/distroless/base-debian12:latest",
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-pg17-pgrdf-pgck-smoke/pgdata",
+			Network:   "ociger-pg17-pgrdf-pgck-net",
+			Container: "ociger-pg17-pgrdf-pgck-smoke",
+		},
+	}
+
+	df, bake, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	if !strings.Contains(df, "FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch") {
+		t.Fatalf("Dockerfile missing pgck fetch stage:\n%s", df)
+	}
+
+	if !strings.Contains(df, `/bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.1.2-pg17-${TARGETARCH}"`) {
+		t.Fatalf("Dockerfile missing pgck oras pull:\n%s", df)
+	}
+
+	if !strings.Contains(df, "COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so") {
+		t.Fatalf("Dockerfile missing pgck shared library copy:\n%s", df)
+	}
+
+	if !strings.Contains(df, "COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/17/extension/") {
+		t.Fatalf("Dockerfile missing pgck extension directory copy:\n%s", df)
+	}
+
+	if !strings.Contains(df, "ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck") {
+		t.Fatalf("Dockerfile missing pgck preload environment:\n%s", df)
+	}
+
+	if !strings.Contains(bake, `target "bundle-pg17-pgrdf-pgck"`) {
+		t.Fatalf("Bake output missing pgck target name:\n%s", bake)
+	}
+
+	if !strings.Contains(bake, `dockerfile = "bundles/bundle-pg17-pgrdf-pgck/Dockerfile"`) {
+		t.Fatalf("Bake output missing pgck Dockerfile path:\n%s", bake)
+	}
+}

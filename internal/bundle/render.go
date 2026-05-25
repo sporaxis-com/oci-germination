@@ -19,7 +19,7 @@ COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
-{{- if isPGRDF . }}
+{{- if includesPGRDF . }}
 FROM alpine:3.20 AS pgrdf_fetch
 ARG TARGETARCH
 RUN apk add --no-cache curl tar
@@ -33,6 +33,18 @@ RUN set -eux; \
   test -s /out/share/extension/pgrdf.control; \
   test -s /out/share/extension/pgrdf--0.5.1.sql
 {{ end }}
+{{- if includesPGCK . }}
+
+FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
+ARG TARGETARCH
+WORKDIR /work
+RUN set -eux; \
+  case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.1.2-pg{{ .Image.PGMajor }}-${TARGETARCH}"; \
+  test -s /work/lib/pgck.so; \
+  test -s /work/share/extension/pgck.control; \
+  test -s /work/share/extension/pgck--0.1.2.sql
+{{ end }}
 
 FROM {{ .Image.BaseImage }} AS postgres_source
 RUN set -eux; \
@@ -45,13 +57,20 @@ RUN set -eux; \
   cp /etc/group /out/etc/group; \
   ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
-{{- if isPGRDF . }}
+{{- if includesPGRDF . }}
 COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgrdf.so
 COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/
+{{ end }}
+{{- if includesPGCK . }}
+COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgck.so
+COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/
 {{ end }}
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data
+{{- if includesPGCK . }}
+ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck
+{{ end }}
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
 VOLUME ["/var/lib/postgresql/data"]
@@ -109,8 +128,11 @@ func Write(spec Spec, dockerfilePath string, bakePath string) error {
 
 func executeTemplate(source string, spec Spec) (string, error) {
 	tpl, err := template.New("tpl").Funcs(template.FuncMap{
-		"isPGRDF": func(spec Spec) bool {
-			return spec.Name == "bundle-pg17-pgrdf"
+		"includesPGRDF": func(spec Spec) bool {
+			return spec.Name == "bundle-pg17-pgrdf" || spec.Name == "bundle-pg17-pgrdf-pgck"
+		},
+		"includesPGCK": func(spec Spec) bool {
+			return spec.Name == "bundle-pg17-pgrdf-pgck"
 		},
 	}).Parse(source)
 	if err != nil {

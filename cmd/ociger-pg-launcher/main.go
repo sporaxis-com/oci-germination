@@ -60,7 +60,8 @@ func main() {
 		appendFile(filepath.Join(pgData, "pg_hba.conf"), "host all all all trust\n")
 	}
 
-	dropPrivilegesAndExec(runUID, runGID, bin("postgres"), "-D", pgData)
+	args := launcher.PostgresArgs(pgData, os.Getenv("OCIGER_SHARED_PRELOAD_LIBRARIES"))
+	dropPrivilegesAndExec(runUID, runGID, args[0], args[1:]...)
 }
 
 func bin(name string) string {
