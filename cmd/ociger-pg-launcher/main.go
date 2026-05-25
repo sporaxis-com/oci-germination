@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+
+	"github.com/sporaxis-com/oci-germination/internal/launcher"
 )
 
 const (
@@ -24,11 +26,29 @@ func main() {
 	must(os.MkdirAll(socketDir, 0o775))
 	must(os.Chmod(pgData, 0o700))
 	must(os.Chmod(socketDir, 0o775))
-	must(os.Chown(pgData, postgresUID, postgresGID))
-	must(os.Chown(socketDir, postgresUID, postgresGID))
+
+	stat, err := os.Stat(pgData)
+	must(err)
+	sysStat, ok := stat.Sys().(*syscall.Stat_t)
+	if !ok {
+		log.Fatal("pgdata stat did not expose unix ownership")
+	}
+
+	runUID, runGID, err := launcher.SelectIdentity(
+		postgresUID,
+		postgresGID,
+		int(sysStat.Uid),
+		int(sysStat.Gid),
+		os.Chown(pgData, postgresUID, postgresGID),
+	)
+	must(err)
+	must(os.Chown(socketDir, runUID, runGID))
+	must(launcher.EnsureIdentityFiles("/etc/passwd", "/etc/group", runUID, runGID))
 
 	if _, err := os.Stat(filepath.Join(pgData, "PG_VERSION")); os.IsNotExist(err) {
 		runAsPostgres(
+			runUID,
+			runGID,
 			bin("initdb"),
 			"-D", pgData,
 			"--username=postgres",
@@ -40,22 +60,22 @@ func main() {
 		appendFile(filepath.Join(pgData, "pg_hba.conf"), "host all all all trust\n")
 	}
 
-	dropPrivilegesAndExec(bin("postgres"), "-D", pgData)
+	dropPrivilegesAndExec(runUID, runGID, bin("postgres"), "-D", pgData)
 }
 
 func bin(name string) string {
 	return filepath.Join("/usr/lib/postgresql", pgMajor, "bin", name)
 }
 
-func runAsPostgres(name string, args ...string) {
+func runAsPostgres(uid int, gid int, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{
-			Uid: postgresUID,
-			Gid: postgresGID,
+			Uid: uint32(uid),
+			Gid: uint32(gid),
 		},
 	}
 	if err := cmd.Run(); err != nil {
@@ -63,10 +83,10 @@ func runAsPostgres(name string, args ...string) {
 	}
 }
 
-func dropPrivilegesAndExec(name string, args ...string) {
-	must(syscall.Setgroups([]int{postgresGID}))
-	must(syscall.Setgid(postgresGID))
-	must(syscall.Setuid(postgresUID))
+func dropPrivilegesAndExec(uid int, gid int, name string, args ...string) {
+	must(syscall.Setgroups([]int{gid}))
+	must(syscall.Setgid(gid))
+	must(syscall.Setuid(uid))
 	must(syscall.Exec(name, append([]string{name}, args...), os.Environ()))
 }
 

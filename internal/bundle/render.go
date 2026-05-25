@@ -14,18 +14,22 @@ FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS launcher_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
+COPY go.sum ./
 COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
+COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
 FROM {{ .Image.BaseImage }} AS postgres_source
 RUN set -eux; \
-  mkdir -p /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql; \
+  mkdir -p /out/bin /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql; \
+  cp -L /bin/sh /out/bin/sh; \
   cp -a /usr/lib/postgresql/{{ .Image.PGMajor }} /out/usr/lib/postgresql/; \
   cp -a /usr/share/postgresql/{{ .Image.PGMajor }} /out/usr/share/postgresql/; \
+  cp -L /usr/share/postgresql/postgresql.conf.sample /out/usr/share/postgresql/postgresql.conf.sample; \
   cp /etc/passwd /out/etc/passwd; \
   cp /etc/group /out/etc/group; \
-  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | awk '/=> \\/|^\\// {print $(NF-1)}' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | awk '/=> \\/|^\\// {print $(NF-1)}' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data

@@ -37,6 +37,22 @@ func TestRenderCoreBundle(t *testing.T) {
 		t.Fatalf("Dockerfile missing launcher copy:\n%s", df)
 	}
 
+	if !strings.Contains(df, "COPY go.sum ./") {
+		t.Fatalf("Dockerfile missing go.sum copy:\n%s", df)
+	}
+
+	if !strings.Contains(df, "COPY internal/launcher ./internal/launcher") {
+		t.Fatalf("Dockerfile missing internal launcher copy:\n%s", df)
+	}
+
+	if !strings.Contains(df, "cp -L /bin/sh /out/bin/sh;") {
+		t.Fatalf("Dockerfile missing dereferenced /bin/sh copy for initdb:\n%s", df)
+	}
+
+	if !strings.Contains(df, "cp -L /usr/share/postgresql/postgresql.conf.sample /out/usr/share/postgresql/postgresql.conf.sample;") {
+		t.Fatalf("Dockerfile missing root postgresql.conf.sample copy for initdb:\n%s", df)
+	}
+
 	if !strings.Contains(bake, "linux/amd64") || !strings.Contains(bake, "linux/arm64") {
 		t.Fatalf("Bake output missing platforms:\n%s", bake)
 	}
