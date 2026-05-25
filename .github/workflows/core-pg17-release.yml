@@ -99,7 +99,8 @@ jobs:
       - name: Inspect published image
         run: docker buildx imagetools inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
 
-      - name: Make GHCR package public
+      - name: Attempt to make GHCR package public
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/ensure-ghcr-public.sh ociger-core-pg17-min
