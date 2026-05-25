@@ -1,42 +1,43 @@
 # OCI Germination
 
-`oci-germination` is a public experiment in building very small OCI-delivered PostgreSQL bundles without rebuilding upstream extension projects here.
+`oci-germination` publishes small OCI PostgreSQL bundles without rebuilding upstream extension projects in this repo.
 
-The immediate release target is a three-part bundle:
+Current public releases:
 
-1. PostgreSQL 17 as a minimal embedded runtime
-2. `pgRDF` consumed as an upstream OCI artifact
-3. `pgCK` consumed as an upstream OCI artifact
+- `core-pg17` — minimal PostgreSQL 17 runtime
+- `pg17-pgrdf` — PostgreSQL 17 + `pgRDF 0.5.1`
 
-This repo owns the assembly surface, size discipline, release pipeline, and documentation. It does **not** own the `pgRDF` or `pgCK` build pipelines.
+Next target:
 
-## Current Status
+- `pg17-pgrdf-pgck` — PostgreSQL 17 + `pgRDF` + `pgCK`
 
-The current shipped layer is `core-pg17-min`:
+## Published Images
 
-- PostgreSQL 17 extracted from `postgres:17-bookworm`
-- distroless final image based on `gcr.io/distroless/base-debian12:latest`
-- tiny Go launcher for first-boot `initdb`
-- verified local bind-mount persistence
-- generator-driven Dockerfile and Bake output from `bundles/core-pg17/bundle.yaml`
+All published images are multi-arch manifest lists for `linux/amd64` and `linux/arm64`.
 
-The next verified slice is `bundle-pg17-pgrdf`:
+| Bundle | OCI image | GitHub release | Platforms | Verified behavior |
+| --- | --- | --- | --- | --- |
+| `core-pg17` | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2` | `core-pg17-v0.1.2` | `amd64`, `arm64` | boots, initializes `PGDATA`, creates DB/table/row, proves relation file on host bind mount |
+| `pg17-pgrdf` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1` | `pg17-pgrdf-v0.1.1` | `amd64`, `arm64` | `CREATE EXTENSION pgrdf`; `pg_available_extensions.default_version=0.5.1`; `pg_extension.extversion=0.5.1`; `pgrdf.version()=0.5.1` |
 
-- PostgreSQL 17 with `pgRDF v0.5.1` installed from upstream release artifacts
-- local smoke verified on `linux/arm64`
-- verified SQL version surfaces:
-  - `pg_available_extensions.default_version`
-  - `pg_extension.extversion`
-  - `pgrdf.version()`
-- generator-driven Dockerfile and Bake output from `bundles/bundle-pg17-pgrdf/bundle.yaml`
+Pinned manifest digests:
 
-The critical next release target remains:
+- `core-pg17-v0.1.2` → `sha256:bd11e0bc6b39577e1e8e946dc28fcf3a7cea24524472a97c68c408a80ef4e3ac`
+- `pg17-pgrdf:v0.1.1` → `sha256:31e2bdbb34d2ddf3fec609eb748ef9bec0707a019adb386d0d095463abb20d61`
 
-- `pg17 + pgRDF + pgCK` in one runnable bundle image
+## Bundle Chain
+
+| Stage | Inputs | Output | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `core-pg17` | `postgres:17-bookworm` runtime files + distroless final image | `ociger-core-pg17-min` | released | minimal PostgreSQL 17 runtime, no extensions |
+| `pg17-pgrdf` | same minimal PG17 runtime shape + upstream `pgRDF 0.5.1` release artifact | `ociger-pg17-pgrdf` | released | current working extension bundle |
+| `pg17-pgrdf-pgck` | PG17 runtime + `pgRDF` + `pgCK` | pending | next | target triple bundle |
+
+`pg17-pgrdf` is linked to the same minimal PG17 runtime shape as `core-pg17`, then adds the `pgRDF` extension files during the image build. The next bundle adds `pgCK` on top of that sequence.
 
 ## One-Line Launch
 
-Latest launch:
+Run the minimal core image:
 
 ```bash
 docker run --rm -d \
@@ -44,168 +45,50 @@ docker run --rm -d \
   -e PGDATA=/var/lib/postgresql/data \
   -v "$PWD/ociger-core-pg17-data:/var/lib/postgresql/data" \
   -p 15432:5432 \
-  ghcr.io/sporaxis-com/ociger-core-pg17-min:latest
+  ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2
 ```
 
-Then connect from the host:
+Then connect:
 
 ```bash
 psql -h 127.0.0.1 -p 15432 -U postgres -d postgres
 ```
 
-Notes:
-
-- Host port `15432` avoids clobbering an existing local `5432`.
-- Current defaults are for local/dev use, not production hardening.
-- The image initializes its data directory on first boot if `PGDATA` is empty.
-- Replace `:latest` with any `core-pg17-vX.Y.Z` tag when you want a pinned release.
-
-## Current Core Specification
-
-`core-pg17-min` is the first runnable layer in the germination sequence.
-
-Design constraints:
-
-- keep the final runtime close to distroless
-- use ordinary multi-stage Docker builds, not a custom layer assembler
-- generate the Dockerfile and Bake file from a small checked-in bundle spec
-- keep local verification contained to `ociger-`-prefixed resources
-- prepare the build surface so future bundles can pull `pgRDF` and `pgCK` OCI artifacts during image assembly
-
-This repository does **not** rebuild `pgRDF` or `pgCK`. Those stay upstream. This repository will later consume their published OCI artifacts.
-
-## Measured Core Footprint
-
-Verified on local `linux/arm64` Colima on May 25, 2026:
-
-- Uncompressed image size: `146277807` bytes (`139.5 MiB`)
-- Compressed local archive size: `55630530` bytes (`53.1 MiB`)
-- Base source image: `postgres:17-bookworm`
-- Final runtime base: `gcr.io/distroless/base-debian12:latest`
-- PostgreSQL version: `17.10`
-
-These are measured values from actual builds, not estimates.
-
-## Persistence Proof
-
-The local smoke test does all of the following against the built image:
-
-1. boots PostgreSQL in a bind-mounted `PGDATA`
-2. creates database `ociger_demo`
-3. creates table `public.demo_rows`
-4. inserts a row
-5. queries it back
-6. resolves the relation file with `pg_relation_filepath(...)`
-7. confirms the file exists on the host bind mount
-
-Example verification output:
-
-```text
-CREATE DATABASE
-CREATE TABLE
-INSERT 0 1
- id |       note
-----+------------------
-  1 | ociger smoke row
-(1 row)
-
-pg_relation_filepath(public.demo_rows)=base/16384/16385
-host_path=/Users/neoxr/git_sporaxis-com/oci-germination/.artifacts/ociger-core-pg17-smoke/pgdata/base/16384/16385
-```
-
-That is the current proof that data written by the container lands in the host-mounted `PGDATA`.
-
-## Feature Matrix
-
-### Artifact Matrix
-
-| Artifact | Type | Runnable | Platforms | Includes | Source Strategy | Size | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `core-pg17-min` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 | extract runtime from `postgres:17-bookworm` into distroless final image | `139.5 MiB` uncompressed, `53.1 MiB` compressed local archive | active |
-| `core-pg17-debug` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 | larger debug/control image for inspection and diffing | TBD | planned |
-| `bundle-pg17-pgrdf` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 + `pgRDF` | install pinned `pgRDF` release tarball during build; OCI source remains the intended follow-up once the anonymous artifact ref is confirmed | TBD | local smoke verified |
-| `bundle-pg17-pgrdf-pgck` | OCI image | yes | `linux/amd64`, `linux/arm64` | PostgreSQL 17 + `pgRDF` + `pgCK` | pull upstream `pgRDF` and `pgCK` OCI artifacts during build | TBD | critical goal |
-| `bundle-index` | OCI index / artifact | no | n/a | bundle metadata only | future OCI root manifest for materialization | TBD | planned |
-
-### Combination Matrix
-
-| Combination | Runnable Image | Non-Runnable Artifact | Planned Here | Notes |
-| --- | --- | --- | --- | --- |
-| `PG17` | yes | later | yes | current core layer |
-| `PG17 + pgRDF` | yes | yes | yes | next assembly step after core |
-| `PG17 + pgCK` | no | no | no | `pgCK` is not treated as a standalone replacement for `pgRDF` |
-| `PG17 + pgRDF + pgCK` | yes | yes | yes | main bundle goal |
-| `pgRDF` only | no | yes | upstream-owned | consumed here, not built here |
-| `pgCK` only | no | yes | upstream-owned | consumed here, not built here |
-| `Bundle manifest only` | no | yes | yes | future ORAS/OCI descriptor |
-
-### Behavior Matrix
-
-| Artifact | First Boot | Auth Default | Persistence | Local Smoke Path | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `core-pg17-min` | runs `initdb` when `PGDATA` is empty | `trust` for zero-config local startup | bind mount verified | `bash scripts/smoke-core-pg17.sh` | local/dev only |
-| `bundle-pg17-pgrdf` | runs `initdb` when `PGDATA` is empty | `trust` for zero-config local startup | bind mount available | `bash scripts/smoke-pg17-pgrdf.sh` | smoke proves `pg_available_extensions`, `pg_extension.extversion`, and `pgrdf.version()` all report `0.5.1` after `CREATE EXTENSION pgrdf` |
-| `bundle-pg17-pgrdf-pgck` | same pattern | TBD | planned | TBD | must be ready-to-go on first launch |
-
-## Security Posture
-
-Current `core-pg17-min` defaults are intentionally optimized for frictionless local startup:
-
-- `listen_addresses='*'`
-- `host all all all trust`
-- no password required for the default smoke path
-
-That is acceptable for local isolated testing and unacceptable for exposed or shared networks. Treat the current image as a local/dev artifact until passworded startup and stricter auth defaults are added.
-
-## Repository Layout
-
-Key files:
-
-- `bundles/core-pg17/bundle.yaml`: source of truth for the core bundle
-- `bundles/core-pg17/Dockerfile`: generated runtime build
-- `bundles/core-pg17/docker-bake.hcl`: generated Bake config
-- `cmd/ociger-gen/main.go`: generator entrypoint
-- `cmd/ociger-pg-launcher/main.go`: first-boot launcher
-- `scripts/build-core-pg17.sh`: native-platform local build
-- `scripts/smoke-core-pg17.sh`: contained smoke test with host persistence proof
-- `scripts/build-pg17-pgrdf.sh`: native-platform local build for the `pgRDF` bundle
-- `scripts/smoke-pg17-pgrdf.sh`: contained smoke test for `pgRDF` version visibility
-- `.github/workflows/core-pg17-release.yml`: CI and GHCR publish workflow
-- `.github/workflows/pg17-pgrdf-release.yml`: CI and GHCR publish workflow for the `pgRDF` bundle
-
-## Local Development
-
-Generate the bundle outputs:
+Run the `pgRDF` bundle:
 
 ```bash
-bash scripts/generate.sh
+docker run --rm -d \
+  --name ociger-pg17-pgrdf \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-pg17-pgrdf-data:/var/lib/postgresql/data" \
+  -p 15433:5432 \
+  ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1
 ```
 
-Build the local image for the native Docker architecture:
+Then verify the extension surface:
 
 ```bash
-bash scripts/build-core-pg17.sh
+psql -h 127.0.0.1 -p 15433 -U postgres -d postgres \
+  -c 'CREATE EXTENSION pgrdf; SELECT pgrdf.version();'
 ```
 
-Build the local `pgRDF` variant for the native Docker architecture:
+## Verification
 
-```bash
-bash scripts/build-pg17-pgrdf.sh
-```
-
-Run the full persistence smoke test:
+Core proof:
 
 ```bash
 bash scripts/smoke-core-pg17.sh
+bash scripts/smoke-core-pg17.sh ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2
 ```
 
-Run the `pgRDF` version smoke test:
+`pgRDF` proof:
 
 ```bash
 bash scripts/smoke-pg17-pgrdf.sh
+bash scripts/smoke-pg17-pgrdf.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1
 ```
 
-Expected output:
+Expected `pgRDF` smoke output:
 
 ```text
 CREATE EXTENSION
@@ -214,39 +97,58 @@ pg_extension.extversion=0.5.1
 pgrdf.version()=0.5.1
 ```
 
-If you need to force a specific local build platform:
+Measured core footprint:
+
+- uncompressed image size: `146277807` bytes (`139.5 MiB`)
+- compressed local archive size: `55630530` bytes (`53.1 MiB`)
+
+No bundled `pgRDF` size is claimed here yet because it has not been measured and recorded the same way.
+
+## Local Development
+
+Generate bundle outputs:
+
+```bash
+bash scripts/generate.sh
+```
+
+Build locally:
+
+```bash
+bash scripts/build-core-pg17.sh
+bash scripts/build-pg17-pgrdf.sh
+```
+
+If you need to force a local architecture:
 
 ```bash
 OCI_GER_PLATFORM=linux/amd64 bash scripts/build-core-pg17.sh
+OCI_GER_PLATFORM=linux/amd64 bash scripts/build-pg17-pgrdf.sh
 ```
 
-The local workflow is intentionally contained:
+Local smoke resources stay contained to `ociger-`-prefixed names and `.artifacts/ociger-*` paths.
 
-- container name: `ociger-core-pg17-smoke`
-- network name: `ociger-core-pg17-net`
-- data path: `.artifacts/ociger-core-pg17-smoke/pgdata`
+## Repository Layout
 
-Cleanup logic only removes those exact `ociger-` resources when the ownership label matches this repo's smoke test.
+- `bundles/core-pg17/` — core PostgreSQL bundle spec and generated build files
+- `bundles/bundle-pg17-pgrdf/` — `pgRDF` bundle spec and generated build files
+- `cmd/ociger-gen/` — bundle generator
+- `cmd/ociger-pg-launcher/` — minimal first-boot PostgreSQL launcher
+- `scripts/build-*.sh` — local native-arch image builds
+- `scripts/smoke-*.sh` — contained local and public-image smoke tests
+- `.github/workflows/` — release verification and GHCR publish workflows
 
-## Release Flow
+## Release
 
-The release workflow is tag-driven.
+Release tags:
 
-Workflow trigger:
+- `core-pg17-vX.Y.Z`
+- `pg17-pgrdf-vX.Y.Z`
 
-- push a tag matching `core-pg17-v*`
-- push a tag matching `pg17-pgrdf-v*`
+Current workflows:
 
-What the workflow does:
-
-1. runs `go test ./...`
-2. regenerates `Dockerfile` and `docker-bake.hcl`
-3. verifies generated files are committed
-4. builds the native smoke image
-5. runs the smoke test
-6. publishes a multi-arch GHCR image for `linux/amd64` and `linux/arm64`
-7. tags the package with both the version tag and `latest`
-8. creates or updates the GitHub release for that tag
+- [core-pg17-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/core-pg17-release.yml)
+- [pg17-pgrdf-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/pg17-pgrdf-release.yml)
 
 Manual release example:
 
@@ -258,44 +160,18 @@ git push origin core-pg17-vX.Y.Z
 git push origin pg17-pgrdf-vX.Y.Z
 ```
 
-## Why No Compose
+## Defaults
 
-This repo deliberately does not use `compose.yaml` as the assembly primitive.
+Current images are optimized for local startup and smoke verification, not exposed production use:
 
-The goals here are:
+- `listen_addresses='*'`
+- `host all all all trust`
+- no password required for the default smoke path
 
-- normal multi-stage Dockerfiles
-- generator-driven bundle configuration
-- OCI-native publication to GHCR
-- future OCI artifact consumption for `pgRDF` and `pgCK`
+Treat the current images as local/dev artifacts until stricter auth defaults are introduced.
 
-Compose may still be useful at the application layer later, but it is not the core bundle definition surface here.
-
-## ORAS and OCI Artifact Roadmap
-
-The longer-term manifest story is:
-
-1. upstream projects publish their own extension artifacts
-2. this repo pulls those OCI artifacts during bundle builds
-3. this repo publishes runnable bundle images
-4. this repo later publishes a higher-level OCI bundle descriptor or image index that points at the runnable and non-runnable parts together
-
-That means:
-
-- no custom low-level layer assembler in this repo
-- standard Docker build mechanics for image construction
-- ORAS/OCI artifact handling for extension inputs and future bundle descriptors
-
-## Upstream References
+## Upstream Inputs
 
 - `pgRDF` repository: `https://github.com/styk-tv/pgRDF`
 - `pgRDF` install docs: `https://pgrdf.styk.tv/v0.5/operations/install`
 - `pgCK` repository: `https://github.com/styk-tv/pgCK`
-
-## Near-Term Roadmap
-
-1. publish and verify `core-pg17-min` from GHCR
-2. consume upstream `pgRDF` OCI artifacts in a generated bundle build
-3. consume upstream `pgCK` OCI artifacts in the same generated bundle build
-4. make the triple bundle ready-to-go on first launch
-5. add a non-runnable OCI bundle descriptor for materialization workflows
