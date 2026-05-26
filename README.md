@@ -2,6 +2,8 @@
 
 `oci-germination` publishes small OCI PostgreSQL bundles without rebuilding upstream extension projects in this repo.
 
+**CI/CD:** New bundle versions are published automatically via GitHub Actions when version tags are pushed (see [CONTRIBUTING.CI.md](CONTRIBUTING.CI.md) for tag convention and publishing workflow).
+
 Current public releases:
 
 - `core-pg17` — minimal PostgreSQL 17 runtime
@@ -33,10 +35,10 @@ All published images are multi-arch manifest lists for `linux/amd64` and `linux/
 | `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
 | `pg17-pgrdf-pgck-nats` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1` | `amd64`, `arm64` | `170.1 / 65.1 MiB` | triple-bundle proof plus NATS core on `4222`, WebSocket on `9222`, and one-image host relation-file proof |
 | `pg17-pgrdf-pgck-nats-micro` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` | `amd64`, `arm64` | `104.5 / 41.3 MiB` | all-in-one proof on the micro runtime line: `pgrdf`, `pgck`, NATS, and host relation-file proof |
-| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0` | `amd64`, `arm64` | `~200 / TBD` | PostgreSQL + extensions + FastAPI web UI on port 8000 + cklib static files at `/cklib/` |
-| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` | `amd64`, `arm64` | `~150 / TBD` | CKP v3.8 all-in-one: pgckweb + cklib + NATS core (4222) + WSS (9222) + supervisor orchestration |
+| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0` | `amd64`, `arm64` | `~200 / TBD` | ✓ Published | PostgreSQL + extensions + FastAPI web UI on port 8000 + cklib static files at `/cklib/` |
+| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` | `amd64`, `arm64` | `~150 / TBD` | ✓ Published | CKP v3.8 all-in-one: pgckweb + cklib + NATS core (4222) + WSS (9222) + supervisor orchestration |
 
-Size values are `uncompressed / compressed` local measurements on `linux/arm64`. New bundles pending multi-platform GHCR push.
+Size values are `uncompressed / compressed` local measurements on `linux/arm64`. New bundles now published to GHCR with multi-platform manifests.
 
 Pinned manifest digests:
 
