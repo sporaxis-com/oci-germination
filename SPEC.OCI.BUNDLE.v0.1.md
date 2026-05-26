@@ -28,23 +28,35 @@ The specification governs:
 
 ---
 
-## 2. Bundle Anatomy
+## 2. Bundle ≠ Image (Critical Distinction)
+
+A **bundle** is a specification file (`bundle.yaml`). An **image** is a published OCI artifact.
+
+```
+SPECIFICATION (in git)          PUBLISHED IMAGES (in registry)
+bundles/bundle-ck-lib-js/       ghcr.io/org/ck-lib-js:1.2.0        (static only)
+├── bundle.yaml                 ghcr.io/org/ck-lib-js-dev:1.2.0    (dev server)
+├── Dockerfile                  ghcr.io/org/ck-lib-js:latest
+└── smoke.sh
+```
+
+One bundle can produce **multiple image artifacts** (e.g., static vs. dev-server variants, or stable vs. micro). Name the images by their **purpose**, not the bundle specification name.
 
 ### 2.1 Directory Structure
 
 Each bundle occupies a directory under `bundles/` with this shape:
 
 ```
-bundles/<bundle-name>/
-├── bundle.yaml                 ← declarative specification (this file is the source of truth)
+bundles/<bundle-type>-<name>/
+├── bundle.yaml                 ← declarative specification (source of truth)
 ├── Dockerfile                  ← generated from bundle.yaml (do not hand-edit)
 └── smoke.sh                    ← optional: local verification script
 ```
 
-The `<bundle-name>` follows the pattern `{core,bundle}-<descriptor>`, e.g.:
-- `core-pg17` — PostgreSQL 17 core (minimal runtime)
-- `bundle-pg17-pgrdf-pgck-nats` — PostgreSQL 17 + pgRDF + pgCK + NATS (all-in-one)
-- `bundle-pg17-pgrdf-pgck-nats-micro` — PostgreSQL 17 + pgRDF + pgCK + NATS (size-optimized)
+Examples:
+- `bundles/core-pg17/` → publishes `ghcr.io/org/ociger-core-pg17:v0.1.0` (spec name anchors the dir, not the image)
+- `bundles/bundle-ck-lib-js/` → publishes `ghcr.io/org/ck-lib-js:1.2.0` (static) + `ghcr.io/org/ck-lib-js-dev:1.2.0` (server)
+- `bundles/bundle-pg17-pgrdf-pgck-nats/` → publishes `ghcr.io/org/ociger-pg17-pgrdf-pgck-nats:v0.1.1` (image name is simplified)
 
 ### 2.2 The `bundle.yaml` Schema
 
@@ -67,19 +79,22 @@ Every bundle is declared in YAML. The canonical schema is defined in `internal/b
 
 ```yaml
 image:
-  registry: ghcr.io/sporaxis-com/ociger-<bundle-name>   # OCI registry + image name (no tag)
-  pg_major: 17                                           # PostgreSQL major version
-  base_image: postgres:17-bookworm                       # Upstream Docker image for build stage
+  registry: ghcr.io/conceptkernel/ck-lib-js             # OCI registry + image name (NO "bundle-" prefix, NO tag)
+  pg_major: 17                                          # PostgreSQL major version (if applicable)
+  base_image: node:20-bookworm                          # Upstream Docker image for build stage
   final_image: gcr.io/distroless/base-debian12:latest   # Distroless base for runtime
-  runtime_profile: stable | micro                        # "stable" (full postgres) or "micro" (stripped)
+  runtime_profile: stable | micro                       # "stable" (full runtime) or "micro" (stripped)
 ```
 
 **Semantics:**
-- `registry`: Full registry path and image name, without the tag. The tag is determined at build/release time (e.g., `:v0.1.1`).
-- `pg_major`: The major version of PostgreSQL (e.g., 16, 17). Used to resolve extension compatibility and binary paths.
+- `registry`: Full registry path and image name, **without the tag and without "bundle-" prefix**. 
+  - The bundle directory is `bundles/bundle-ck-lib-js/`, but the image is `ghcr.io/conceptkernel/ck-lib-js`.
+  - The tag is determined at build/release time (e.g., `:1.2.0`, `:dev`, `:latest`).
+  - If you publish multiple variants from one bundle (static vs. dev server), use suffixes in the tag (`:1.2.0` and `:1.2.0-dev`), not in the registry name.
+- `pg_major`: The major version of PostgreSQL (e.g., 16, 17). Optional; used only if the bundle includes PostgreSQL.
 - `base_image`: The upstream Docker image used in the initial build stage. Must be a tagged image on Docker Hub or a compatible registry.
-- `final_image`: The distroless (or minimal) image used as the final base. Typically `gcr.io/distroless/base-debian12:latest`. Kept fixed to minimize attack surface and image size.
-- `runtime_profile`: If `micro`, the build stage performs selective binary/library extraction (see §4.2). If `stable`, all PostgreSQL binaries and libraries are included.
+- `final_image`: The distroless (or minimal) image used as the final base. Kept fixed to minimize attack surface and image size.
+- `runtime_profile`: If `micro`, the build stage performs selective binary/library extraction. If `stable`, all runtime binaries and libraries are included.
 
 #### `extensions` Section (Optional)
 
@@ -347,38 +362,110 @@ This verifies that the published image works identically to the local build (i.e
 
 ### 6.1 Git Tags
 
-Release tags follow this pattern:
+Release tags anchor the bundle **specification** version, not individual image variants:
 
 ```
-<bundle-name>-v<semver>
+<bundle-type>-<name>-v<semver>
 ```
 
 Examples:
-- `pg17-pgrdf-pgck-nats-v0.1.1`
-- `pg17-pgrdf-pgck-nats-micro-v0.1.1`
+- `bundle-ck-lib-js-v1.2.0` (both static and dev-server images publish under this tag)
+- `bundle-pg17-pgrdf-pgck-nats-v0.1.1`
 - `core-pg17-v0.1.0`
 
-Each bundle has its own version series (they are independent). Tags are pushed to the main repository.
+Each bundle has its own version series (they are independent).
 
-### 6.2 OCI Image Tags
+### 6.2 OCI Image Tags & Multi-Variant Publishing
 
-The OCI image itself is tagged:
+The OCI **image** tags may differ from the git tag if you publish multiple variants:
 
-```
-ghcr.io/sporaxis-com/ociger-<bundle-name>:v<semver>
-```
-
-Additionally, **manifests** (multi-platform descriptors) are published to the same tag, allowing `docker pull` to auto-select the correct architecture.
-
-### 6.3 Digests
-
-Each image and manifest publish produces a **digest** (SHA256 hash of the content). Digests are immutable and published in release notes and README.
-
-Example:
+**Single image per bundle:**
 ```
 ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1
-  sha256:8a7e8c42b3557a1b7958006ad42bf53423bd75512a9c3db530dbe0c6ae4f84bf
 ```
+
+**Multiple variants from one bundle (e.g., static + dev-server):**
+```
+ghcr.io/conceptkernel/ck-lib-js:1.2.0           ← static assets (ckp:WebServing)
+ghcr.io/conceptkernel/ck-lib-js:1.2.0-dev       ← dev server (ckp:APIServing)
+ghcr.io/conceptkernel/ck-lib-js:latest          ← stable default
+```
+
+Both images are published from the same `bundle-ck-lib-js-v1.2.0` git tag. Use image tag suffixes (`:1.2.0` vs `:1.2.0-dev`), not separate `registry` entries in bundle.yaml.
+
+### 6.3 Multi-Platform Manifests & Per-Architecture Digests
+
+Each published image includes:
+- **Manifest** (multi-platform descriptor): Lists digests for all architectures (amd64, arm64, etc.). Allows `docker pull` to auto-select the correct architecture.
+- **Per-architecture digest**: SHA256 hash of the image content for that specific platform.
+
+**Correct multi-platform build:**
+```
+ghcr.io/conceptkernel/ck-lib-js:1.2.0
+  Manifest digest: sha256:abc123...
+    ├─ linux/amd64: sha256:def456...
+    └─ linux/arm64: sha256:def456... (SAME — content is identical)
+```
+
+**Broken manifest (CK.Lib.Js issue):**
+```
+$ docker pull ghcr.io/conceptkernel/bundle-ck-lib-js:dev@sha256:b527c7055fbc7... (amd64)
+$ docker pull ghcr.io/conceptkernel/bundle-ck-lib-js:dev@sha256:74e2a7202b8d... (arm64)
+$ docker pull ghcr.io/conceptkernel/bundle-ck-lib-js:dev@sha256:6ec0cdea... (unknown)
+  ↑ BROKEN: Different digests + "unknown" platform = corrupted manifest
+```
+
+**Root cause:** The Dockerfile may have been built separately per-platform instead of in a single `docker buildx build --platform linux/amd64,linux/arm64 --push` invocation. Each invocation created separate images with different content hashes, and the manifest merge failed.
+
+**Fix:** Rebuild with `docker buildx build --platform linux/amd64,linux/arm64 --push` in one command.
+
+---
+
+## 6.4 Publishing Multiple Images from One Bundle
+
+Some bundles may publish multiple image variants (e.g., static assets + development server, or stable + micro runtime profile).
+
+**Pattern: Tag suffixes, not separate registry entries**
+
+```yaml
+# bundle-ck-lib-js/bundle.yaml (ONE bundle)
+name: bundle-ck-lib-js
+description: CK.Lib.Js client library + dev server
+image:
+  registry: ghcr.io/conceptkernel/ck-lib-js  # single base image name
+  node_major: 20
+  base_image: node:20-bookworm
+  final_image: node:20-alpine
+  runtime_profile: stable
+```
+
+```bash
+# Publishes TWO images from the SAME bundle.yaml
+ghcr.io/conceptkernel/ck-lib-js:1.2.0           ← static assets (Dockerfile stage: static)
+ghcr.io/conceptkernel/ck-lib-js:1.2.0-dev       ← dev server (Dockerfile stage: dev)
+ghcr.io/conceptkernel/ck-lib-js:latest          ← points to :1.2.0 (stable default)
+```
+
+The Dockerfile can conditionally build different stages based on build args:
+```dockerfile
+ARG BUILD_TARGET=static  # or "dev"
+
+FROM ... AS static
+RUN ... (copy only HTML/JS/CSS assets)
+
+FROM ... AS dev
+RUN ... (include Node.js dev server)
+
+FROM ${BUILD_TARGET} AS final
+```
+
+Then publish both:
+```bash
+docker buildx build --target static --tag ghcr.io/conceptkernel/ck-lib-js:1.2.0 --push .
+docker buildx build --target dev --tag ghcr.io/conceptkernel/ck-lib-js:1.2.0-dev --push .
+```
+
+**Semantic annotation:** Use the bundle's `services` or `image.runtime_profile` field to document which variant each image represents. Or add a field (e.g., `variants: [static, dev]`) to the bundle.yaml if needed.
 
 ---
 
@@ -388,19 +475,31 @@ ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1
 
 To define a new Sporaxis-Com compatible bundle:
 
-1. **Choose a name** following the pattern `{core,bundle}-<descriptor>`. Examples: `core-pg18`, `bundle-pg17-pgvector-nats`.
+1. **Choose a bundle name** (specification):
+   - Pattern: `{core,bundle}-<descriptor>`
+   - Examples: `core-pg18`, `bundle-pg17-pgvector-nats`, `bundle-ck-lib-js`
+   - This is the **directory name** under `bundles/`
 
-2. **Create directory** under `bundles/`:
+2. **Choose image name(s)** (published artifacts):
+   - **Do NOT prefix with "bundle-"** in the image registry name.
+   - Simplify: `bundle-ck-lib-js` → publishes `ghcr.io/org/ck-lib-js:1.2.0`
+   - Multiple variants: use tag suffixes (`:1.2.0` and `:1.2.0-dev`), not separate image names
+   - Example: `bundle-pg17-pgvector-nats` → `ghcr.io/org/ociger-pg17-pgvector-nats:v0.1.0`
+
+3. **Create directory** under `bundles/`:
    ```bash
-   mkdir -p bundles/<bundle-name>
+   mkdir -p bundles/<bundle-spec-name>
    ```
 
-3. **Write `bundle.yaml`**:
+4. **Write `bundle.yaml`**:
    - Fill in all required top-level fields (`name`, `description`, `image`, `platforms`, `local`).
+   - `name` = the bundle specification name (matches directory)
+   - `image.registry` = the **image registry path** (NOT the bundle name). Examples:
+     - `ghcr.io/conceptkernel/ck-lib-js` (not `bundle-ck-lib-js`)
+     - `ghcr.io/sporaxis-com/ociger-pg17-pgvector-nats` (simplified, not `bundle-pg17...`)
    - Declare extensions if needed (`extensions.pgrdf.*`, `extensions.pgck.*`).
    - Declare services if needed (`services.nats.*`).
-   - Ensure `image.pg_major` matches the PostgreSQL version in `image.base_image`.
-   - Ensure `image.registry` is fully qualified (no tag).
+   - Ensure `image.registry` is fully qualified (no tag, no "bundle-" prefix).
    - Ensure `platforms` includes both `linux/amd64` and `linux/arm64`.
 
 4. **Render the Dockerfile**:
