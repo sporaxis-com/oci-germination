@@ -55,6 +55,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tagged commit is on main history
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+            echo "refusing to publish tag outside origin/main history: $GITHUB_SHA" >&2
+            exit 1
+          fi
 
       - uses: actions/setup-go@v5
         with:
