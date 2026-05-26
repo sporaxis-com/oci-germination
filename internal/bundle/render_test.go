@@ -329,3 +329,38 @@ func TestRenderCorePG17NATSMicroBundle(t *testing.T) {
 
 	assertMicroRuntimeContract(t, df)
 }
+
+func TestRenderRejectsNATSPortMismatch(t *testing.T) {
+	spec := Spec{
+		Name:        "core-pg17-nats",
+		Description: "Minimal embedded PostgreSQL 17 runtime with NATS",
+		BundleDir:   "bundles/core-pg17-nats",
+		Image: ImageSpec{
+			Registry:   "ghcr.io/sporaxis-com/ociger-core-pg17-nats",
+			PGMajor:    17,
+			BaseImage:  "postgres:17-bookworm",
+			FinalImage: "gcr.io/distroless/base-debian12:latest",
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+			{Name: "nats", ContainerPort: 4222},
+		},
+		Services: ServiceSpec{
+			NATS: &NATSServiceSpec{
+				SourceImage:   "nats:2.14.1-scratch",
+				CorePort:      4222,
+				WebSocketPort: 9222,
+				JetStream:     false,
+			},
+		},
+	}
+
+	_, _, err := Render(spec)
+	if err == nil {
+		t.Fatal("Render returned nil error for mismatched NATS ports")
+	}
+	if !strings.Contains(err.Error(), "nats") || !strings.Contains(err.Error(), "9222") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

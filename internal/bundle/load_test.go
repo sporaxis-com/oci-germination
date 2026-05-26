@@ -3,6 +3,7 @@ package bundle
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -89,5 +90,38 @@ local:
 
 	if !spec.Services.NATS.JetStream {
 		t.Fatal("expected jetstream to be enabled")
+	}
+}
+
+func TestLoadRejectsUnknownRuntimeProfile(t *testing.T) {
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "bundle.yaml")
+	data := []byte(`
+name: core-pg17-weird
+description: PostgreSQL 17 runtime with unsupported profile
+image:
+  registry: ghcr.io/sporaxis-com/ociger-core-pg17-weird
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: scratch
+  runtime_profile: tiny
+platforms:
+  - linux/amd64
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-core-pg17-weird-smoke/pgdata
+  network: ociger-core-pg17-weird-net
+  container: ociger-core-pg17-weird-smoke
+`)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("Load returned nil error for invalid runtime profile")
+	}
+	if !strings.Contains(err.Error(), "runtime profile") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

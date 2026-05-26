@@ -177,7 +177,10 @@ func Write(spec Spec, dockerfilePath string, bakePath string) error {
 }
 
 func renderAssets(spec Spec) (renderedAssets, error) {
-	spec = normalizeSpec(spec)
+	spec, err := normalizeSpec(spec)
+	if err != nil {
+		return renderedAssets{}, err
+	}
 
 	df, err := executeTemplate(dockerfileTemplate, spec)
 	if err != nil {
@@ -204,12 +207,35 @@ func renderAssets(spec Spec) (renderedAssets, error) {
 	return assets, nil
 }
 
-func normalizeSpec(spec Spec) Spec {
-	if spec.Image.RuntimeProfile == "" {
-		spec.Image.RuntimeProfile = "stable"
+func normalizeSpec(spec Spec) (Spec, error) {
+	profile := strings.ToLower(strings.TrimSpace(spec.Image.RuntimeProfile))
+	if profile == "" {
+		profile = "stable"
+	}
+	if profile != "stable" && profile != "micro" {
+		return spec, fmt.Errorf("invalid runtime profile %q: must be stable or micro", spec.Image.RuntimeProfile)
+	}
+	spec.Image.RuntimeProfile = profile
+
+	if spec.Services.NATS != nil {
+		portSet := make(map[int]struct{}, len(spec.Ports))
+		for _, port := range spec.Ports {
+			portSet[port.ContainerPort] = struct{}{}
+		}
+
+		var missing []string
+		if _, ok := portSet[spec.Services.NATS.CorePort]; !ok {
+			missing = append(missing, fmt.Sprintf("core_port %d", spec.Services.NATS.CorePort))
+		}
+		if _, ok := portSet[spec.Services.NATS.WebSocketPort]; !ok {
+			missing = append(missing, fmt.Sprintf("websocket_port %d", spec.Services.NATS.WebSocketPort))
+		}
+		if len(missing) > 0 {
+			return spec, fmt.Errorf("nats service ports must be present in ports metadata: missing %s", strings.Join(missing, ", "))
+		}
 	}
 
-	return spec
+	return spec, nil
 }
 
 func executeTemplate(source string, spec Spec) (string, error) {
@@ -225,9 +251,6 @@ func executeTemplate(source string, spec Spec) (string, error) {
 		"hasNATS": func(spec Spec) bool {
 			return spec.Services.NATS != nil
 		},
-		"includedProfile": func(spec Spec) string {
-			return strings.ToLower(spec.Image.RuntimeProfile)
-		},
 		"includesPGRDF": func(spec Spec) bool {
 			return spec.Name == "bundle-pg17-pgrdf" || spec.Name == "bundle-pg17-pgrdf-pgck"
 		},
@@ -235,7 +258,7 @@ func executeTemplate(source string, spec Spec) (string, error) {
 			return spec.Name == "bundle-pg17-pgrdf-pgck"
 		},
 		"isMicro": func(spec Spec) bool {
-			return strings.EqualFold(spec.Image.RuntimeProfile, "micro")
+			return spec.Image.RuntimeProfile == "micro"
 		},
 	}).Parse(source)
 	if err != nil {
