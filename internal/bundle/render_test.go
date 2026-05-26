@@ -113,6 +113,11 @@ func TestRenderPGRDFBundle(t *testing.T) {
 			BaseImage:  "postgres:17-bookworm",
 			FinalImage: "gcr.io/distroless/base-debian12:latest",
 		},
+		Extensions: ExtensionSpec{
+			PGRDF: &PGRDFExtensionSpec{
+				Version: "0.5.1",
+			},
+		},
 		Platforms: []string{"linux/amd64", "linux/arm64"},
 		Local: LocalSpec{
 			Prefix:    "ociger-",
@@ -162,6 +167,14 @@ func TestRenderPGRDFPGCKBundle(t *testing.T) {
 			PGMajor:    17,
 			BaseImage:  "postgres:17-bookworm",
 			FinalImage: "gcr.io/distroless/base-debian12:latest",
+		},
+		Extensions: ExtensionSpec{
+			PGRDF: &PGRDFExtensionSpec{
+				Version: "0.5.1",
+			},
+			PGCK: &PGCKExtensionSpec{
+				Version: "0.1.2",
+			},
 		},
 		Platforms: []string{"linux/amd64", "linux/arm64"},
 		Local: LocalSpec{
@@ -354,6 +367,137 @@ func TestRenderCorePG17NATSMicroBundle(t *testing.T) {
 	}
 	if strings.Contains(df, "COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server") {
 		t.Fatalf("Dockerfile should copy nats-server in the final stage only:\n%s", df)
+	}
+
+	assertMicroRuntimeContract(t, df)
+}
+
+func TestRenderPGRDFPGCKNATSBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "bundle-pg17-pgrdf-pgck-nats",
+		Description: "PostgreSQL 17 with pgRDF, pgCK, and NATS",
+		BundleDir:   "bundles/bundle-pg17-pgrdf-pgck-nats",
+		Image: ImageSpec{
+			Registry:   "ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats",
+			PGMajor:    17,
+			BaseImage:  "postgres:17-bookworm",
+			FinalImage: "gcr.io/distroless/base-debian12:latest",
+		},
+		Extensions: ExtensionSpec{
+			PGRDF: &PGRDFExtensionSpec{
+				Version: "0.5.1",
+			},
+			PGCK: &PGCKExtensionSpec{
+				Version: "0.1.2",
+			},
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+			{Name: "nats", ContainerPort: 4222},
+			{Name: "nats-websocket", ContainerPort: 9222},
+		},
+		Services: ServiceSpec{
+			NATS: &NATSServiceSpec{
+				SourceImage:   "nats:2.14.1-scratch",
+				CorePort:      4222,
+				WebSocketPort: 9222,
+				JetStream:     false,
+			},
+		},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-pg17-pgrdf-pgck-nats-smoke/pgdata",
+			Network:   "ociger-pg17-pgrdf-pgck-nats-net",
+			Container: "ociger-pg17-pgrdf-pgck-nats-smoke",
+		},
+	}
+
+	df, _, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	for _, want := range []string{
+		"FROM alpine:3.20 AS pgrdf_fetch",
+		"FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch",
+		"FROM nats:2.14.1-scratch AS nats_source",
+		"COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/17/lib/pgrdf.so",
+		"COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so",
+		"COPY --from=nats_source /nats-server /usr/local/bin/nats-server",
+		"COPY bundles/bundle-pg17-pgrdf-pgck-nats/nats-server.conf /etc/nats/nats-server.conf",
+		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck",
+		"EXPOSE 5432 4222 9222",
+		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("Dockerfile missing %q:\n%s", want, df)
+		}
+	}
+}
+
+func TestRenderPGRDFPGCKNATSMicroBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "bundle-pg17-pgrdf-pgck-nats-micro",
+		Description: "PostgreSQL 17 micro runtime with pgRDF, pgCK, and NATS",
+		BundleDir:   "bundles/bundle-pg17-pgrdf-pgck-nats-micro",
+		Image: ImageSpec{
+			Registry:       "ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro",
+			PGMajor:        17,
+			BaseImage:      "postgres:17-bookworm",
+			FinalImage:     "scratch",
+			RuntimeProfile: "micro",
+		},
+		Extensions: ExtensionSpec{
+			PGRDF: &PGRDFExtensionSpec{
+				Version: "0.5.1",
+			},
+			PGCK: &PGCKExtensionSpec{
+				Version: "0.1.2",
+			},
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+			{Name: "nats", ContainerPort: 4222},
+			{Name: "nats-websocket", ContainerPort: 9222},
+		},
+		Services: ServiceSpec{
+			NATS: &NATSServiceSpec{
+				SourceImage:   "nats:2.14.1-scratch",
+				CorePort:      4222,
+				WebSocketPort: 9222,
+				JetStream:     false,
+			},
+		},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-pg17-pgrdf-pgck-nats-micro-smoke/pgdata",
+			Network:   "ociger-pg17-pgrdf-pgck-nats-micro-net",
+			Container: "ociger-pg17-pgrdf-pgck-nats-micro-smoke",
+		},
+	}
+
+	df, _, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	for _, want := range []string{
+		"FROM alpine:3.20 AS pgrdf_fetch",
+		"FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch",
+		"FROM nats:2.14.1-scratch AS nats_source",
+		"COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/17/lib/pgrdf.so",
+		"COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so",
+		"COPY --from=nats_source /nats-server /usr/local/bin/nats-server",
+		"COPY bundles/bundle-pg17-pgrdf-pgck-nats-micro/nats-server.conf /etc/nats/nats-server.conf",
+		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck",
+		"EXPOSE 5432 4222 9222",
+		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("Dockerfile missing %q:\n%s", want, df)
+		}
 	}
 
 	assertMicroRuntimeContract(t, df)

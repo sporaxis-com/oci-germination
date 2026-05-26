@@ -5,6 +5,7 @@ type Spec struct {
 	Description string      `yaml:"description"`
 	BundleDir   string      `yaml:"-"`
 	Image       ImageSpec   `yaml:"image"`
+	Extensions  ExtensionSpec `yaml:"extensions"`
 	Platforms   []string    `yaml:"platforms"`
 	Ports       []PortSpec  `yaml:"ports"`
 	Services    ServiceSpec `yaml:"services"`
@@ -22,6 +23,19 @@ type ImageSpec struct {
 type PortSpec struct {
 	Name          string `yaml:"name"`
 	ContainerPort int    `yaml:"container_port"`
+}
+
+type ExtensionSpec struct {
+	PGRDF *PGRDFExtensionSpec `yaml:"pgrdf,omitempty"`
+	PGCK  *PGCKExtensionSpec  `yaml:"pgck,omitempty"`
+}
+
+type PGRDFExtensionSpec struct {
+	Version string `yaml:"version"`
+}
+
+type PGCKExtensionSpec struct {
+	Version string `yaml:"version"`
 }
 
 type ServiceSpec struct {

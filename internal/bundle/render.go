@@ -39,12 +39,12 @@ RUN apk add --no-cache curl tar
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  curl -fsSL -o /tmp/pgrdf.tar.gz "https://github.com/styk-tv/pgRDF/releases/download/v0.5.1/pgrdf-0.5.1-pg{{ .Image.PGMajor }}-glibc-${TARGETARCH}.tar.gz"; \
+  curl -fsSL -o /tmp/pgrdf.tar.gz "https://github.com/styk-tv/pgRDF/releases/download/v{{ .Extensions.PGRDF.Version }}/pgrdf-{{ .Extensions.PGRDF.Version }}-pg{{ .Image.PGMajor }}-glibc-${TARGETARCH}.tar.gz"; \
   mkdir -p /out; \
   tar -xzf /tmp/pgrdf.tar.gz -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.5.1.sql
+  test -s /out/share/extension/pgrdf--{{ .Extensions.PGRDF.Version }}.sql
 {{ end }}
 {{- if includesPGCK . }}
 
@@ -53,10 +53,10 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.1.2-pg{{ .Image.PGMajor }}-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:{{ .Extensions.PGCK.Version }}-pg{{ .Image.PGMajor }}-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.1.2.sql
+  test -s /work/share/extension/pgck--{{ .Extensions.PGCK.Version }}.sql
 {{ end }}
 {{- if hasNATS . }}
 
@@ -254,6 +254,13 @@ func normalizeSpec(spec Spec) (Spec, error) {
 		}
 	}
 
+	if spec.Extensions.PGRDF != nil && strings.TrimSpace(spec.Extensions.PGRDF.Version) == "" {
+		return spec, fmt.Errorf("pgrdf version must be set when pgrdf extension is enabled")
+	}
+	if spec.Extensions.PGCK != nil && strings.TrimSpace(spec.Extensions.PGCK.Version) == "" {
+		return spec, fmt.Errorf("pgck version must be set when pgck extension is enabled")
+	}
+
 	return spec, nil
 }
 
@@ -271,10 +278,10 @@ func executeTemplate(source string, spec Spec) (string, error) {
 			return spec.Services.NATS != nil
 		},
 		"includesPGRDF": func(spec Spec) bool {
-			return spec.Name == "bundle-pg17-pgrdf" || spec.Name == "bundle-pg17-pgrdf-pgck"
+			return spec.Extensions.PGRDF != nil
 		},
 		"includesPGCK": func(spec Spec) bool {
-			return spec.Name == "bundle-pg17-pgrdf-pgck"
+			return spec.Extensions.PGCK != nil
 		},
 		"isMicro": func(spec Spec) bool {
 			return spec.Image.RuntimeProfile == "micro"

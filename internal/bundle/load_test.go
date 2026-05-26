@@ -20,6 +20,11 @@ image:
   base_image: postgres:17-bookworm
   final_image: scratch
   runtime_profile: micro
+extensions:
+  pgrdf:
+    version: 0.5.1
+  pgck:
+    version: 0.1.2
 platforms:
   - linux/amd64
 ports:
@@ -52,6 +57,14 @@ local:
 
 	if spec.Image.RuntimeProfile != "micro" {
 		t.Fatalf("runtime profile = %q", spec.Image.RuntimeProfile)
+	}
+
+	if spec.Extensions.PGRDF == nil || spec.Extensions.PGRDF.Version != "0.5.1" {
+		t.Fatalf("pgrdf extension = %#v", spec.Extensions.PGRDF)
+	}
+
+	if spec.Extensions.PGCK == nil || spec.Extensions.PGCK.Version != "0.1.2" {
+		t.Fatalf("pgck extension = %#v", spec.Extensions.PGCK)
 	}
 
 	gotPorts := make(map[string]int, len(spec.Ports))
