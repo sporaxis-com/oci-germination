@@ -12,6 +12,8 @@ Current public releases:
 - `pg17-pgrdf-pgck` — PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2`
 - `pg17-pgrdf-pgck-nats` — PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2` + `nats-server 2.14.1`
 - `pg17-pgrdf-pgck-nats-micro` — smaller PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2` + `nats-server 2.14.1`
+- `pg17-pgrdf-pgck-web-cklib` — PostgreSQL 17 + extensions + FastAPI web UI + cklib (CK.Lib.Js 1.2.0)
+- `ck-allinone` (v3.8-rc2) — all-in-one CKP stack: PostgreSQL 17 + pgRDF + pgCK + pgckweb + cklib + NATS core + WSS bridge + supervisor
 
 Next target:
 
@@ -31,8 +33,10 @@ All published images are multi-arch manifest lists for `linux/amd64` and `linux/
 | `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
 | `pg17-pgrdf-pgck-nats` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1` | `amd64`, `arm64` | `170.1 / 65.1 MiB` | triple-bundle proof plus NATS core on `4222`, WebSocket on `9222`, and one-image host relation-file proof |
 | `pg17-pgrdf-pgck-nats-micro` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` | `amd64`, `arm64` | `104.5 / 41.3 MiB` | all-in-one proof on the micro runtime line: `pgrdf`, `pgck`, NATS, and host relation-file proof |
+| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0` | `amd64`, `arm64` | `~200 / TBD` | PostgreSQL + extensions + FastAPI web UI on port 8000 + cklib static files at `/cklib/` |
+| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` | `amd64`, `arm64` | `~150 / TBD` | CKP v3.8 all-in-one: pgckweb + cklib + NATS core (4222) + WSS (9222) + supervisor orchestration |
 
-Size values are `uncompressed / compressed` local measurements on `linux/arm64`.
+Size values are `uncompressed / compressed` local measurements on `linux/arm64`. New bundles pending multi-platform GHCR push.
 
 Pinned manifest digests:
 
@@ -57,8 +61,12 @@ Pinned manifest digests:
 | `pg17-pgrdf-pgck` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts | `ociger-pg17-pgrdf-pgck` | triple bundle with `pgck` preloaded by default |
 | `pg17-pgrdf-pgck-nats` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats` | all-in-one stable bundle with NATS and both extensions |
 | `pg17-pgrdf-pgck-nats-micro` | `core-pg17-micro` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats-micro` | smaller all-in-one bundle with the same SQL/NATS contract |
+| `pg17-pgrdf-pgck-web-cklib` | `pg17-pgrdf-pgck` runtime shape | FastAPI web server (pgckweb 0.1.0) + cklib (CK.Lib.Js 1.2.0) OCI layer source | `ociger-pg17-pgrdf-pgck-web-cklib` | web UI variant with cklib static files mounted at `/cklib/` |
+| `ck-allinone` (v3.8-rc2) | `pg17-pgrdf-pgck-nats-micro` runtime shape | FastAPI pgckweb 0.1.0 + cklib 1.2.0 + ociger-supervisor for service orchestration | `ociger-ck-allinone` | CKP v3.8 complete stack: all extensions + web UI + NATS WSS bridge + orchestration |
 
 The NATS service layer is reusable: it copies only `nats-server` from `nats:2.14.1-scratch`, renders a minimal config, and starts PostgreSQL plus NATS through the same tiny supervisor. `pg17-pgrdf-pgck-nats` and `pg17-pgrdf-pgck-nats-micro` prove the same pattern can carry both upstream extensions and the colocated message bus in one OCI image.
+
+Web-serving bundles extend the PostgreSQL+extensions base with FastAPI and static file mounts. The cklib OCI layer is imported additively—no extraction—by referencing `ck-lib-js:1.2.0` in the builder stage and mounting files at `/cklib/` in the final image.
 
 ## One-Line Launch
 
@@ -195,6 +203,52 @@ nc 127.0.0.1 34222 < /dev/null
 nc -zv 127.0.0.1 39222
 ```
 
+Run the `pg17-pgrdf-pgck-web-cklib` bundle (FastAPI + cklib):
+
+```bash
+docker run --rm -d \
+  --name ociger-pg17-pgrdf-pgck-web-cklib \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-pg17-pgrdf-pgck-web-cklib-data:/var/lib/postgresql/data" \
+  -p 15440:5432 \
+  -p 18000:8000 \
+  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
+```
+
+Then verify FastAPI and cklib files:
+
+```bash
+curl http://127.0.0.1:18000/          # pgckweb root endpoint
+curl http://127.0.0.1:18000/cklib/ck-client.js    # cklib JavaScript files
+psql -h 127.0.0.1 -p 15440 -U postgres -d postgres \
+  -c 'CREATE EXTENSION pgrdf; CREATE EXTENSION pgck CASCADE; SELECT pgrdf.version(), pgck_version();'
+```
+
+Run the `ck-allinone` bundle (v3.8-rc2 — full CKP stack):
+
+```bash
+docker run --rm -d \
+  --name ociger-ck-allinone \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-ck-allinone-data:/var/lib/postgresql/data" \
+  -p 15441:5432 \
+  -p 18001:8000 \
+  -p 14222:4222 \
+  -p 19222:9222 \
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2
+```
+
+Then verify the full stack (PostgreSQL + extensions + FastAPI + NATS + cklib):
+
+```bash
+curl http://127.0.0.1:18001/          # pgckweb with cklib + NATS WSS message
+curl http://127.0.0.1:18001/cklib/ck-client.js    # cklib client library
+psql -h 127.0.0.1 -p 15441 -U postgres -d postgres \
+  -c 'CREATE EXTENSION pgrdf; CREATE EXTENSION pgck CASCADE; SELECT pgrdf.version(), pgck_version();'
+nc 127.0.0.1 14222 < /dev/null   # NATS core
+nc -zv 127.0.0.1 19222           # NATS WSS
+```
+
 ## Verification
 
 Core proof:
@@ -236,6 +290,20 @@ bash scripts/smoke-pg17-pgrdf-pgck-nats.sh
 bash scripts/smoke-pg17-pgrdf-pgck-nats.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1
 bash scripts/smoke-pg17-pgrdf-pgck-nats-micro.sh
 bash scripts/smoke-pg17-pgrdf-pgck-nats-micro.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1
+```
+
+Web-serving bundle proof (FastAPI + cklib):
+
+```bash
+bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh
+bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
+```
+
+CKP v3.8 all-in-one bundle proof (complete stack):
+
+```bash
+bash scripts/smoke-ck-allinone.sh
+bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2
 ```
 
 Expected `pgRDF` smoke output:

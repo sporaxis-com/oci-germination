@@ -555,7 +555,23 @@ The build system MUST enforce:
 
 ---
 
-## 8. Extension Compatibility Matrix
+## 8. Component Versioning & Attribution
+
+### 8.1 Bundled Components (Independent Versions)
+
+Each bundle declares its component versions explicitly. Users must understand which versions they're pulling.
+
+| Component | Type | Verified Version | Source | Bundle | Notes |
+|---|---|---|---|---|---|
+| **pgRDF** | PostgreSQL extension | 0.5.1 | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF) | bundle-pg17-pgrdf* | RDF/semantic data layer |
+| **pgCK** | PostgreSQL extension | 0.1.2 | [styk-tv/pgCK](https://github.com/styk-tv/pgCK) | bundle-pg17-pgck* | Knowledge/compliance kernel |
+| **pgckweb** | FastAPI web UI | 0.1.0 | [styk-tv/pgCK/web](https://github.com/styk-tv/pgCK/tree/main/web) | bundle-pg17-*-web-cklib, bundle-ck-allinone | HTTP API + static routes for pgCK operations |
+| **cklib** | JavaScript client library | 1.2.0 | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js) | bundle-*-cklib, bundle-ck-allinone | Browser client for CKP v3.8 kernel dispatch + NATS WSS |
+| **NATS** | Message bus + WebSocket | 2.14.1 | [nats-io/nats-server](https://github.com/nats-io/nats-server) | bundle-ck-allinone | Core protocol on 4222, WSS bridge on 9222 |
+
+**Critical for users:** Each component is versioned independently. To upgrade one (e.g., pgRDF → 0.6.0), only that component's version changes in the bundle.yaml; others remain stable.
+
+### 8.2 Extension Compatibility
 
 | Extension | Min PG | Max PG | Fetch Method | Verified Versions |
 |---|---|---|---|---|
