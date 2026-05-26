@@ -5,6 +5,9 @@
 Current public releases:
 
 - `core-pg17` — minimal PostgreSQL 17 runtime
+- `core-pg17-micro` — smaller scratch-based PostgreSQL 17 runtime
+- `core-pg17-nats` — PostgreSQL 17 + embedded `nats-server` + WebSocket listener
+- `core-pg17-nats-micro` — smaller PostgreSQL 17 + embedded `nats-server` + WebSocket listener
 - `pg17-pgrdf` — PostgreSQL 17 + `pgRDF 0.5.1`
 - `pg17-pgrdf-pgck` — PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2`
 
@@ -16,27 +19,38 @@ Next target:
 
 All published images are multi-arch manifest lists for `linux/amd64` and `linux/arm64`.
 
-| Bundle | OCI image | GitHub release | Platforms | Verified behavior |
+| Bundle | OCI image | Platforms | Size | Verified behavior |
 | --- | --- | --- | --- | --- |
-| `core-pg17` | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2` | `core-pg17-v0.1.2` | `amd64`, `arm64` | boots, initializes `PGDATA`, creates DB/table/row, proves relation file on host bind mount |
-| `pg17-pgrdf` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1` | `pg17-pgrdf-v0.1.1` | `amd64`, `arm64` | `CREATE EXTENSION pgrdf`; `pg_available_extensions.default_version=0.5.1`; `pg_extension.extversion=0.5.1`; `pgrdf.version()=0.5.1` |
-| `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `pg17-pgrdf-pgck-v0.1.1` | `amd64`, `arm64` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
+| `core-pg17` | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2` | `amd64`, `arm64` | `139.5 / 53.1 MiB` | boots, initializes `PGDATA`, creates DB/table/row, proves relation file on host bind mount |
+| `core-pg17-micro` | `ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.1` | `amd64`, `arm64` | `73.8 / 29.2 MiB` | same SQL/data proof as `core-pg17`, with a smaller scratch final image |
+| `core-pg17-nats` | `ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.1` | `amd64`, `arm64` | `157.9 / 60.3 MiB` | `core-pg17` proof plus NATS core on `4222` and WebSocket on `9222` |
+| `core-pg17-nats-micro` | `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.1` | `amd64`, `arm64` | `92.2 / 36.4 MiB` | `core-pg17-micro` proof plus NATS core on `4222` and WebSocket on `9222` |
+| `pg17-pgrdf` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1` | `amd64`, `arm64` | `not measured yet` | `CREATE EXTENSION pgrdf`; `pg_available_extensions.default_version=0.5.1`; `pg_extension.extversion=0.5.1`; `pgrdf.version()=0.5.1` |
+| `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
+
+Size values are `uncompressed / compressed` local measurements on `linux/arm64`.
 
 Pinned manifest digests:
 
 - `core-pg17-v0.1.2` → `sha256:bd11e0bc6b39577e1e8e946dc28fcf3a7cea24524472a97c68c408a80ef4e3ac`
+- `core-pg17-micro:v0.1.1` → `sha256:730abc0ca4104fbb9da37228ca9e941bd59d03e997ca5ae73ac06636ad0ba92c`
+- `core-pg17-nats:v0.1.1` → `sha256:8732386137c50770ca67ca74d8066ec7948b7294c1c1bdb40d055be88f6481ea`
+- `core-pg17-nats-micro:v0.1.1` → `sha256:d5b45d0abe70f7df63d159e331c2baefc6a78dd2098e8907cb5251070640e552`
 - `pg17-pgrdf:v0.1.1` → `sha256:31e2bdbb34d2ddf3fec609eb748ef9bec0707a019adb386d0d095463abb20d61`
 - `pg17-pgrdf-pgck:v0.1.1` → `sha256:16312830aed761a6201c111e31ff949d5179de613dfdf39d060e8a3c906c59c2`
 
 ## Bundle Chain
 
-| Stage | Inputs | Output | Status | Notes |
+| Bundle | Extends | Adds | Output | Notes |
 | --- | --- | --- | --- | --- |
-| `core-pg17` | `postgres:17-bookworm` runtime files + distroless final image | `ociger-core-pg17-min` | released | minimal PostgreSQL 17 runtime, no extensions |
-| `pg17-pgrdf` | same minimal PG17 runtime shape + upstream `pgRDF 0.5.1` release artifact | `ociger-pg17-pgrdf` | released | current working extension bundle |
-| `pg17-pgrdf-pgck` | same PG17 runtime shape + upstream `pgRDF 0.5.1` and `pgCK 0.1.2` release artifacts | `ociger-pg17-pgrdf-pgck` | released | triple bundle with `pgck` preloaded by default |
+| `core-pg17` | `postgres:17-bookworm` runtime files + distroless final image | none | `ociger-core-pg17-min` | stable minimal PostgreSQL 17 runtime |
+| `core-pg17-micro` | selective PostgreSQL runtime files + `scratch` final image | none | `ociger-core-pg17-micro` | smaller runtime family with the same SQL/data contract |
+| `core-pg17-nats` | `core-pg17` runtime shape | `nats-server 2.14.1`, tiny supervisor, WebSocket listener | `ociger-core-pg17-nats` | JetStream off by default |
+| `core-pg17-nats-micro` | `core-pg17-micro` runtime shape | `nats-server 2.14.1`, tiny supervisor, WebSocket listener | `ociger-core-pg17-nats-micro` | smaller service bundle, JetStream off by default |
+| `pg17-pgrdf` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` artifact | `ociger-pg17-pgrdf` | working extension bundle |
+| `pg17-pgrdf-pgck` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts | `ociger-pg17-pgrdf-pgck` | triple bundle with `pgck` preloaded by default |
 
-`pg17-pgrdf` and `pg17-pgrdf-pgck` are both assembled against the same minimal PG17 runtime shape as `core-pg17`. The triple bundle keeps the upstream extension inputs separate and materializes both into the final runnable image during build.
+The NATS service layer is reusable: it copies only `nats-server` from `nats:2.14.1-scratch`, renders a minimal config, and starts PostgreSQL plus NATS through the same tiny supervisor. `pg17-pgrdf` and `pg17-pgrdf-pgck` stay on the stable `core-pg17` runtime line; the micro family is an additional size-focused bundle path, not a replacement.
 
 ## One-Line Launch
 
@@ -55,6 +69,50 @@ Then connect:
 
 ```bash
 psql -h 127.0.0.1 -p 15432 -U postgres -d postgres
+```
+
+Run the smaller `core-pg17-micro` image:
+
+```bash
+docker run --rm -d \
+  --name ociger-core-pg17-micro \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-core-pg17-micro-data:/var/lib/postgresql/data" \
+  -p 15435:5432 \
+  ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.1
+```
+
+Run the `core-pg17-nats` image:
+
+```bash
+docker run --rm -d \
+  --name ociger-core-pg17-nats \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-core-pg17-nats-data:/var/lib/postgresql/data" \
+  -p 15436:5432 \
+  -p 14222:4222 \
+  -p 19222:9222 \
+  ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.1
+```
+
+Run the smaller `core-pg17-nats-micro` image:
+
+```bash
+docker run --rm -d \
+  --name ociger-core-pg17-nats-micro \
+  -e PGDATA=/var/lib/postgresql/data \
+  -v "$PWD/ociger-core-pg17-nats-micro-data:/var/lib/postgresql/data" \
+  -p 15437:5432 \
+  -p 14223:4222 \
+  -p 19223:9222 \
+  ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.1
+```
+
+Then probe the NATS listeners:
+
+```bash
+nc 127.0.0.1 14222 < /dev/null
+nc -zv 127.0.0.1 19222
 ```
 
 Run the `pgRDF` bundle:
@@ -100,6 +158,17 @@ Core proof:
 ```bash
 bash scripts/smoke-core-pg17.sh
 bash scripts/smoke-core-pg17.sh ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.2
+bash scripts/smoke-core-pg17-micro.sh
+bash scripts/smoke-core-pg17-micro.sh ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.1
+```
+
+NATS bundle proof:
+
+```bash
+bash scripts/smoke-core-pg17-nats.sh
+bash scripts/smoke-core-pg17-nats.sh ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.1
+bash scripts/smoke-core-pg17-nats-micro.sh
+bash scripts/smoke-core-pg17-nats-micro.sh ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.1
 ```
 
 `pgRDF` proof:
@@ -125,6 +194,26 @@ pg_extension.extversion=0.5.1
 pgrdf.version()=0.5.1
 ```
 
+Expected `core-pg17` and `core-pg17-micro` smoke output shape:
+
+```text
+CREATE DATABASE
+CREATE TABLE
+INSERT 0 1
+pg_relation_filepath(public.demo_rows)=base/16384/16385
+host_path=.../.artifacts/ociger-.../pgdata/base/16384/16385
+relation_proof_method=host
+```
+
+Expected `core-pg17-nats` and `core-pg17-nats-micro` extra proof:
+
+```text
+ociger-core-pg17-nats... (x.x.x.x:9222) open
+nats_info_line=INFO {... "version":"2.14.1" ...}
+pg_relation_filepath(public.demo_rows)=base/16384/16385
+relation_proof_method=host
+```
+
 Expected triple-bundle smoke output:
 
 ```text
@@ -139,18 +228,6 @@ pgrdf.version()=0.5.1
 pgck_version()=pgck 0.1.2 (rc3)
 ```
 
-Measured core footprint:
-
-- uncompressed image size: `146277807` bytes (`139.5 MiB`)
-- compressed local archive size: `55630530` bytes (`53.1 MiB`)
-
-Measured triple-bundle footprint on local `linux/arm64`:
-
-- uncompressed image size: `159041394` bytes (`151.7 MiB`)
-- compressed local archive size: `60621500` bytes (`57.8 MiB`)
-
-No bundled `pgRDF` size is claimed here yet because it has not been measured and recorded the same way.
-
 ## Local Development
 
 Generate bundle outputs:
@@ -163,6 +240,9 @@ Build locally:
 
 ```bash
 bash scripts/build-core-pg17.sh
+bash scripts/build-core-pg17-micro.sh
+bash scripts/build-core-pg17-nats.sh
+bash scripts/build-core-pg17-nats-micro.sh
 bash scripts/build-pg17-pgrdf.sh
 bash scripts/build-pg17-pgrdf-pgck.sh
 ```
@@ -170,20 +250,23 @@ bash scripts/build-pg17-pgrdf-pgck.sh
 If you need to force a local architecture:
 
 ```bash
-OCI_GER_PLATFORM=linux/amd64 bash scripts/build-core-pg17.sh
-OCI_GER_PLATFORM=linux/amd64 bash scripts/build-pg17-pgrdf.sh
-OCI_GER_PLATFORM=linux/amd64 bash scripts/build-pg17-pgrdf-pgck.sh
+OCI_GER_PLATFORM=linux/amd64 bash scripts/build-core-pg17-micro.sh
+OCI_GER_PLATFORM=linux/amd64 bash scripts/build-core-pg17-nats-micro.sh
 ```
 
-Local smoke resources stay contained to `ociger-`-prefixed names and `.artifacts/ociger-*` paths.
+The same `OCI_GER_PLATFORM` override works for the other build scripts. Local smoke resources stay contained to `ociger-`-prefixed names and `.artifacts/ociger-*` paths.
 
 ## Repository Layout
 
 - `bundles/core-pg17/` — core PostgreSQL bundle spec and generated build files
 - `bundles/bundle-pg17-pgrdf/` — `pgRDF` bundle spec and generated build files
 - `bundles/bundle-pg17-pgrdf-pgck/` — triple-bundle spec and generated build files
+- `bundles/core-pg17-micro/` — smaller PostgreSQL 17 core bundle
+- `bundles/core-pg17-nats/` — PostgreSQL 17 + NATS bundle
+- `bundles/core-pg17-nats-micro/` — smaller PostgreSQL 17 + NATS bundle
 - `cmd/ociger-gen/` — bundle generator
 - `cmd/ociger-pg-launcher/` — minimal first-boot PostgreSQL launcher
+- `cmd/ociger-supervisor/` — tiny multi-service supervisor for PostgreSQL + NATS
 - `scripts/build-*.sh` — local native-arch image builds
 - `scripts/smoke-*.sh` — contained local and public-image smoke tests
 - `.github/workflows/` — release verification and GHCR publish workflows
@@ -193,25 +276,40 @@ Local smoke resources stay contained to `ociger-`-prefixed names and `.artifacts
 Release tags:
 
 - `core-pg17-vX.Y.Z`
+- `core-pg17-micro-vX.Y.Z`
+- `core-pg17-nats-vX.Y.Z`
+- `core-pg17-nats-micro-vX.Y.Z`
 - `pg17-pgrdf-vX.Y.Z`
 - `pg17-pgrdf-pgck-vX.Y.Z`
 
 Current workflows:
 
 - [core-pg17-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/core-pg17-release.yml)
+- [core-pg17-micro-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/core-pg17-micro-release.yml)
+- [core-pg17-nats-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/core-pg17-nats-release.yml)
+- [core-pg17-nats-micro-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/core-pg17-nats-micro-release.yml)
 - [pg17-pgrdf-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/pg17-pgrdf-release.yml)
 - [pg17-pgrdf-pgck-release.yml](/Users/neoxr/git_sporaxis-com/oci-germination/.github/workflows/pg17-pgrdf-pgck-release.yml)
+
+Release publish jobs only proceed when the tagged commit is on `origin/main` history.
 
 Manual release example:
 
 ```bash
 git push origin main
 git tag core-pg17-vX.Y.Z
+git tag core-pg17-micro-vX.Y.Z
+git tag core-pg17-nats-vX.Y.Z
+git tag core-pg17-nats-micro-vX.Y.Z
 git tag pg17-pgrdf-vX.Y.Z
 git tag pg17-pgrdf-pgck-vX.Y.Z
-git push origin core-pg17-vX.Y.Z
-git push origin pg17-pgrdf-vX.Y.Z
-git push origin pg17-pgrdf-pgck-vX.Y.Z
+git push origin \
+  core-pg17-vX.Y.Z \
+  core-pg17-micro-vX.Y.Z \
+  core-pg17-nats-vX.Y.Z \
+  core-pg17-nats-micro-vX.Y.Z \
+  pg17-pgrdf-vX.Y.Z \
+  pg17-pgrdf-pgck-vX.Y.Z
 ```
 
 ## Defaults
@@ -220,6 +318,9 @@ Current images are optimized for local startup and smoke verification, not expos
 
 - `listen_addresses='*'`
 - `host all all all trust`
+- NATS core listener on `4222`
+- NATS WebSocket listener on `9222`
+- JetStream disabled in the current NATS variants
 - no password required for the default smoke path
 
 Treat the current images as local/dev artifacts until stricter auth defaults are introduced.
@@ -229,3 +330,4 @@ Treat the current images as local/dev artifacts until stricter auth defaults are
 - `pgRDF` repository: `https://github.com/styk-tv/pgRDF`
 - `pgRDF` install docs: `https://pgrdf.styk.tv/v0.5/operations/install`
 - `pgCK` repository: `https://github.com/styk-tv/pgCK`
+- NATS runtime source image: `nats:2.14.1-scratch`
