@@ -1,0 +1,19 @@
+name: core-pg17-micro
+description: Minimal embedded PostgreSQL 17 runtime with aggressively pruned runtime files
+image:
+  registry: ghcr.io/sporaxis-com/ociger-core-pg17-micro
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: scratch
+  runtime_profile: micro
+platforms:
+  - linux/amd64
+  - linux/arm64
+ports:
+  - name: postgres
+    container_port: 5432
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-core-pg17-micro-smoke/pgdata
+  network: ociger-core-pg17-micro-net
+  container: ociger-core-pg17-micro-smoke

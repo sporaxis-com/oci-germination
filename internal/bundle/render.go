@@ -59,24 +59,33 @@ RUN set -eux; \
   cp -L /bin/sh /out/bin/sh; \
   cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres; \
   cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb; \
+  cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/dict_snowball.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/dict_snowball.so; \
   cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/plpgsql.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/plpgsql.so; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/catalog_version /out/usr/share/postgresql/{{ .Image.PGMajor }}/catalog_version; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/errcodes.txt /out/usr/share/postgresql/{{ .Image.PGMajor }}/errcodes.txt; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/postgres.bki /out/usr/share/postgresql/{{ .Image.PGMajor }}/postgres.bki; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/information_schema.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/information_schema.sql; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/snowball_create.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/snowball_create.sql; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/sql_features.txt /out/usr/share/postgresql/{{ .Image.PGMajor }}/sql_features.txt; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/system_functions.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/system_functions.sql; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/system_views.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/system_views.sql; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/system_constraints.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/system_constraints.sql; \
   cp -a /usr/share/postgresql/{{ .Image.PGMajor }}/tsearch_data/. /out/usr/share/postgresql/{{ .Image.PGMajor }}/tsearch_data/; \
   cp -a /usr/share/postgresql/{{ .Image.PGMajor }}/timezonesets/. /out/usr/share/postgresql/{{ .Image.PGMajor }}/timezonesets/; \
   cp -L /usr/share/postgresql/postgresql.conf.sample /out/usr/share/postgresql/postgresql.conf.sample; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/postgresql.conf.sample /out/usr/share/postgresql/{{ .Image.PGMajor }}/postgresql.conf.sample; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/pg_hba.conf.sample /out/usr/share/postgresql/{{ .Image.PGMajor }}/pg_hba.conf.sample; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/pg_ident.conf.sample /out/usr/share/postgresql/{{ .Image.PGMajor }}/pg_ident.conf.sample; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/pg_service.conf.sample /out/usr/share/postgresql/{{ .Image.PGMajor }}/pg_service.conf.sample; \
+  cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/psqlrc.sample /out/usr/share/postgresql/{{ .Image.PGMajor }}/psqlrc.sample; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/extension/plpgsql.control /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/plpgsql.control; \
   cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/extension/plpgsql--*.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/; \
   printf 'root:x:0:0:root:/root:/bin/sh\npostgres:x:999:999:postgres:/var/lib/postgresql:/bin/sh\n' > /out/etc/passwd; \
   printf 'root:x:0:\npostgres:x:999:\n' > /out/etc/group; \
-  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/plpgsql.so | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/plpgsql.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/dict_snowball.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
 {{- else }}
 RUN set -eux; \
   mkdir -p /out/bin /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql{{ if hasNATS . }} /out/usr/local/bin{{ end }}; \

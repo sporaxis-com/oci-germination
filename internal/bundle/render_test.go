@@ -16,7 +16,15 @@ func assertMicroRuntimeContract(t *testing.T, df string) {
 	for _, want := range []string{
 		"/usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres",
 		"/usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb",
+		"/usr/lib/postgresql/17/lib/dict_snowball.so /out/usr/lib/postgresql/17/lib/dict_snowball.so",
 		"/usr/lib/postgresql/17/lib/plpgsql.so /out/usr/lib/postgresql/17/lib/plpgsql.so",
+		"/usr/share/postgresql/17/catalog_version /out/usr/share/postgresql/17/catalog_version",
+		"/usr/share/postgresql/17/errcodes.txt /out/usr/share/postgresql/17/errcodes.txt",
+		"/usr/share/postgresql/17/postgresql.conf.sample /out/usr/share/postgresql/17/postgresql.conf.sample",
+		"/usr/share/postgresql/17/pg_service.conf.sample /out/usr/share/postgresql/17/pg_service.conf.sample",
+		"/usr/share/postgresql/17/psqlrc.sample /out/usr/share/postgresql/17/psqlrc.sample",
+		"/usr/share/postgresql/17/snowball_create.sql /out/usr/share/postgresql/17/snowball_create.sql",
+		"/usr/share/postgresql/17/sql_features.txt /out/usr/share/postgresql/17/sql_features.txt",
 	} {
 		if !strings.Contains(df, want) {
 			t.Fatalf("micro Dockerfile missing selective artifact copy %q:\n%s", want, df)
@@ -29,6 +37,10 @@ func assertMicroRuntimeContract(t *testing.T, df string) {
 
 	if strings.Contains(df, "cp -a /usr/share/postgresql/17 /out/usr/share/postgresql/;") {
 		t.Fatalf("micro Dockerfile copied full postgres share tree:\n%s", df)
+	}
+
+	if !strings.Contains(df, "tr -s '[:space:]' '\\n'") {
+		t.Fatalf("micro Dockerfile missing whitespace-safe ldd parsing for dynamic loader copy:\n%s", df)
 	}
 }
 
