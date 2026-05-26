@@ -166,3 +166,154 @@ func TestRenderPGRDFPGCKBundle(t *testing.T) {
 		t.Fatalf("Bake output missing pgck Dockerfile path:\n%s", bake)
 	}
 }
+
+func TestRenderCorePG17MicroBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "core-pg17-micro",
+		Description: "Minimal embedded PostgreSQL 17 micro runtime",
+		BundleDir:   "bundles/core-pg17-micro",
+		Image: ImageSpec{
+			Registry:       "ghcr.io/sporaxis-com/ociger-core-pg17-micro",
+			PGMajor:        17,
+			BaseImage:      "postgres:17-bookworm",
+			FinalImage:     "scratch",
+			RuntimeProfile: "micro",
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+		},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-core-pg17-micro-smoke/pgdata",
+			Network:   "ociger-core-pg17-micro-net",
+			Container: "ociger-core-pg17-micro-smoke",
+		},
+	}
+
+	df, _, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	if !strings.Contains(df, "FROM scratch") {
+		t.Fatalf("Dockerfile missing scratch final stage:\n%s", df)
+	}
+
+	for _, want := range []string{
+		"cp -a /usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres;",
+		"cp -a /usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb;",
+		"cp -a /usr/lib/postgresql/17/lib/plpgsql.so /out/usr/lib/postgresql/17/lib/plpgsql.so;",
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("micro Dockerfile missing %q:\n%s", want, df)
+		}
+	}
+
+	if strings.Contains(df, "cp -a /usr/lib/postgresql/17 /out/usr/lib/postgresql/;") {
+		t.Fatalf("micro Dockerfile copied full postgres tree:\n%s", df)
+	}
+}
+
+func TestRenderCorePG17NATSBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "core-pg17-nats",
+		Description: "Minimal embedded PostgreSQL 17 runtime with NATS",
+		BundleDir:   "bundles/core-pg17-nats",
+		Image: ImageSpec{
+			Registry:   "ghcr.io/sporaxis-com/ociger-core-pg17-nats",
+			PGMajor:    17,
+			BaseImage:  "postgres:17-bookworm",
+			FinalImage: "gcr.io/distroless/base-debian12:latest",
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+			{Name: "nats", ContainerPort: 4222},
+			{Name: "nats-websocket", ContainerPort: 9222},
+		},
+		Services: ServiceSpec{
+			NATS: &NATSServiceSpec{
+				SourceImage:   "nats:2.14.1-scratch",
+				CorePort:      4222,
+				WebSocketPort: 9222,
+				JetStream:     false,
+			},
+		},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-core-pg17-nats-smoke/pgdata",
+			Network:   "ociger-core-pg17-nats-net",
+			Container: "ociger-core-pg17-nats-smoke",
+		},
+	}
+
+	df, _, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	for _, want := range []string{
+		"FROM nats:2.14.1-scratch AS nats_source",
+		"COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server",
+		"EXPOSE 5432 4222 9222",
+		"COPY bundles/core-pg17-nats/nats-server.conf /etc/nats/nats-server.conf",
+		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("Dockerfile missing %q:\n%s", want, df)
+		}
+	}
+}
+
+func TestRenderCorePG17NATSMicroBundle(t *testing.T) {
+	spec := Spec{
+		Name:        "core-pg17-nats-micro",
+		Description: "Minimal embedded PostgreSQL 17 micro runtime with NATS",
+		BundleDir:   "bundles/core-pg17-nats-micro",
+		Image: ImageSpec{
+			Registry:       "ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro",
+			PGMajor:        17,
+			BaseImage:      "postgres:17-bookworm",
+			FinalImage:     "scratch",
+			RuntimeProfile: "micro",
+		},
+		Platforms: []string{"linux/amd64", "linux/arm64"},
+		Ports: []PortSpec{
+			{Name: "postgres", ContainerPort: 5432},
+			{Name: "nats", ContainerPort: 4222},
+			{Name: "nats-websocket", ContainerPort: 9222},
+		},
+		Services: ServiceSpec{
+			NATS: &NATSServiceSpec{
+				SourceImage:   "nats:2.14.1-scratch",
+				CorePort:      4222,
+				WebSocketPort: 9222,
+				JetStream:     false,
+			},
+		},
+		Local: LocalSpec{
+			Prefix:    "ociger-",
+			DataDir:   ".artifacts/ociger-core-pg17-nats-micro-smoke/pgdata",
+			Network:   "ociger-core-pg17-nats-micro-net",
+			Container: "ociger-core-pg17-nats-micro-smoke",
+		},
+	}
+
+	df, _, err := Render(spec)
+	if err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	for _, want := range []string{
+		"FROM nats:2.14.1-scratch AS nats_source",
+		"COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server",
+		"EXPOSE 5432 4222 9222",
+		"COPY bundles/core-pg17-nats-micro/nats-server.conf /etc/nats/nats-server.conf",
+		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("Dockerfile missing %q:\n%s", want, df)
+		}
+	}
+}
