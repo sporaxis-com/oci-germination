@@ -32,7 +32,7 @@ services:
     source_image: nats:2.14.1-scratch
     core_port: 4222
     websocket_port: 9222
-    jetstream: false
+    jetstream: true
 local:
   prefix: ociger-
   data_dir: .artifacts/ociger-core-pg17-nats-micro-smoke/pgdata
@@ -87,7 +87,7 @@ local:
 		t.Fatalf("websocket port = %d", got)
 	}
 
-	if spec.Services.NATS.JetStream {
-		t.Fatal("expected jetstream to be disabled")
+	if !spec.Services.NATS.JetStream {
+		t.Fatal("expected jetstream to be enabled")
 	}
 }
