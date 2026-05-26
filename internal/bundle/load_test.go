@@ -25,6 +25,8 @@ ports:
     container_port: 5432
   - name: nats
     container_port: 4222
+  - name: nats-websocket
+    container_port: 9222
 services:
   nats:
     source_image: nats:2.14.1-scratch
@@ -56,8 +58,9 @@ local:
 	}
 
 	wantPorts := map[string]int{
-		"postgres": 5432,
-		"nats":     4222,
+		"postgres":       5432,
+		"nats":           4222,
+		"nats-websocket": 9222,
 	}
 	if len(gotPorts) != len(wantPorts) {
 		t.Fatalf("ports length = %d", len(gotPorts))

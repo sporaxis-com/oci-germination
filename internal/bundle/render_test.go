@@ -25,6 +25,10 @@ func assertMicroRuntimeContract(t *testing.T, df string) {
 	if strings.Contains(df, "cp -a /usr/lib/postgresql/17 /out/usr/lib/postgresql/;") {
 		t.Fatalf("micro Dockerfile copied full postgres tree:\n%s", df)
 	}
+
+	if strings.Contains(df, "cp -a /usr/share/postgresql/17 /out/usr/share/postgresql/;") {
+		t.Fatalf("micro Dockerfile copied full postgres share tree:\n%s", df)
+	}
 }
 
 func TestRenderCoreBundle(t *testing.T) {
