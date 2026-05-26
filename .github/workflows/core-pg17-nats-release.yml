@@ -1,0 +1,125 @@
+name: core-pg17-nats-release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - core-pg17-nats-v*
+  schedule:
+    - cron: '35 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: core-pg17-nats-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Regenerate bundle outputs
+        run: bash scripts/generate.sh
+
+      - name: Verify generated files are committed
+        run: git diff --exit-code -- bundles/
+
+      - name: Build native NATS image
+        run: bash scripts/build-core-pg17-nats.sh
+
+      - name: Smoke test native NATS image
+        run: bash scripts/smoke-core-pg17-nats.sh
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-pg17-nats-v')
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Regenerate bundle outputs
+        run: bash scripts/generate.sh
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve release coordinates
+        id: meta
+        run: |
+          set -euo pipefail
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-core-pg17-nats" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME#core-pg17-nats-}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish multi-arch image
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file bundles/core-pg17-nats/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.version=${{ steps.meta.outputs.tag }}" \
+            --label "org.opencontainers.image.description=Minimal PostgreSQL 17 runtime with colocated NATS core and websocket listeners" \
+            --tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" \
+            --tag "${{ steps.meta.outputs.image }}:latest" \
+            --provenance=false \
+            --push \
+            .
+
+      - name: Inspect published image
+        run: docker buildx imagetools inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
+
+      - name: Attempt to make GHCR package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ensure-ghcr-public.sh ociger-core-pg17-nats
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Published `${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}` and `${{ steps.meta.outputs.image }}:latest`.
+
+            Local launch:
+
+            ```bash
+            docker run --rm -d \
+              --name ociger-core-pg17-nats \
+              -e PGDATA=/var/lib/postgresql/data \
+              -v "$PWD/ociger-core-pg17-nats-data:/var/lib/postgresql/data" \
+              -p 15436:5432 \
+              -p 14222:4222 \
+              -p 19222:9222 \
+              ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ```
