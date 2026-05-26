@@ -45,26 +45,22 @@ func main() {
 	defer signal.Stop(signals)
 
 	terminated := make(map[int]struct{}, len(cmds))
+	intentional := make(map[int]struct{}, len(cmds))
 	exitCode := 0
-	shutdownBySignal := false
 
 	select {
 	case sig := <-signals:
 		log.Printf("received %s, shutting down", sig)
-		shutdownBySignal = true
-		terminateSiblings(cmds, nil, terminated)
+		terminateSiblings(cmds, nil, terminated, intentional)
 	case result := <-results:
-		if result.err != nil {
+		if code := unexpectedExitCode(result, intentional); code != 0 {
 			log.Printf("%s exited: %v", result.name, result.err)
-			exitCode = exitStatus(result.err)
-			if exitCode == 0 {
-				exitCode = 1
-			}
+			exitCode = code
 		} else {
 			log.Printf("%s exited", result.name)
 		}
 		terminated[result.cmd.Process.Pid] = struct{}{}
-		terminateSiblings(cmds, result.cmd, terminated)
+		terminateSiblings(cmds, result.cmd, terminated, intentional)
 	}
 
 	remaining := len(cmds) - len(terminated)
@@ -72,11 +68,10 @@ func main() {
 		result := <-results
 		remaining--
 		terminated[result.cmd.Process.Pid] = struct{}{}
-		if !shutdownBySignal && result.err != nil && exitCode == 0 {
-			log.Printf("%s exited while shutting down: %v", result.name, result.err)
-			exitCode = exitStatus(result.err)
-			if exitCode == 0 {
-				exitCode = 1
+		if exitCode == 0 {
+			if code := unexpectedExitCode(result, intentional); code != 0 {
+				log.Printf("%s exited while shutting down: %v", result.name, result.err)
+				exitCode = code
 			}
 		}
 	}
@@ -86,7 +81,7 @@ func main() {
 	}
 }
 
-func terminateSiblings(cmds []*exec.Cmd, exclude *exec.Cmd, terminated map[int]struct{}) {
+func terminateSiblings(cmds []*exec.Cmd, exclude *exec.Cmd, terminated map[int]struct{}, intentional map[int]struct{}) {
 	for _, cmd := range cmds {
 		if cmd == exclude || cmd.Process == nil {
 			continue
@@ -95,10 +90,31 @@ func terminateSiblings(cmds []*exec.Cmd, exclude *exec.Cmd, terminated map[int]s
 		if _, ok := terminated[pid]; ok {
 			continue
 		}
-		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil && !errors.Is(err, syscall.ESRCH) {
-			log.Printf("terminate pid %d: %v", pid, err)
+		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+			if !errors.Is(err, syscall.ESRCH) {
+				log.Printf("terminate pid %d: %v", pid, err)
+			}
+			continue
+		}
+		intentional[pid] = struct{}{}
+	}
+}
+
+func unexpectedExitCode(result childResult, intentional map[int]struct{}) int {
+	if result.err == nil {
+		return 0
+	}
+	if result.cmd != nil && result.cmd.Process != nil {
+		if _, ok := intentional[result.cmd.Process.Pid]; ok {
+			return 0
 		}
 	}
+
+	code := exitStatus(result.err)
+	if code == 0 {
+		return 1
+	}
+	return code
 }
 
 func exitStatus(err error) int {

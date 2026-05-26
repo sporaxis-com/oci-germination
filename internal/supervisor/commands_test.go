@@ -6,15 +6,12 @@ import (
 )
 
 func TestDefaultPrograms(t *testing.T) {
-	programs := DefaultPrograms()
+	want := []Program{
+		{Name: "postgres", Path: "/usr/local/bin/ociger-pg-launcher"},
+		{Name: "nats", Path: "/usr/local/bin/nats-server", Args: []string{"--config", "/etc/nats/nats-server.conf"}},
+	}
 
-	if len(programs) != 2 {
-		t.Fatalf("program count = %d", len(programs))
-	}
-	if programs[0].Path != "/usr/local/bin/ociger-pg-launcher" {
-		t.Fatalf("postgres path = %q", programs[0].Path)
-	}
-	if !reflect.DeepEqual(programs[1].Args, []string{"--config", "/etc/nats/nats-server.conf"}) {
-		t.Fatalf("nats args = %#v", programs[1].Args)
+	if programs := DefaultPrograms(); !reflect.DeepEqual(programs, want) {
+		t.Fatalf("DefaultPrograms() = %#v, want %#v", programs, want)
 	}
 }

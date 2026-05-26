@@ -23,7 +23,7 @@ FROM nats:2.14.1-scratch AS nats_source
 
 FROM postgres:17-bookworm AS postgres_source
 RUN set -eux; \
-  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/17/bin /out/usr/lib/postgresql/17/lib /out/usr/share/postgresql /out/usr/share/postgresql/17/extension /out/usr/share/postgresql/17/tsearch_data /out/usr/share/postgresql/17/timezonesets /out/var/lib/postgresql /out/var/run/postgresql /out/usr/local/bin; \
+  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/17/bin /out/usr/lib/postgresql/17/lib /out/usr/share/postgresql /out/usr/share/postgresql/17/extension /out/usr/share/postgresql/17/tsearch_data /out/usr/share/postgresql/17/timezonesets /out/var/lib/postgresql /out/var/run/postgresql; \
   cp -L /bin/sh /out/bin/sh; \
   cp -L /usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres; \
   cp -L /usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb; \
@@ -54,14 +54,13 @@ RUN set -eux; \
   ldd /usr/lib/postgresql/17/bin/initdb | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/17/lib/plpgsql.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/17/lib/dict_snowball.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
-COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server
-
 
 FROM scratch
 ENV PGDATA=/var/lib/postgresql/data
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
 COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor
+COPY --from=nats_source /nats-server /usr/local/bin/nats-server
 COPY bundles/core-pg17-nats-micro/nats-server.conf /etc/nats/nats-server.conf
 EXPOSE 5432 4222 9222
 

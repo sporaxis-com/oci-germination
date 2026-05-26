@@ -66,7 +66,7 @@ FROM {{ .Services.NATS.SourceImage }} AS nats_source
 FROM {{ .Image.BaseImage }} AS postgres_source
 {{- if isMicro . }}
 RUN set -eux; \
-  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib /out/usr/share/postgresql /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension /out/usr/share/postgresql/{{ .Image.PGMajor }}/tsearch_data /out/usr/share/postgresql/{{ .Image.PGMajor }}/timezonesets /out/var/lib/postgresql /out/var/run/postgresql{{ if hasNATS . }} /out/usr/local/bin{{ end }}; \
+  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib /out/usr/share/postgresql /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension /out/usr/share/postgresql/{{ .Image.PGMajor }}/tsearch_data /out/usr/share/postgresql/{{ .Image.PGMajor }}/timezonesets /out/var/lib/postgresql /out/var/run/postgresql; \
   cp -L /bin/sh /out/bin/sh; \
   cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin/postgres; \
   cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb /out/usr/lib/postgresql/{{ .Image.PGMajor }}/bin/initdb; \
@@ -99,7 +99,7 @@ RUN set -eux; \
   ldd /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/dict_snowball.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
 {{- else }}
 RUN set -eux; \
-  mkdir -p /out/bin /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql{{ if hasNATS . }} /out/usr/local/bin{{ end }}; \
+  mkdir -p /out/bin /out/usr/lib/postgresql /out/usr/share/postgresql /out/etc /out/var/lib/postgresql /out/var/run/postgresql; \
   cp -L /bin/sh /out/bin/sh; \
   cp -a /usr/lib/postgresql/{{ .Image.PGMajor }} /out/usr/lib/postgresql/; \
   cp -a /usr/share/postgresql/{{ .Image.PGMajor }} /out/usr/share/postgresql/; \
@@ -117,9 +117,6 @@ COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/{{ .Imag
 COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgck.so
 COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/
 {{ end }}
-{{- if hasNATS . }}
-COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server
-{{ end }}
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data
@@ -130,6 +127,7 @@ COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
 {{- if hasNATS . }}
 COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor
+COPY --from=nats_source /nats-server /usr/local/bin/nats-server
 COPY {{ .BundleDir }}/nats-server.conf /etc/nats/nats-server.conf
 EXPOSE {{ exposedPorts . }}
 {{ end }}
