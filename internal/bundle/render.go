@@ -132,23 +132,23 @@ target "{{ .Name }}" {
 }
 `
 
-type renderedAssets struct {
-	dockerfile string
-	bake       string
-	natsConfig string
+type Assets struct {
+	Dockerfile string
+	Bake       string
+	NATSConfig string
 }
 
 func Render(spec Spec) (string, string, error) {
-	assets, err := renderAssets(spec)
+	assets, err := RenderAssets(spec)
 	if err != nil {
 		return "", "", err
 	}
 
-	return assets.dockerfile, assets.bake, nil
+	return assets.Dockerfile, assets.Bake, nil
 }
 
 func Write(spec Spec, dockerfilePath string, bakePath string) error {
-	assets, err := renderAssets(spec)
+	assets, err := RenderAssets(spec)
 	if err != nil {
 		return err
 	}
@@ -160,15 +160,15 @@ func Write(spec Spec, dockerfilePath string, bakePath string) error {
 		return fmt.Errorf("create bake dir: %w", err)
 	}
 
-	if err := os.WriteFile(dockerfilePath, []byte(assets.dockerfile), 0o644); err != nil {
+	if err := os.WriteFile(dockerfilePath, []byte(assets.Dockerfile), 0o644); err != nil {
 		return fmt.Errorf("write Dockerfile: %w", err)
 	}
-	if err := os.WriteFile(bakePath, []byte(assets.bake), 0o644); err != nil {
+	if err := os.WriteFile(bakePath, []byte(assets.Bake), 0o644); err != nil {
 		return fmt.Errorf("write bake file: %w", err)
 	}
-	if assets.natsConfig != "" {
+	if assets.NATSConfig != "" {
 		confPath := filepath.Join(filepath.Dir(dockerfilePath), "nats-server.conf")
-		if err := os.WriteFile(confPath, []byte(assets.natsConfig), 0o644); err != nil {
+		if err := os.WriteFile(confPath, []byte(assets.NATSConfig), 0o644); err != nil {
 			return fmt.Errorf("write nats config: %w", err)
 		}
 	}
@@ -176,25 +176,25 @@ func Write(spec Spec, dockerfilePath string, bakePath string) error {
 	return nil
 }
 
-func renderAssets(spec Spec) (renderedAssets, error) {
+func RenderAssets(spec Spec) (Assets, error) {
 	spec = normalizeSpec(spec)
 
 	df, err := executeTemplate(dockerfileTemplate, spec)
 	if err != nil {
-		return renderedAssets{}, err
+		return Assets{}, err
 	}
 
 	bake, err := executeTemplate(bakeTemplate, spec)
 	if err != nil {
-		return renderedAssets{}, err
+		return Assets{}, err
 	}
 
-	assets := renderedAssets{
-		dockerfile: df,
-		bake:       bake,
+	assets := Assets{
+		Dockerfile: df,
+		Bake:       bake,
 	}
 	if spec.Services.NATS != nil {
-		assets.natsConfig = natsconfig.Render(natsconfig.Config{
+		assets.NATSConfig = natsconfig.Render(natsconfig.Config{
 			CorePort:      spec.Services.NATS.CorePort,
 			WebSocketPort: spec.Services.NATS.WebSocketPort,
 			JetStream:     spec.Services.NATS.JetStream,
