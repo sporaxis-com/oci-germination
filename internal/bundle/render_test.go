@@ -5,6 +5,28 @@ import (
 	"testing"
 )
 
+func assertMicroRuntimeContract(t *testing.T, df string) {
+	t.Helper()
+
+	if !strings.Contains(df, "FROM scratch") {
+		t.Fatalf("Dockerfile missing scratch final stage:\n%s", df)
+	}
+
+	for _, want := range []string{
+		"/usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres",
+		"/usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb",
+		"/usr/lib/postgresql/17/lib/plpgsql.so /out/usr/lib/postgresql/17/lib/plpgsql.so",
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("micro Dockerfile missing selective artifact copy %q:\n%s", want, df)
+		}
+	}
+
+	if strings.Contains(df, "cp -a /usr/lib/postgresql/17 /out/usr/lib/postgresql/;") {
+		t.Fatalf("micro Dockerfile copied full postgres tree:\n%s", df)
+	}
+}
+
 func TestRenderCoreBundle(t *testing.T) {
 	spec := Spec{
 		Name:        "core-pg17",
@@ -196,23 +218,7 @@ func TestRenderCorePG17MicroBundle(t *testing.T) {
 		t.Fatalf("Render returned error: %v", err)
 	}
 
-	if !strings.Contains(df, "FROM scratch") {
-		t.Fatalf("Dockerfile missing scratch final stage:\n%s", df)
-	}
-
-	for _, want := range []string{
-		"cp -a /usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres;",
-		"cp -a /usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb;",
-		"cp -a /usr/lib/postgresql/17/lib/plpgsql.so /out/usr/lib/postgresql/17/lib/plpgsql.so;",
-	} {
-		if !strings.Contains(df, want) {
-			t.Fatalf("micro Dockerfile missing %q:\n%s", want, df)
-		}
-	}
-
-	if strings.Contains(df, "cp -a /usr/lib/postgresql/17 /out/usr/lib/postgresql/;") {
-		t.Fatalf("micro Dockerfile copied full postgres tree:\n%s", df)
-	}
+	assertMicroRuntimeContract(t, df)
 }
 
 func TestRenderCorePG17NATSBundle(t *testing.T) {
@@ -316,4 +322,6 @@ func TestRenderCorePG17NATSMicroBundle(t *testing.T) {
 			t.Fatalf("Dockerfile missing %q:\n%s", want, df)
 		}
 	}
+
+	assertMicroRuntimeContract(t, df)
 }

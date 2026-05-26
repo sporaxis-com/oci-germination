@@ -50,16 +50,22 @@ local:
 		t.Fatalf("runtime profile = %q", spec.Image.RuntimeProfile)
 	}
 
-	if len(spec.Ports) != 2 {
-		t.Fatalf("ports length = %d", len(spec.Ports))
+	gotPorts := make(map[string]int, len(spec.Ports))
+	for _, port := range spec.Ports {
+		gotPorts[port.Name] = port.ContainerPort
 	}
 
-	if got := spec.Ports[0].ContainerPort; got != 5432 {
-		t.Fatalf("postgres container port = %d", got)
+	wantPorts := map[string]int{
+		"postgres": 5432,
+		"nats":     4222,
 	}
-
-	if got := spec.Ports[1].ContainerPort; got != 4222 {
-		t.Fatalf("nats container port = %d", got)
+	if len(gotPorts) != len(wantPorts) {
+		t.Fatalf("ports length = %d", len(gotPorts))
+	}
+	for name, want := range wantPorts {
+		if got := gotPorts[name]; got != want {
+			t.Fatalf("port %q = %d", name, got)
+		}
 	}
 
 	if spec.Services.NATS == nil {
