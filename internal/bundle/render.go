@@ -21,6 +21,17 @@ COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
+{{- if hasNATS . }}
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS supervisor_build
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod ./
+COPY go.sum ./
+COPY cmd/ociger-supervisor/main.go ./cmd/ociger-supervisor/main.go
+COPY internal/supervisor ./internal/supervisor
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-supervisor ./cmd/ociger-supervisor
+
+{{ end }}
 {{- if includesPGRDF . }}
 FROM alpine:3.20 AS pgrdf_fetch
 ARG TARGETARCH
@@ -118,6 +129,7 @@ ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
 {{- if hasNATS . }}
+COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor
 COPY {{ .BundleDir }}/nats-server.conf /etc/nats/nats-server.conf
 EXPOSE {{ exposedPorts . }}
 {{ end }}

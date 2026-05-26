@@ -1,0 +1,29 @@
+name: core-pg17-nats
+description: Minimal PostgreSQL 17 runtime with colocated NATS core and websocket listeners
+image:
+  registry: ghcr.io/sporaxis-com/ociger-core-pg17-nats
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: gcr.io/distroless/base-debian12:latest
+  runtime_profile: stable
+platforms:
+  - linux/amd64
+  - linux/arm64
+ports:
+  - name: postgres
+    container_port: 5432
+  - name: nats
+    container_port: 4222
+  - name: nats-ws
+    container_port: 9222
+services:
+  nats:
+    source_image: nats:2.14.1-scratch
+    core_port: 4222
+    websocket_port: 9222
+    jetstream: false
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-core-pg17-nats-smoke/pgdata
+  network: ociger-core-pg17-nats-net
+  container: ociger-core-pg17-nats-smoke

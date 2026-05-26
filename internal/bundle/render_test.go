@@ -277,8 +277,13 @@ func TestRenderCorePG17NATSBundle(t *testing.T) {
 	}
 
 	for _, want := range []string{
+		"FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS supervisor_build",
+		"COPY cmd/ociger-supervisor/main.go ./cmd/ociger-supervisor/main.go",
+		"COPY internal/supervisor ./internal/supervisor",
+		"RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-supervisor ./cmd/ociger-supervisor",
 		"FROM nats:2.14.1-scratch AS nats_source",
 		"COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server",
+		"COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor",
 		"EXPOSE 5432 4222 9222",
 		"COPY bundles/core-pg17-nats/nats-server.conf /etc/nats/nats-server.conf",
 		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
@@ -329,8 +334,13 @@ func TestRenderCorePG17NATSMicroBundle(t *testing.T) {
 	}
 
 	for _, want := range []string{
+		"FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS supervisor_build",
+		"COPY cmd/ociger-supervisor/main.go ./cmd/ociger-supervisor/main.go",
+		"COPY internal/supervisor ./internal/supervisor",
+		"RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-supervisor ./cmd/ociger-supervisor",
 		"FROM nats:2.14.1-scratch AS nats_source",
 		"COPY --from=nats_source /nats-server /out/usr/local/bin/nats-server",
+		"COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor",
 		"EXPOSE 5432 4222 9222",
 		"COPY bundles/core-pg17-nats-micro/nats-server.conf /etc/nats/nats-server.conf",
 		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
