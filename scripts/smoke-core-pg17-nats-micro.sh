@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_PHYSICAL="$(cd -P "$ROOT" && pwd)"
 DATA_DIR="$ROOT/.artifacts/ociger-core-pg17-nats-micro-smoke/pgdata"
 NETWORK="ociger-core-pg17-nats-micro-net"
 CONTAINER="ociger-core-pg17-nats-micro-smoke"
@@ -11,11 +12,61 @@ RELATIVE_PATH=""
 RELATION_PROOF_METHOD=""
 INFO_LINE=""
 
+resolve_physical_dir() {
+  (
+    cd -P "$1" >/dev/null 2>&1 &&
+      pwd
+  )
+}
+
 ensure_repo_data_path() {
+  local artifacts_dir data_parent data_parent_name data_basename
+  local resolved_artifacts resolved_parent resolved_target
+
   case "$DATA_DIR" in
     "$ROOT"/.artifacts/ociger-*) ;;
     *)
       echo "refusing to purge non-ociger data path: $DATA_DIR" >&2
+      exit 1
+      ;;
+  esac
+
+  artifacts_dir="$ROOT/.artifacts"
+  data_parent="${DATA_DIR%/*}"
+  data_parent_name="${data_parent##*/}"
+  data_basename="${DATA_DIR##*/}"
+
+  if [[ -e "$artifacts_dir" || -L "$artifacts_dir" ]]; then
+    resolved_artifacts="$(resolve_physical_dir "$artifacts_dir")" || {
+      echo "refusing to purge unresolved artifacts path: $artifacts_dir" >&2
+      exit 1
+    }
+  else
+    resolved_artifacts="$ROOT_PHYSICAL/.artifacts"
+  fi
+
+  if [[ "$resolved_artifacts" != "$ROOT_PHYSICAL/.artifacts" ]]; then
+    echo "refusing to purge symlinked artifacts path: $artifacts_dir -> $resolved_artifacts" >&2
+    exit 1
+  fi
+
+  if [[ -e "$data_parent" || -L "$data_parent" ]]; then
+    resolved_parent="$(resolve_physical_dir "$data_parent")" || {
+      echo "refusing to purge unresolved data path: $data_parent" >&2
+      exit 1
+    }
+  else
+    resolved_parent="$resolved_artifacts/$data_parent_name"
+  fi
+
+  resolved_target="$resolved_parent/$data_basename"
+
+  case "$resolved_target" in
+    "$ROOT_PHYSICAL"/.artifacts/ociger-*)
+      DATA_DIR="$resolved_target"
+      ;;
+    *)
+      echo "refusing to purge symlinked data path: $DATA_DIR -> $resolved_target" >&2
       exit 1
       ;;
   esac
