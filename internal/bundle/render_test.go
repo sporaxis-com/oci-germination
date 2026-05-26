@@ -1,6 +1,7 @@
 package bundle
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -363,4 +364,57 @@ func TestRenderRejectsNATSPortMismatch(t *testing.T) {
 	if !strings.Contains(err.Error(), "nats") || !strings.Contains(err.Error(), "9222") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestRenderAbsoluteBundlePathKeepsNATSCopySourceRelative(t *testing.T) {
+	repoRoot := testRepoRoot(t)
+	bundlePath, bundleDir := writeTestBundle(t, repoRoot, "absolute-render-", []byte(`
+name: core-pg17-nats-absolute-render
+description: PostgreSQL 17 runtime with NATS rendered from an absolute bundle path
+image:
+  registry: ghcr.io/sporaxis-com/ociger-core-pg17-nats-absolute-render
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: scratch
+platforms:
+  - linux/amd64
+ports:
+  - name: postgres
+    container_port: 5432
+  - name: nats
+    container_port: 4222
+  - name: nats-websocket
+    container_port: 9222
+services:
+  nats:
+    source_image: nats:2.14.1-scratch
+    core_port: 4222
+    websocket_port: 9222
+    jetstream: false
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-core-pg17-nats-absolute-render/pgdata
+  network: ociger-core-pg17-nats-absolute-render-net
+  container: ociger-core-pg17-nats-absolute-render
+`))
+
+	withWorkingDir(t, repoRoot, func() {
+		spec, err := Load(bundlePath)
+		if err != nil {
+			t.Fatalf("Load returned error: %v", err)
+		}
+
+		df, _, err := Render(spec)
+		if err != nil {
+			t.Fatalf("Render returned error: %v", err)
+		}
+
+		wantCopy := "COPY " + filepath.ToSlash(filepath.Join("bundles", filepath.Base(bundleDir), "nats-server.conf")) + " /etc/nats/nats-server.conf"
+		if !strings.Contains(df, wantCopy) {
+			t.Fatalf("Dockerfile missing %q:\n%s", wantCopy, df)
+		}
+		if strings.Contains(df, filepath.ToSlash(bundleDir)) {
+			t.Fatalf("Dockerfile should not embed absolute bundle path %q:\n%s", bundleDir, df)
+		}
+	})
 }
