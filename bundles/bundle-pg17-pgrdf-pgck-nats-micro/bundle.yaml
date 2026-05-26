@@ -1,0 +1,34 @@
+name: bundle-pg17-pgrdf-pgck-nats-micro
+description: PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners
+image:
+  registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: scratch
+  runtime_profile: micro
+extensions:
+  pgrdf:
+    version: 0.5.1
+  pgck:
+    version: 0.1.2
+platforms:
+  - linux/amd64
+  - linux/arm64
+ports:
+  - name: postgres
+    container_port: 5432
+  - name: nats
+    container_port: 4222
+  - name: nats-ws
+    container_port: 9222
+services:
+  nats:
+    source_image: nats:2.14.1-scratch
+    core_port: 4222
+    websocket_port: 9222
+    jetstream: false
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-pg17-pgrdf-pgck-nats-micro-smoke/pgdata
+  network: ociger-pg17-pgrdf-pgck-nats-micro-net
+  container: ociger-pg17-pgrdf-pgck-nats-micro-smoke

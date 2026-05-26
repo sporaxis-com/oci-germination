@@ -500,6 +500,19 @@ func TestRenderPGRDFPGCKNATSMicroBundle(t *testing.T) {
 		}
 	}
 
+	for _, want := range []string{
+		"ldd /out/usr/lib/postgresql/17/lib/pgrdf.so",
+		"ldd /out/usr/lib/postgresql/17/lib/pgck.so",
+		"/usr/lib/postgresql/17/lib/pgcrypto.so /out/usr/lib/postgresql/17/lib/pgcrypto.so",
+		"/usr/share/postgresql/17/extension/pgcrypto.control /out/usr/share/postgresql/17/extension/pgcrypto.control",
+		"/usr/share/postgresql/17/extension/pgcrypto--*.sql /out/usr/share/postgresql/17/extension/",
+		"ldd /out/usr/lib/postgresql/17/lib/pgcrypto.so",
+	} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("micro combined Dockerfile missing dependency handling %q:\n%s", want, df)
+		}
+	}
+
 	assertMicroRuntimeContract(t, df)
 }
 

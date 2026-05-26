@@ -117,6 +117,19 @@ COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/{{ .Imag
 COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgck.so
 COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/
 {{ end }}
+{{- if microHasExtensionDeps . }}
+RUN set -eux; \
+  if [ -f /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgrdf.so ]; then \
+    ldd /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgrdf.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  fi; \
+  if [ -f /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgck.so ]; then \
+    cp -L /usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgcrypto.so /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgcrypto.so; \
+    cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/extension/pgcrypto.control /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/pgcrypto.control; \
+    cp -L /usr/share/postgresql/{{ .Image.PGMajor }}/extension/pgcrypto--*.sql /out/usr/share/postgresql/{{ .Image.PGMajor }}/extension/; \
+    ldd /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgck.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+    ldd /out/usr/lib/postgresql/{{ .Image.PGMajor }}/lib/pgcrypto.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  fi
+{{ end }}
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data
@@ -285,6 +298,9 @@ func executeTemplate(source string, spec Spec) (string, error) {
 		},
 		"isMicro": func(spec Spec) bool {
 			return spec.Image.RuntimeProfile == "micro"
+		},
+		"microHasExtensionDeps": func(spec Spec) bool {
+			return spec.Image.RuntimeProfile == "micro" && (spec.Extensions.PGRDF != nil || spec.Extensions.PGCK != nil)
 		},
 	}).Parse(source)
 	if err != nil {
