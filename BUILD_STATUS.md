@@ -106,40 +106,41 @@ bash scripts/smoke-ck-allinone.sh [image-name]
 
 ---
 
-## Next Steps: GHCR Publishing
+## Published Images
 
-### Prerequisites
-
-1. **GHCR Authentication:**
-   ```bash
-   # Authenticate with GHCR (requires personal access token or gcloud)
-   docker login ghcr.io -u <github-username>
-   # OR
-   gcloud auth configure-docker ghcr.io
-   ```
-
-2. **Multi-Platform Build (linux/amd64, linux/arm64):**
-   ```bash
-   # Build both bundles with docker buildx
-   docker buildx build --platform linux/amd64,linux/arm64 \
-     --tag ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0 \
-     --push bundles/bundle-pg17-pgrdf-pgck-web-cklib/
-
-   docker buildx build --platform linux/amd64,linux/arm64 \
-     --tag ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2 \
-     --push bundles/bundle-ck-allinone/
-   ```
+Both bundles successfully built and published to GHCR with multi-platform (amd64 + arm64) manifests:
 
 ### Registry Paths
 
 - **Bundle 1 (Standard):** `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0`
+  - Manifest: `sha256:71209a0e6dbd5cf888588503da5ca4ee72e324dfd1a18624d7ed8500763d22e4`
+  - Platforms: linux/amd64, linux/arm64
+  
 - **Bundle 2 (All-in-One):** `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2`
+  - Manifest: `sha256:ce871e7b134338c88b6867055bfb58732ee4c7deca698ae5211dcbd8cc93ab77`
+  - Platforms: linux/amd64, linux/arm64
 
-### Local Testing (Current Status)
+### Build Methods
 
-✓ Single-platform (linux/amd64) local build validates Dockerfile correctness  
-✓ Smoke test scripts ready to run against live images  
-⏳ Multi-platform build + GHCR push blocked by authentication
+**Local Development (validation):**
+```bash
+# Single-platform local build
+docker build -t ociger-pg17-pgrdf-pgck-web-cklib:1.0.0 \
+  bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+
+docker build -t ociger-ck-allinone:v3.8-rc2 \
+  bundles/bundle-ck-allinone/
+
+# Multi-platform local build (requires docker buildx)
+gh auth token | docker login ghcr.io -u $(gh api user --jq .login) --password-stdin
+
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0 \
+  --push bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+```
+
+**GitHub Actions (Automated Pipeline):**
+Set up in `.github/workflows/build-bundles.yml` to trigger on version tags (v1.0.0, v3.8-rc2) and build+push multi-platform images to GHCR.
 
 ---
 
