@@ -16,6 +16,9 @@ func Load(path string) (Spec, error) {
 	}
 
 	err = yaml.Unmarshal(data, &spec)
+	if spec.Image.RuntimeProfile == "" {
+		spec.Image.RuntimeProfile = "stable"
+	}
 	spec.BundleDir = filepath.ToSlash(filepath.Dir(path))
 	return spec, err
 }
