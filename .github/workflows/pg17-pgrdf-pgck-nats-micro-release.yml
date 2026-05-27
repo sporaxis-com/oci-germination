@@ -43,6 +43,9 @@ jobs:
       - name: Verify generated files are committed
         run: git diff --exit-code -- bundles/
 
+      - name: Lint pgRDF preload contract
+        run: bash scripts/lint-pgrdf-preload.sh
+
       - name: Build native all-in-one NATS micro image
         run: bash scripts/build-pg17-pgrdf-pgck-nats-micro.sh
 
