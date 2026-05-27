@@ -1,3 +1,4 @@
+spec_version: 0.2
 name: bundle-pg17-pgrdf-pgck-web-cklib
 description: PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.1.0 + cklib 1.2.0
 
@@ -27,6 +28,10 @@ components:
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /cklib
     description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS
+
+static_web:
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.2.0
+    route: /cklib
 
 platforms:
   - linux/amd64
