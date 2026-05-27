@@ -99,7 +99,7 @@ RUN set -eux; \
 
 FROM scratch
 ENV PGDATA=/var/lib/postgresql/data
-ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck
+ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
 
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
