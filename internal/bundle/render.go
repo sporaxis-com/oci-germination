@@ -133,8 +133,8 @@ RUN set -eux; \
 
 FROM {{ .Image.FinalImage }}
 ENV PGDATA=/var/lib/postgresql/data
-{{- if includesPGCK . }}
-ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck
+{{- if needsPreload . }}
+ENV OCIGER_SHARED_PRELOAD_LIBRARIES={{ preloadLibs . }}
 {{ end }}
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
@@ -295,6 +295,19 @@ func executeTemplate(source string, spec Spec) (string, error) {
 		},
 		"includesPGCK": func(spec Spec) bool {
 			return spec.Extensions.PGCK != nil
+		},
+		"needsPreload": func(spec Spec) bool {
+			return spec.Extensions.PGRDF != nil || spec.Extensions.PGCK != nil
+		},
+		"preloadLibs": func(spec Spec) string {
+			var libs []string
+			if spec.Extensions.PGRDF != nil {
+				libs = append(libs, "pgrdf")
+			}
+			if spec.Extensions.PGCK != nil {
+				libs = append(libs, "pgck")
+			}
+			return strings.Join(libs, ",")
 		},
 		"isMicro": func(spec Spec) bool {
 			return spec.Image.RuntimeProfile == "micro"

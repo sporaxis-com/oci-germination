@@ -2,6 +2,13 @@ spec_version: 0.2
 name: bundle-pg17-pgrdf-pgck-web-cklib
 description: PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.2.0 + cklib 1.2.0
 
+# Hand-crafted bundle: thin layer on top of bundle-pg17-pgrdf-pgck with
+# pgckweb (FastAPI) + cklib (CK.Lib.Js) wired in. The current generator
+# (spec_version 0.1) doesn't model FROM-image composition or python venv steps,
+# so this Dockerfile is maintained by hand. Re-enable rendering once the
+# generator learns components: + static_web:.
+skip_render: true
+
 image:
   registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib
   pg_major: 17

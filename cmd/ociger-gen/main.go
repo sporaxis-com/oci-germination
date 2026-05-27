@@ -21,6 +21,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if spec.SkipRender {
+		log.Printf("skip_render set; leaving %s untouched", *specPath)
+		return
+	}
+
 	dir := filepath.Dir(*specPath)
 	if err := bundle.Write(spec, filepath.Join(dir, "Dockerfile"), filepath.Join(dir, "docker-bake.hcl")); err != nil {
 		log.Fatal(err)

@@ -148,6 +148,10 @@ func TestRenderPGRDFBundle(t *testing.T) {
 		t.Fatalf("Dockerfile missing pgrdf extension directory copy:\n%s", df)
 	}
 
+	if !strings.Contains(df, "ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf\n") {
+		t.Fatalf("Dockerfile missing pgrdf preload environment (required for PgAtomic init):\n%s", df)
+	}
+
 	if !strings.Contains(bake, `target "bundle-pg17-pgrdf"`) {
 		t.Fatalf("Bake output missing pgrdf target name:\n%s", bake)
 	}
@@ -206,8 +210,8 @@ func TestRenderPGRDFPGCKBundle(t *testing.T) {
 		t.Fatalf("Dockerfile missing pgck extension directory copy:\n%s", df)
 	}
 
-	if !strings.Contains(df, "ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck") {
-		t.Fatalf("Dockerfile missing pgck preload environment:\n%s", df)
+	if !strings.Contains(df, "ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck") {
+		t.Fatalf("Dockerfile missing pgrdf,pgck preload environment (both extensions require _PG_init):\n%s", df)
 	}
 
 	if !strings.Contains(bake, `target "bundle-pg17-pgrdf-pgck"`) {
@@ -426,7 +430,7 @@ func TestRenderPGRDFPGCKNATSBundle(t *testing.T) {
 		"COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so",
 		"COPY --from=nats_source /nats-server /usr/local/bin/nats-server",
 		"COPY bundles/bundle-pg17-pgrdf-pgck-nats/nats-server.conf /etc/nats/nats-server.conf",
-		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck",
+		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck",
 		"EXPOSE 5432 4222 9222",
 		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
 	} {
@@ -491,7 +495,7 @@ func TestRenderPGRDFPGCKNATSMicroBundle(t *testing.T) {
 		"COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so",
 		"COPY --from=nats_source /nats-server /usr/local/bin/nats-server",
 		"COPY bundles/bundle-pg17-pgrdf-pgck-nats-micro/nats-server.conf /etc/nats/nats-server.conf",
-		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgck",
+		"ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck",
 		"EXPOSE 5432 4222 9222",
 		`ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]`,
 	} {

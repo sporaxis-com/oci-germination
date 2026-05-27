@@ -4,6 +4,7 @@ type Spec struct {
 	Name        string      `yaml:"name"`
 	Description string      `yaml:"description"`
 	BundleDir   string      `yaml:"-"`
+	SkipRender  bool        `yaml:"skip_render,omitempty"`
 	Image       ImageSpec   `yaml:"image"`
 	Extensions  ExtensionSpec `yaml:"extensions"`
 	Platforms   []string    `yaml:"platforms"`
