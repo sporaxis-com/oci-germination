@@ -98,12 +98,12 @@ This allows for patch-level versioning without requiring new tags.
 
 | Bundle | Latest Tag | Semantic Version |
 |---|---|---|
-| `ck-allinone` | `release-ck-allinone-v0.3` | `v0.3.0` |
-| `pg17-pgrdf-pgck-web-cklib` | `release-pg17-pgrdf-pgck-web-cklib-v0.3` | `v0.3.0` |
+| `ck-allinone` | `release-ck-allinone-v0.4` | `v0.4.0` |
+| `pg17-pgrdf-pgck-web-cklib` | `release-pg17-pgrdf-pgck-web-cklib-v0.4` | `v0.4.0` |
 
 Both are published to GHCR as:
-- `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.3.0`
-- `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.3.0`
+- `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0`
+- `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0`
 
 ## Key Principles
 
