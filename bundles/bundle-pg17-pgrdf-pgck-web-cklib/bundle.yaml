@@ -20,7 +20,7 @@ extensions:
 components:
   pgckweb:
     version: 0.2.0
-    source: https://github.com/styk-tv/pgCK/tree/main/web
+    source: https://github.com/styk-tv/pgCK/tree/main/web_demo
     port: 8000
     description: FastAPI web UI for pgCK kernel operations
   cklib:

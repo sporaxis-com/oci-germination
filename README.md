@@ -38,8 +38,8 @@ All published images are multi-arch manifest lists for `linux/amd64` and `linux/
 | `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
 | `pg17-pgrdf-pgck-nats` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1` | `amd64`, `arm64` | `170.1 / 65.1 MiB` | triple-bundle proof plus NATS core on `4222`, WebSocket on `9222`, and one-image host relation-file proof |
 | `pg17-pgrdf-pgck-nats-micro` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` | `amd64`, `arm64` | `104.5 / 41.3 MiB` | all-in-one proof on the micro runtime line: `pgrdf`, `pgck`, NATS, and host relation-file proof |
-| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0` | `amd64`, `arm64` | `~200 / TBD` | ✓ Published | **Standard variant** — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.1.0 + cklib 1.2.0 (no NATS) |
-| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` | `amd64`, `arm64` | `~150 / TBD` | ✓ Published | **CKP Development Default** — All-in-one for Concept Kernel: pgckweb + cklib + NATS core (4222) + WSS (9222) + supervisor. Extends `ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` base. |
+| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0` | `amd64`, `arm64` | `~200 / TBD` | ✓ Published | **Standard variant** — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.1.0 + cklib 1.2.0 (no NATS) |
+| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0` | `amd64`, `arm64` | `~150 / TBD` | ✓ Published | **CKP Development Default** — All-in-one for Concept Kernel: pgckweb 0.1.0 + cklib 1.2.0 + NATS core (4222) + WSS (9222) + supervisor. Extends `ociger-pg17-pgrdf-pgck-nats-micro:v0.3` base. |
 
 Size values are `uncompressed / compressed` local measurements on `linux/arm64`. New bundles now published to GHCR with multi-platform manifests.
 
