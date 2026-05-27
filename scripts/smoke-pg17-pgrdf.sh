@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/assert-pgrdf-pgatomic.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
 DATA_DIR="$ROOT/.artifacts/ociger-pg17-pgrdf-smoke/pgdata"
 NETWORK="ociger-pg17-pgrdf-net"
 CONTAINER="ociger-pg17-pgrdf-smoke"
@@ -114,6 +116,8 @@ if [[ -z "$NATIVE_VERSION" ]]; then
   echo "native-version-empty: pgrdf.version() returned empty" >&2
   exit 1
 fi
+
+assert_pgrdf_pgatomic postgres
 
 if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "wrong-version: extversion=$INSTALLED_VERSION expected=$EXPECTED_VERSION" >&2

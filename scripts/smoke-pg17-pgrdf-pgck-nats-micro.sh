@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_PHYSICAL="$(cd -P "$ROOT" && pwd)"
+# shellcheck source=lib/assert-pgrdf-pgatomic.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
 DATA_DIR="$ROOT/.artifacts/ociger-pg17-pgrdf-pgck-nats-micro-smoke/pgdata"
 NETWORK="ociger-pg17-pgrdf-pgck-nats-micro-net"
 CONTAINER="ociger-pg17-pgrdf-pgck-nats-micro-smoke"
@@ -250,6 +252,8 @@ fi
 
 PGRDF_NATIVE="$(psql_query ociger_demo "SELECT pgrdf.version();")"
 PGCK_NATIVE="$(psql_query ociger_demo "SELECT pgck_version();")"
+
+assert_pgrdf_pgatomic ociger_demo
 
 if [[ "$PGRDF_AVAILABLE" != "$EXPECTED_PGRDF_VERSION" ]]; then
   echo "wrong-version: pgrdf available=$PGRDF_AVAILABLE expected=$EXPECTED_PGRDF_VERSION" >&2

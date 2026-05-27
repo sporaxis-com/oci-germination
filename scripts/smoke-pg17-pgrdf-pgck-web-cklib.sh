@@ -4,6 +4,15 @@
 
 set -e
 
+# shellcheck source=lib/assert-pgrdf-pgatomic.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
+
+psql_query() {
+  local db="$1"
+  local sql="$2"
+  docker exec "$CONTAINER_NAME" psql -U postgres -d "$db" -At -v ON_ERROR_STOP=1 -c "$sql"
+}
+
 IMAGE="${1:-ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:latest}"
 CONTAINER_NAME="ociger-pg17-pgrdf-pgck-web-cklib-smoke"
 NETWORK_NAME="ociger-pg17-pgrdf-pgck-web-cklib-net"
@@ -63,6 +72,10 @@ docker exec "$CONTAINER_NAME" psql -U postgres -d pgrdf_test -c "CREATE EXTENSIO
 docker exec "$CONTAINER_NAME" psql -U postgres -d pgrdf_test -c "SELECT pgck_version();" > /tmp/pgck_version.txt
 PGCK_VERSION=$(cat /tmp/pgck_version.txt | grep "pgck")
 echo "[smoke] pgCK version: $PGCK_VERSION"
+
+# Regression: pgRDF PgAtomic must be initialised (shared_preload_libraries='pgrdf,pgck')
+echo "[smoke] Testing pgRDF PgAtomic initialization (regression)..."
+assert_pgrdf_pgatomic pgrdf_test
 
 # Test FastAPI on port 8000
 echo "[smoke] Waiting for FastAPI startup..."

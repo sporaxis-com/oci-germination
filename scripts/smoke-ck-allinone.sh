@@ -4,6 +4,15 @@
 
 set -e
 
+# shellcheck source=lib/assert-pgrdf-pgatomic.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
+
+psql_query() {
+  local db="$1"
+  local sql="$2"
+  docker exec "$CONTAINER_NAME" psql -U postgres -d "$db" -At -v ON_ERROR_STOP=1 -c "$sql"
+}
+
 IMAGE="${1:-ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2}"
 CONTAINER_NAME="ociger-ck-allinone-smoke"
 NETWORK_NAME="ociger-ck-allinone-net"
@@ -83,25 +92,12 @@ echo ""
 echo "────────────────────────────────────────────────────────────"
 echo "[ck-allinone] ③.₁ pgRDF PgAtomic Initialization (Regression)"
 echo "────────────────────────────────────────────────────────────"
-PGATOMIC_TEST=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test << 'EOSQL' 2>&1
-SELECT pgrdf.parse_turtle(
-  'PREFIX ex: <http://example.org/> ex:test a ex:Thing .',
-  1::bigint,
-  'http://example.org/'
-);
-EOSQL
-)
-if echo "$PGATOMIC_TEST" | grep -q "PgAtomic was not initialized"; then
-  echo "[ck-allinone] ❌ REGRESSION: PgAtomic not initialized - pgRDF module not in shared_preload_libraries"
-  echo "[ck-allinone]    Fix: Add 'pgrdf' to shared_preload_libraries in PostgreSQL config"
-  PGATOMIC_PASS=0
-elif echo "$PGATOMIC_TEST" | grep -q "ERROR"; then
-  echo "[ck-allinone] ❌ REGRESSION: Unexpected error in pgrdf.parse_turtle()"
-  echo "[ck-allinone]    Error: $(echo "$PGATOMIC_TEST" | grep ERROR)"
-  PGATOMIC_PASS=0
-else
+if assert_pgrdf_pgatomic ck_test; then
   echo "[ck-allinone] ✓ pgRDF PgAtomic initialized successfully"
   PGATOMIC_PASS=1
+else
+  echo "[ck-allinone] ❌ REGRESSION: see error output above"
+  PGATOMIC_PASS=0
 fi
 
 # Test FastAPI (port 8000)

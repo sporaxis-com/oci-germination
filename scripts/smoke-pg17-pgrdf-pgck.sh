@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/assert-pgrdf-pgatomic.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
 DATA_DIR="$ROOT/.artifacts/ociger-pg17-pgrdf-pgck-smoke/pgdata"
 NETWORK="ociger-pg17-pgrdf-pgck-net"
 CONTAINER="ociger-pg17-pgrdf-pgck-smoke"
@@ -142,6 +144,8 @@ fi
 
 PGRDF_NATIVE="$(psql_query postgres "SELECT pgrdf.version();")"
 PGCK_NATIVE="$(psql_query postgres "SELECT pgck_version();")"
+
+assert_pgrdf_pgatomic postgres
 
 if [[ "$PGRDF_AVAILABLE" != "$EXPECTED_PGRDF_VERSION" ]]; then
   echo "wrong-version: pgrdf available=$PGRDF_AVAILABLE expected=$EXPECTED_PGRDF_VERSION" >&2
