@@ -78,6 +78,32 @@ docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE EXTENSION p
 PGCK_VER=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "SELECT pgck_version();" 2>/dev/null | tail -1)
 echo "[ck-allinone] ✓ pgCK version: $PGCK_VER"
 
+# Test pgRDF PgAtomic Initialization (Regression Test)
+echo ""
+echo "────────────────────────────────────────────────────────────"
+echo "[ck-allinone] ③.₁ pgRDF PgAtomic Initialization (Regression)"
+echo "────────────────────────────────────────────────────────────"
+PGATOMIC_TEST=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test << 'EOSQL' 2>&1
+SELECT pgrdf.parse_turtle(
+  'PREFIX ex: <http://example.org/> ex:test a ex:Thing .',
+  1::bigint,
+  'http://example.org/'
+);
+EOSQL
+)
+if echo "$PGATOMIC_TEST" | grep -q "PgAtomic was not initialized"; then
+  echo "[ck-allinone] ❌ REGRESSION: PgAtomic not initialized - pgRDF module not in shared_preload_libraries"
+  echo "[ck-allinone]    Fix: Add 'pgrdf' to shared_preload_libraries in PostgreSQL config"
+  PGATOMIC_PASS=0
+elif echo "$PGATOMIC_TEST" | grep -q "ERROR"; then
+  echo "[ck-allinone] ❌ REGRESSION: Unexpected error in pgrdf.parse_turtle()"
+  echo "[ck-allinone]    Error: $(echo "$PGATOMIC_TEST" | grep ERROR)"
+  PGATOMIC_PASS=0
+else
+  echo "[ck-allinone] ✓ pgRDF PgAtomic initialized successfully"
+  PGATOMIC_PASS=1
+fi
+
 # Test FastAPI (port 8000)
 echo ""
 echo "────────────────────────────────────────────────────────────"
@@ -192,7 +218,11 @@ echo "[ck-allinone] ✓ Supervisor managing $RUNNING_SERVICES services"
 # Summary
 echo ""
 echo "════════════════════════════════════════════════════════════"
-echo "[ck-allinone] ✓ All Smoke Tests Passed"
+if [ "$PGATOMIC_PASS" = "1" ]; then
+  echo "[ck-allinone] ✓ All Smoke Tests Passed"
+else
+  echo "[ck-allinone] ⚠ Smoke Tests Completed - PgAtomic Regression DETECTED"
+fi
 echo "════════════════════════════════════════════════════════════"
 echo ""
 echo "Component Versions:"
