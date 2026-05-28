@@ -46,7 +46,10 @@ jobs:
           cache: false
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.62
+          # v1.64+ is built with Go 1.24; older versions fail with
+          # "Go language version (go1.23) used to build golangci-lint
+          # is lower than the targeted Go version (1.24.4)".
+          version: v1.64
 
   shellcheck:
     name: shellcheck (smoke scripts)

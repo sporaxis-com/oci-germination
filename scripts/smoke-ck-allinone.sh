@@ -197,7 +197,7 @@ echo "────────────────────────�
 if [ -d "$DATA_DIR/base" ]; then
   RELATION_FILES=$(find "$DATA_DIR/base" -type f 2>/dev/null | wc -l)
   echo "[ck-allinone] ✓ Found $RELATION_FILES relation files in pgdata"
-  PGCK_TEST_TABLE=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE TABLE demo_rows (id INT, data TEXT);" 2>/dev/null && echo "✓" || echo "✗")
+  docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE TABLE demo_rows (id INT, data TEXT);" >/dev/null 2>&1 || true
   docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "INSERT INTO demo_rows VALUES (1, 'test'), (2, 'ckp-v3.8');" 2>/dev/null || true
   RELATION_PATH=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "SELECT pg_relation_filepath('demo_rows');" 2>/dev/null | tail -1)
   echo "[ck-allinone] ✓ Relation proof method: host (demo_rows → $RELATION_PATH)"
