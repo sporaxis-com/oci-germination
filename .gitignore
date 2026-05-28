@@ -47,3 +47,6 @@ coverage.out
 
 # Claude Code session state
 .claude/
+
+# WIP scratch (NOTIFIES, drafts, transient docs — local exchange only)
+_WIP/
