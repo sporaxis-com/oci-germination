@@ -1,0 +1,79 @@
+spec_version: 0.2
+name: bundle-pg17-pgrdf-pgck-static-cklib
+description: CKP v3.8 static-only bundle — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + NATS 2.14.1 WSS + ociger-static-server + cklib 1.2.1 (no FastAPI/Python)
+
+# Hand-crafted bundle: thin Go-based static server layer on top of
+# bundle-pg17-pgrdf-pgck-nats-micro. Replaces FastAPI/pgckweb with
+# ociger-static-server (single Go binary, no Python runtime).
+# Aligns with CK.Lib.Js v3.8 architecture: browser ↔ NATS only, HTTP
+# serves static assets only.
+skip_render: true
+
+image:
+  registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: gcr.io/distroless/base-debian12:latest
+  runtime_profile: micro
+
+extensions:
+  pgrdf:
+    version: 0.5.1
+    source: https://github.com/styk-tv/pgRDF
+  pgck:
+    version: 0.1.2
+    source: https://github.com/styk-tv/pgCK
+
+components:
+  static_server:
+    version: 0.1.0
+    source: cmd/ociger-static-server
+    port: 8000
+    description: Tiny Go HTTP server mounting subdirectories of /app at /<name>/
+  cklib:
+    version: 1.2.1
+    source: https://github.com/ConceptKernel/CK.Lib.Js
+    mount_path: /cklib
+    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS
+  nats:
+    version: 2.14.1
+    source: https://github.com/nats-io/nats-server
+    core_port: 4222
+    wss_port: 9222
+    jetstream: false
+    description: Message bus for kernel communication, WSS bridge for browser clients
+
+services:
+  nats:
+    source_image: nats:2.14.1-scratch
+    core_port: 4222
+    websocket_port: 9222
+    jetstream: false
+
+static_web:
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.2.1
+    route: /cklib
+
+supervisor:
+  profile: static
+  description: ociger-supervisor in static profile (postgres + nats + ociger-static-server)
+
+platforms:
+  - linux/amd64
+  - linux/arm64
+
+ports:
+  - name: postgres
+    container_port: 5432
+  - name: static
+    container_port: 8000
+  - name: nats
+    container_port: 4222
+  - name: nats-wss
+    container_port: 9222
+
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-pg17-pgrdf-pgck-static-cklib-smoke/pgdata
+  network: ociger-pg17-pgrdf-pgck-static-cklib-net
+  container: ociger-pg17-pgrdf-pgck-static-cklib-smoke
