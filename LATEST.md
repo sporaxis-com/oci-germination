@@ -46,21 +46,14 @@ PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distr
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
-## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.3`
+## ociger-pg17-pgrdf-pgck-nats-micro — *no attested release yet*
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.
 
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:dcd40f525b35659e64b0c8df26a5884d245906c0a29696a62a47f4bb2e603db5`  | 2026-05-28 19:00:46 |
-| arm64 | `sha256:9607a76f432a5330dd38337f688adf2c4b1a6d1d9a7efcc2a965345e74825096`  | 2026-05-28 19:00:46 |
+> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.3`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:54b55864c5b34a372337c14943445866cac7331ccbdcfd9a064da54fe73b6c5b`                                                         |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
 
