@@ -1,0 +1,29 @@
+# Minimal golangci-lint config — opt for signal over noise.
+# Tighten over time as findings get addressed.
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck     # unchecked errors
+    - gosimple     # simplification opportunities
+    - govet        # standard go vet
+    - ineffassign  # ineffectual assignments
+    - staticcheck  # standard analysis
+    - unused       # unused code
+
+linters-settings:
+  errcheck:
+    # log.Fatal returns and fmt.Fprint write-error noise we already handle.
+    exclude-functions:
+      - fmt.Fprint
+      - fmt.Fprintf
+      - fmt.Fprintln
+      - (io.Writer).Write
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck  # tests often ignore errors on cleanup paths

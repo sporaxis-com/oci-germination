@@ -1,16 +1,16 @@
 package bundle
 
 type Spec struct {
-	Name        string      `yaml:"name"`
-	Description string      `yaml:"description"`
-	BundleDir   string      `yaml:"-"`
-	SkipRender  bool        `yaml:"skip_render,omitempty"`
-	Image       ImageSpec   `yaml:"image"`
+	Name        string        `yaml:"name"`
+	Description string        `yaml:"description"`
+	BundleDir   string        `yaml:"-"`
+	SkipRender  bool          `yaml:"skip_render,omitempty"`
+	Image       ImageSpec     `yaml:"image"`
 	Extensions  ExtensionSpec `yaml:"extensions"`
-	Platforms   []string    `yaml:"platforms"`
-	Ports       []PortSpec  `yaml:"ports"`
-	Services    ServiceSpec `yaml:"services"`
-	Local       LocalSpec   `yaml:"local"`
+	Platforms   []string      `yaml:"platforms"`
+	Ports       []PortSpec    `yaml:"ports"`
+	Services    ServiceSpec   `yaml:"services"`
+	Local       LocalSpec     `yaml:"local"`
 }
 
 type ImageSpec struct {

@@ -1,0 +1,88 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go vet + gofmt + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+      - name: go vet
+        run: go vet ./...
+      - name: gofmt check
+        run: |
+          out=$(gofmt -l ./cmd ./internal)
+          if [ -n "$out" ]; then
+            echo "gofmt found unformatted files:"
+            echo "$out"
+            exit 1
+          fi
+      - name: go test
+        run: go test -race ./...
+      - name: coverage summary
+        run: |
+          go test -coverprofile=coverage.out ./... >/dev/null
+          go tool cover -func=coverage.out | tail -1
+
+  golangci-lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: false
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62
+
+  shellcheck:
+    name: shellcheck (smoke scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        run: |
+          shellcheck --source-path=scripts/lib --severity=warning scripts/*.sh scripts/lib/*.sh
+
+  hadolint:
+    name: hadolint (Dockerfiles)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - bundles/bundle-ck-allinone/Dockerfile
+          - bundles/bundle-pg17-pgrdf-pgck-web-cklib/Dockerfile
+          - bundles/bundle-pg17-pgrdf-pgck-static-cklib/Dockerfile
+          - bundles/bundle-pg17-pgrdf-pgck-nats-micro/Dockerfile
+          - bundles/bundle-pg17-pgrdf-pgck-nats/Dockerfile
+          - bundles/bundle-pg17-pgrdf-pgck/Dockerfile
+          - bundles/bundle-pg17-pgrdf/Dockerfile
+          - bundles/core-pg17-nats-micro/Dockerfile
+          - bundles/core-pg17-nats/Dockerfile
+          - bundles/core-pg17-micro/Dockerfile
+          - bundles/core-pg17/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: hadolint ${{ matrix.dockerfile }}
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          # Warnings allowed; only fail on errors. Tightening as bundles get cleanup passes.
+          failure-threshold: error
+          # DL3008 = pin apt versions, DL3009 = clear apt-lists, DL3018 = pin apk
+          # DL4006 = pipefail (we don't use bash | sh -o pipefail), DL3007 = ':latest' tags
+          ignore: DL3008,DL3009,DL3018,DL4006,DL3007
