@@ -93,8 +93,13 @@ jobs:
           file: ${{ steps.extract.outputs.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
+          # Each release moves :latest forward on the production image
+          # name (per SPEC.OCIGERMI.TRACKS.DEVEL §4.3). Devel-track images
+          # (when the -devel image name lands) will move their own
+          # :latest independently.
           tags: |
             ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}
+            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
