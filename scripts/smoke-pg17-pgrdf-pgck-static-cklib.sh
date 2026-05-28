@@ -13,7 +13,7 @@ IMAGE="${1:-ociger-pg17-pgrdf-pgck-static-cklib:local}"
 EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.1}"
 EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.1.2}"
 EXPECTED_NATS_VERSION="${NATS_EXPECTED_VERSION:-2.14.1}"
-EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.2.1}"
+EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.0}"
 
 owned_container_label() {
   docker inspect -f '{{ index .Config.Labels "io.sporaxis.ociger" }}' "$1" 2>/dev/null || true
