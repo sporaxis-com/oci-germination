@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'release-pg17-pgrdf-pgck-web-cklib-*'
+      - 'release-pg17-pgrdf-pgck-static-cklib-*'
       - 'release-ck-allinone-*'
 
 env:
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -34,14 +37,19 @@ jobs:
         id: extract
         run: |
           TAG="${{ github.ref_name }}"
-          if [[ "$TAG" =~ ^release-pg17-pgrdf-pgck-web-cklib-(.*) ]]; then
+          # Order matters: longer-prefix first to avoid 'web-cklib' matching 'static-cklib' (etc.)
+          if [[ "$TAG" =~ ^release-pg17-pgrdf-pgck-static-cklib-(.*) ]]; then
+            echo "bundle=pg17-pgrdf-pgck-static-cklib" >> $GITHUB_OUTPUT
+            echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "dockerfile=bundles/bundle-pg17-pgrdf-pgck-static-cklib/Dockerfile" >> $GITHUB_OUTPUT
+          elif [[ "$TAG" =~ ^release-pg17-pgrdf-pgck-web-cklib-(.*) ]]; then
             echo "bundle=pg17-pgrdf-pgck-web-cklib" >> $GITHUB_OUTPUT
             echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "context=bundles/bundle-pg17-pgrdf-pgck-web-cklib" >> $GITHUB_OUTPUT
+            echo "dockerfile=bundles/bundle-pg17-pgrdf-pgck-web-cklib/Dockerfile" >> $GITHUB_OUTPUT
           elif [[ "$TAG" =~ ^release-ck-allinone-(.*) ]]; then
             echo "bundle=ck-allinone" >> $GITHUB_OUTPUT
             echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "context=bundles/bundle-ck-allinone" >> $GITHUB_OUTPUT
+            echo "dockerfile=bundles/bundle-ck-allinone/Dockerfile" >> $GITHUB_OUTPUT
           else
             echo "ERROR: Tag format not recognized: $TAG"
             exit 1
@@ -50,26 +58,27 @@ jobs:
       - name: Calculate semantic version
         id: semver
         run: |
-          DESCRIBE=$(git describe --tags --always)
+          # Match describe output against this bundle's release-* tag prefix
+          # (e.g. release-pg17-pgrdf-pgck-static-cklib-v0.1 + 5 commits → v0.1.5).
+          BUNDLE="${{ steps.extract.outputs.bundle }}"
           BASE_VERSION="${{ steps.extract.outputs.base_version }}"
+          DESCRIBE=$(git describe --tags --match "release-${BUNDLE}-*" --always 2>/dev/null || git describe --tags --always)
 
-          # Extract patch number from git describe (distance since tag)
-          # Format: release-ck-allinone-vX.Y-N-gHASH or release-ck-allinone-vX.Y if at tag
           if [[ "$DESCRIBE" =~ -([0-9]+)-g[a-f0-9]+ ]]; then
             PATCH="${BASH_REMATCH[1]}"
             SEMANTIC_VERSION="${BASE_VERSION}.${PATCH}"
           else
-            # At the tag (distance 0)
             SEMANTIC_VERSION="${BASE_VERSION}.0"
           fi
 
           echo "semantic_version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
-          echo "Semantic version: $SEMANTIC_VERSION from git describe: $DESCRIBE"
+          echo "Semantic version: $SEMANTIC_VERSION (bundle=$BUNDLE, describe=$DESCRIBE)"
 
       - name: Build and push to GHCR
         uses: docker/build-push-action@v5
         with:
-          context: ${{ steps.extract.outputs.context }}
+          context: .
+          file: ${{ steps.extract.outputs.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
