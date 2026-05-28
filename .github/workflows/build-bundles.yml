@@ -58,21 +58,33 @@ jobs:
       - name: Calculate semantic version
         id: semver
         run: |
-          # Match describe output against this bundle's release-* tag prefix
-          # (e.g. release-pg17-pgrdf-pgck-static-cklib-v0.1 + 5 commits → v0.1.5).
+          # Two tag shapes are supported:
+          #   release-<bundle>-vM.N       → 2-number tag, patch from git describe distance
+          #                                 (e.g. v0.1 + 5 commits → v0.1.5)
+          #   release-<bundle>-vM.N.K     → 3-number tag, used verbatim
+          #                                 (e.g. v0.6.1 → v0.6.1)
+          # The 3-number form is preferred for explicit-patch releases when a
+          # 2-number+distance scheme would collide with an already-published tag.
           BUNDLE="${{ steps.extract.outputs.bundle }}"
           BASE_VERSION="${{ steps.extract.outputs.base_version }}"
-          DESCRIBE=$(git describe --tags --match "release-${BUNDLE}-*" --always 2>/dev/null || git describe --tags --always)
 
-          if [[ "$DESCRIBE" =~ -([0-9]+)-g[a-f0-9]+ ]]; then
-            PATCH="${BASH_REMATCH[1]}"
-            SEMANTIC_VERSION="${BASE_VERSION}.${PATCH}"
+          if [[ "$BASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            SEMANTIC_VERSION="$BASE_VERSION"
+            echo "tag_shape=3-number" >> $GITHUB_OUTPUT
           else
-            SEMANTIC_VERSION="${BASE_VERSION}.0"
+            DESCRIBE=$(git describe --tags --match "release-${BUNDLE}-*" --always 2>/dev/null || git describe --tags --always)
+            if [[ "$DESCRIBE" =~ -([0-9]+)-g[a-f0-9]+ ]]; then
+              PATCH="${BASH_REMATCH[1]}"
+              SEMANTIC_VERSION="${BASE_VERSION}.${PATCH}"
+            else
+              SEMANTIC_VERSION="${BASE_VERSION}.0"
+            fi
+            echo "tag_shape=2-number+distance" >> $GITHUB_OUTPUT
+            echo "describe=$DESCRIBE" >> $GITHUB_OUTPUT
           fi
 
           echo "semantic_version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
-          echo "Semantic version: $SEMANTIC_VERSION (bundle=$BUNDLE, describe=$DESCRIBE)"
+          echo "Semantic version: $SEMANTIC_VERSION (bundle=$BUNDLE, base=$BASE_VERSION)"
 
       - name: Build and push to GHCR
         uses: docker/build-push-action@v5

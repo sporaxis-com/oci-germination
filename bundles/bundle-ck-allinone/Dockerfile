@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1.7
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.2 AS base
+LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
+LABEL org.opencontainers.image.description="CKP v3.8 all-in-one micro runtime — PG17 + pgRDF + pgCK + NATS + pgckweb + cklib"
+LABEL org.opencontainers.image.licenses="MIT"
 
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.0 AS cklib_source
 
