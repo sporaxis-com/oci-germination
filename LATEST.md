@@ -13,124 +13,201 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — *no attested release yet*
+## ociger-ck-allinone — `v0.6.3`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI) + CK.Lib.Js mounted at `/cklib/`. Supervisor-orchestrated, scratch base. ⚠️ FastAPI process latent gap — Postgres/pgRDF/pgCK/NATS work; FastAPI dead. Use `static-cklib` (below) for a working web layer.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:e983c612770c7d60646d5c90cdbe3aa76ff7e9bd8b17c8866354d67986bc44d3`  | 2026-05-28 18:54:22 |
+| arm64 | `sha256:1a644694dc07f7faf8d64ea4e9b89337a55a5d823a588936b629d2a0fa57920b`  | 2026-05-28 18:54:22 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.6.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:a86a165a55ece3607f00b9f661da64fd3f2af7471b106a81d04aedc1a20724b1`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-## ociger-pg17-pgrdf-pgck-static-cklib — *no attested release yet*
+## ociger-pg17-pgrdf-pgck-static-cklib — `v0.6.3`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at `/cklib/`. No Python, no FastAPI. Browser ↔ kernel via NATS WSS; HTTP serves only static assets.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:8a7bc5f0fbf9413221b2fb4d925737e9fd66eb371f0a047c9612d3ad85ff0324`  | 2026-05-28 18:58:39 |
+| arm64 | `sha256:57e89ce9c9caf1ac370ed5a9ddc1c9e5847f4f528bb9f2a920cfebbcfd6d7c32`  | 2026-05-28 18:58:39 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:fd0a4b6d6f55d5342db21b29bafea1b7dab88dcb35ff69a3e543aa507d3143e3`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-static-cklib |
 
-## ociger-pg17-pgrdf-pgck-web-cklib — *no attested release yet*
+## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.3`
 
 PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. ⚠️ Same FastAPI latent gap as ck-allinone. Use `static-cklib` for a working web layer.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:c1eca18476e274e486b3d660574d698eeee6db2566da0ac082380cbfd5e10bb8`  | 2026-05-28 19:00:07 |
+| arm64 | `sha256:bccd4e706f1a1388cf569baaccf5dc32241d11411dad126b77a2b7cca61b8b4b`  | 2026-05-28 19:00:07 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.6.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:482e86b505dbf1eb80bd034eefc3deeb1d1cc702ce1b41408872c1ffbe5ef96b`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
-## ociger-pg17-pgrdf-pgck-nats-micro — *no attested release yet*
+## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.3`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:dcd40f525b35659e64b0c8df26a5884d245906c0a29696a62a47f4bb2e603db5`  | 2026-05-28 19:00:46 |
+| arm64 | `sha256:9607a76f432a5330dd38337f688adf2c4b1a6d1d9a7efcc2a965345e74825096`  | 2026-05-28 19:00:46 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:54b55864c5b34a372337c14943445866cac7331ccbdcfd9a064da54fe73b6c5b`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
 
-## ociger-pg17-pgrdf-pgck-nats — *no attested release yet*
+## ociger-pg17-pgrdf-pgck-nats — `v0.1.3`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc available).
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:9e129209c8316ebf2403a471298141eb55723d5a81863b8f771b42971d91c938`  | 2026-05-28 19:01:34 |
+| arm64 | `sha256:8e1335d3c55ba6b43c4923aac799dfc9b726e272b99682fe92f2e25248ee2132`  | 2026-05-28 19:01:34 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:6b99a599a47a4f40ba12905dbaa867c05dd1230f6580f64330fb2614bbb5fc30`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats/`](./bundles/bundle-pg17-pgrdf-pgck-nats/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats |
 
-## ociger-pg17-pgrdf-pgck — *no attested release yet*
+## ociger-pg17-pgrdf-pgck — `v0.1.3`
 
 PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgrdf,pgck`). No NATS. Distroless base.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:1b986dc2cc6284f5ef31fbfecf81cf17ebcedbebd2c92dcf7113deb9508c2363`  | 2026-05-28 19:00:25 |
+| arm64 | `sha256:0b6782b043b4419f68a4480ee96d9a22ced869d627f4609c6265ed59c0893940`  | 2026-05-28 19:00:25 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:9e751c7fd49f6092c4d1aba251e9129a663e6e47cbbdb09ae52a4c4f022f60d4`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
 
-## ociger-pg17-pgrdf — *no attested release yet*
+## ociger-pg17-pgrdf — `v0.1.3`
 
 PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:d97561dc692a906f4f942b59765603da610214d90d46c1d801af4f63685af7e4`  | 2026-05-28 19:00:00 |
+| arm64 | `sha256:4a4d0413fdfb0ab59470ec71e3a54dfd77f61dccac9f543594f9e6aa524f3215`  | 2026-05-28 19:00:00 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:049f46c3ea0140da72753c352db51a41e880baf6f646e9e858d3b595b190ef3f`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf/`](./bundles/bundle-pg17-pgrdf/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf |
 
-## ociger-core-pg17-nats-micro — *no attested release yet*
+## ociger-core-pg17-nats-micro — `v0.1.2`
 
 PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:d6fda67f4b21be6ced4e91a96b960b3e2a3b0f65fc1e5849af89f72d2a3b9e31`  | 2026-05-28 19:00:27 |
+| arm64 | `sha256:277f68b09d1150bfcf1f9aea6e0e00f6c2f2079b35db6091903400928a976253`  | 2026-05-28 19:00:27 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.2`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:988e81a04bce15bf255ab19e48987eefd0e77f6791a2c158d48946fc1e3fc7a1`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-nats-micro/`](./bundles/core-pg17-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats-micro |
 
-## ociger-core-pg17-nats — *no attested release yet*
+## ociger-core-pg17-nats — `v0.1.2`
 
 PostgreSQL 17 + NATS + NATS WSS. No extensions. Distroless base.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:dc303a2ac9bca965fa1505129dc69e235b362caf34c6a673e64ed09a14566ffe`  | 2026-05-28 19:00:58 |
+| arm64 | `sha256:ce350151e83e9e615063e85f06e2d09f5bc685b9fb64aeee75f5d645b97c42c7`  | 2026-05-28 19:00:58 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.2`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:07e2a997518a87e3a4a9071de8c0dd3a6c55897e20a2862ecbaaf4c05d552e7b`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-nats/`](./bundles/core-pg17-nats/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats |
 
-## ociger-core-pg17-micro — *no attested release yet*
+## ociger-core-pg17-micro — `v0.1.2`
 
 PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bundle.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:aeb2d7245c5cebcad24f3ffcc56ec29fcfe8d55fd647191dbf3396835bb84eaf`  | 2026-05-28 18:59:52 |
+| arm64 | `sha256:58b7e9a8c6d523cec72d7e3b9305c94ad31c6a12b806830eb8a03c43eebeba8f`  | 2026-05-28 18:59:52 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.2`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:25aca368af58b68d7f07cb837a43f8a20e5b0efff0a5ba5cde5047ae1ccfab11`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-micro/`](./bundles/core-pg17-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-micro |
 
-## ociger-core-pg17-min — *no attested release yet*
+## ociger-core-pg17-min — `core-pg17-v0.1.3`
 
 PostgreSQL 17 only. Distroless base (shell + libc available).
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:d81998763e41a04603eb1235ab1c13bd1cb0b355e8ab4ed84e345bc40c7c877a`  | 2026-05-28 18:59:54 |
+| arm64 | `sha256:858a43bad4089840976c9720815f7c9667347ad210edeb10ff020659cbc4d813`  | 2026-05-28 18:59:54 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.3`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:e68908d1e6fbefd2c2723670e96f98a6f0faaecf26cd5858e8ada52bb5af6dc5`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17/`](./bundles/core-pg17/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-min |
 

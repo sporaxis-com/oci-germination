@@ -116,8 +116,28 @@ def gh(args: list[str]) -> str:
     return res.stdout
 
 
+_VERSION_TAG_RE = re.compile(r"^(?:[a-z0-9-]+-)?v?[0-9]+\.[0-9]+\.[0-9]+$")
+"""Matches real version tags like 'v0.6.3', 'v0.1.2', 'core-pg17-v0.1.3'.
+
+Excludes:
+- 'latest' aliases
+- attestation referrer tags like 'sha256-a86a165a...'
+- arch-suffixed aliases like 'v0.6.3-amd64' (we publish multi-arch manifests, not per-arch tags)
+"""
+
+
 def get_latest_tagged_version(owner: str, package: str) -> dict | None:
-    """Return the most recent VERSION-tagged GHCR version (skipping `latest` aliases)."""
+    """Return the most recent VERSION-tagged GHCR version.
+
+    Skips:
+    - `latest` / `latest-amd64` / `latest-arm64` aliases
+    - `sha256-…` attestation referrer tags (these are OCI referrer artifacts that
+      GHCR exposes as separate versions; tagging by the digest of their subject)
+    - any other non-semver tag
+
+    Picks the most-recently-created version whose tag set contains at least one
+    semver-shaped tag.
+    """
     raw = gh(
         [
             "api",
@@ -129,9 +149,9 @@ def get_latest_tagged_version(owner: str, package: str) -> dict | None:
     versions = json.loads(raw)
     for v in versions:
         tags = v.get("metadata", {}).get("container", {}).get("tags", [])
-        non_latest = [t for t in tags if t not in ("latest", "latest-amd64", "latest-arm64")]
-        if non_latest:
-            v["_chosen_tag"] = sorted(non_latest)[-1]
+        version_tags = [t for t in tags if _VERSION_TAG_RE.match(t)]
+        if version_tags:
+            v["_chosen_tag"] = sorted(version_tags)[-1]
             v["_all_tags"] = tags
             return v
     return None
