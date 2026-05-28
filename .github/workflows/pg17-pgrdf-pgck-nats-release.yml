@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
   packages: write
+  # id-token + attestations are required for SLSA Build Provenance v1
+  # (PROVENANCE.md Rule 2: no advance into LATEST.md without attestation).
+  id-token: write
+  attestations: write
 
 concurrency:
   group: pg17-pgrdf-pgck-nats-${{ github.ref }}
@@ -96,6 +100,7 @@ jobs:
           echo "tag=${GITHUB_REF_NAME#pg17-pgrdf-pgck-nats-}" >> "$GITHUB_OUTPUT"
 
       - name: Publish multi-arch image
+        id: publish
         run: |
           set -euo pipefail
           docker buildx build \
@@ -107,11 +112,25 @@ jobs:
             --tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" \
             --tag "${{ steps.meta.outputs.image }}:latest" \
             --provenance=false \
+            --metadata-file /tmp/build-meta.json \
             --push \
             .
+          DIGEST=$(jq -r '."containerimage.digest"' /tmp/build-meta.json)
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Published manifest digest: ${DIGEST}"
 
       - name: Inspect published image
         run: docker buildx imagetools inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
+
+      # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio CA,
+      # pushed to GHCR as an OCI referrer alongside the manifest list.
+      # PROVENANCE.md Rule 2: no advance into LATEST.md without this passing.
+      - name: Attest build provenance (SLSA v1)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
 
       - name: Attempt to make GHCR package public
         continue-on-error: true

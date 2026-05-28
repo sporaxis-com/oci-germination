@@ -13,9 +13,14 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # id-token + attestations are required for SLSA Build Provenance v1.
+    # Per PROVENANCE.md Rule 2, no entry lands in LATEST.md unless
+    # gh attestation verify accepts the digest pushed here.
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout repository
@@ -87,6 +92,7 @@ jobs:
           echo "Semantic version: $SEMANTIC_VERSION (bundle=$BUNDLE, base=$BASE_VERSION)"
 
       - name: Build and push to GHCR
+        id: push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -103,10 +109,28 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio
+      # CA via the Sigstore keyless flow. The attestation is pushed to
+      # GHCR as an OCI referrer alongside the manifest list, so
+      # 'gh attestation verify oci://<image>:<tag> --repo sporaxis-com/oci-germination'
+      # works for every published bundle. PROVENANCE.md Rule 2: no
+      # advance into LATEST.md without this passing.
+      - name: Attest build provenance (SLSA v1)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
       - name: Image digest
         run: |
-          echo "Built and pushed:"
-          echo "  Bundle: ${{ steps.extract.outputs.bundle }}"
-          echo "  Base version: ${{ steps.extract.outputs.base_version }}"
+          echo "Built, pushed, and attested:"
+          echo "  Bundle:           ${{ steps.extract.outputs.bundle }}"
+          echo "  Base version:     ${{ steps.extract.outputs.base_version }}"
           echo "  Semantic version: ${{ steps.semver.outputs.semantic_version }}"
-          echo "  Registry: ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          echo "  Image:            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          echo "  Index digest:     ${{ steps.push.outputs.digest }}"
+          echo ""
+          echo "Verify:"
+          echo "  gh attestation verify oci://${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }} \\"
+          echo "    --repo sporaxis-com/oci-germination"

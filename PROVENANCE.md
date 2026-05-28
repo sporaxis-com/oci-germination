@@ -149,15 +149,20 @@ When a base bundle is rebuilt (e.g. `pg17-pgrdf-pgck-nats-micro:v0.1.3`), every 
 - Spec: this file ([`PROVENANCE.md`](./PROVENANCE.md)) — the binding contract
 - Related specs: [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md), [`SPEC.OCI.BUNDLE.v0.2.md`](./SPEC.OCI.BUNDLE.v0.2.md), [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md)
 
-## Pending implementation tasks
+## Implementation status
 
-To bring rules 2, 3, 4 into full force:
+- [x] Wire `actions/attest-build-provenance@v1` into `.github/workflows/build-bundles.yml` (web bundles)
+- [x] Wire same into 8 per-bundle release workflows (`core-pg17-*-release.yml`, `pg17-pgrdf-*-release.yml`)
+- [x] Add `.github/workflows/update-latest-md.yml` driven by `workflow_run`
+- [x] Add `tools/render-latest-md.py` (query GHCR + verify attestations + render file)
+- [x] Reset `LATEST.md` to the "no attested release yet" template
+- [ ] First post-attestation tag per bundle = bootstrap, populates that bundle's entry — pending the next release tag push on any bundle
 
-- [ ] Wire `actions/attest-build-provenance@v1` into `.github/workflows/build-bundles.yml`
-- [ ] Wire same into per-bundle release workflows (`*-release.yml`)
-- [ ] Add `.github/workflows/update-latest-md.yml` driven by `workflow_run`
-- [ ] Add `tools/render-latest-md.py` (query GHCR + verify attestations + render file)
-- [ ] Reset `LATEST.md` to the "no attested release yet" template on the commit that lands the above
-- [ ] First post-attestation tag per bundle = bootstrap, populates that bundle's entry
+The pipeline gate is armed. The next release tag push (any bundle) will:
+1. Build, push, and attest the artifact in the release workflow
+2. Trigger `update-latest-md.yml` on workflow success
+3. Run `gh attestation verify` against the digest
+4. If ✓: render and commit the populated `LATEST.md` block for that bundle
+5. If ✗: leave `LATEST.md` showing "no attested release yet" for that bundle
 
-These will be tracked in the next release-turn report once started.
+Subsequent tags on other bundles flow through the same gate, populating their own `LATEST.md` blocks one by one.
