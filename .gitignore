@@ -44,3 +44,6 @@ data/
 
 coverage.out
 *.coverprofile
+
+# Claude Code session state
+.claude/
