@@ -11,6 +11,8 @@
    - **This turn:** bundle name + semver, plus the task IDs closed (e.g. `ck-allinone:v0.6.3 — Task #10, Task #24`)
    - **Bundles updated:** which of the 11 surfaces were rebuilt this turn
    - **Cross-bundle ripple:** if a base image (`core-pg17-*` or `pg17-pgrdf-pgck-*`) was bumped, list which downstream bundles also need to roll forward
+7. **Verify upstream attestation BEFORE doing any work that depends on an upstream artifact.** Before consuming `pgrdf`, `pgck`, `ck-lib-js`, or any other external OCI image in a `Dockerfile`, `bundle.yaml`, smoke script, or release note, run `gh attestation verify oci://<image>:<tag>` against the digest you intend to pin. A 404 or rejection means the artifact is NOT consumable under this policy. The work pauses; the user is notified; we do not proceed until either (a) the upstream ships a valid attestation for that exact digest, or (b) the user explicitly overrides for that specific bump with the override recorded in the commit message and in `LATEST.md` notes.
+8. **Voice inconsistencies between upstream `LATEST.md` and actual attestation state immediately, do not accept them.** If an upstream repo's `LATEST.md` advertises a version (e.g. pgRDF's `LATEST.md` listing `0.5.9-pg17-*` as the head) but `gh attestation verify` returns 404 or rejects that digest, that is a verifiable inconsistency. The agent surfaces it in the same turn the discrepancy is found, refuses to consume that version, and recommends one of: bug-report NOTIFY to the upstream, hold-back to the last attested version of theirs, or user-driven explicit override. Silent acceptance of an unattested upstream artifact is prohibited.
 
 Everything else in this document explains how those rules are enforced.
 
@@ -65,6 +67,26 @@ A successful verify means:
 - That workflow run is in `sporaxis-com/oci-germination`
 - The signature is recorded in Sigstore's Rekor transparency log
 - The subject digest matches the artifact you pulled (multi-arch manifest list, both `amd64` and `arm64` per-platform digests included)
+
+## Verifying upstream artifacts BEFORE bumping a pin (Rule 7 in action)
+
+```sh
+# pgRDF — before bumping the FROM line in any *-pgrdf-* Dockerfile
+gh attestation verify oci://ghcr.io/styk-tv/pgrdf-bundle:0.5.9-pg17-amd64 \
+  --repo styk-tv/pgRDF
+
+# pgCK — before bumping the ORAS pull tag
+gh attestation verify oci://ghcr.io/styk-tv/pgck:0.1.7-pg17-amd64 \
+  --repo styk-tv/pgCK
+
+# CK.Lib.Js — before bumping static_web.source_image
+gh attestation verify oci://ghcr.io/conceptkernel/ck-lib-js:1.3.0 \
+  --repo ConceptKernel/CK.Lib.Js
+```
+
+Any of these returning **404 Not Found** or rejection blocks the bump. Surface it to the user, propose a NOTIFY to the upstream repo, hold back to the last attested version of theirs (or refuse to consume that surface entirely), and do not silently proceed.
+
+**Snapshot of upstream attestation state (2026-05-28):** all three of pgRDF 0.5.9, pgCK 0.1.7, and CK.Lib.Js 1.3.0 return 404. pgRDF's `LATEST.md` advertises `0.5.9` as the head; pgCK's and CK.Lib.Js's `LATEST.md` correctly say "no attested release yet". Under Rule 8, the pgRDF inconsistency is voiced; under Rule 7, we cannot bump any of the three until they ship attestations or you override.
 
 ## Cutting a release (the only allowed flow)
 
