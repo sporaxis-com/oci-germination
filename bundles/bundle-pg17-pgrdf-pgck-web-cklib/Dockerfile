@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.2 AS base
 
-FROM ghcr.io/conceptkernel/ck-lib-js:1.2.0 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.2.1 AS cklib_source
 
 FROM python:3.11-slim AS app_builder
 RUN python -m venv /opt/venv && \
