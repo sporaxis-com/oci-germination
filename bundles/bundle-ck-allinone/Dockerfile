@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germi
 LABEL org.opencontainers.image.description="CKP v3.8 all-in-one micro runtime — PG17 + pgRDF + pgCK + NATS + pgckweb + cklib"
 LABEL org.opencontainers.image.licenses="MIT"
 
-FROM ghcr.io/conceptkernel/ck-lib-js:1.3.0 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
 
 FROM python:3.11-slim AS builder
 RUN python -m venv /opt/venv && \

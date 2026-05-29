@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germi
 LABEL org.opencontainers.image.description="PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + cklib (no NATS, standard variant)"
 LABEL org.opencontainers.image.licenses="MIT"
 
-FROM ghcr.io/conceptkernel/ck-lib-js:1.3.0 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
 
 FROM python:3.11-slim AS app_builder
 RUN python -m venv /opt/venv && \

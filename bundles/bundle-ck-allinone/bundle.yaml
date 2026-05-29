@@ -1,6 +1,6 @@
 spec_version: 0.2
 name: bundle-ck-allinone
-description: CKP v3.8 all-in-one micro runtime — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.1.0 + cklib 1.3.0 + NATS 2.14.1 WSS bridge
+description: CKP v3.8 all-in-one micro runtime — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.1.0 + cklib 1.3.11 + NATS 2.14.1 WSS bridge
 
 # Hand-crafted bundle: thin layer on top of bundle-pg17-pgrdf-pgck-nats-micro
 # with pgckweb (FastAPI) + cklib (CK.Lib.Js) wired in. The current generator
@@ -31,7 +31,7 @@ components:
     port: 8000
     description: FastAPI web UI for pgCK kernel operations
   cklib:
-    version: 1.3.0
+    version: 1.3.11
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /cklib
     description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS
@@ -51,7 +51,7 @@ services:
     jetstream: false
 
 static_web:
-  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.0
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
     route: /cklib
 
 supervisor:
