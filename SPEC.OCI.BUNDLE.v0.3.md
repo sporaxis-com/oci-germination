@@ -73,7 +73,7 @@ application/vnd.oci.image.manifest.v1+json
 **Example:**
 ```
 ghcr.io/styk-tv/pgrdf-bundle:0.5.16-pg17-amd64   # single layer = pgrdf-0.5.16-pg17-glibc-amd64.tar.gz
-ghcr.io/styk-tv/pgck:0.2.1-pg17-amd64             # same shape, pgCK extension
+ghcr.io/styk-tv/pgck:0.2.2-pg17-amd64             # same shape, pgCK extension
 ```
 
 **Consumer pattern (extract — acceptable):**
@@ -338,10 +338,10 @@ extracted_sources:
     extract:
       - { src_path: lib/pgrdf.so, into: /usr/lib/postgresql/17/lib/pgrdf.so }
       - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
-  - source_image: ghcr.io/styk-tv/pgck:0.2.1-pg17-${TARGETARCH}
-    # NOTE: artifact_type below is the DECLARED expected media type. Confirm it
-    # against the published pgck manifest's artifactType before relying on the
-    # §4 gate (the pgCK extension NOTIFY asks consumers to verify, not assume).
+  - source_image: ghcr.io/styk-tv/pgck:0.2.2-pg17-${TARGETARCH}
+    # artifact_type CONFIRMED by pgCK (RESPONSE 2026-05-29): the published
+    # manifest artifactType IS application/vnd.styk.pgck.extension.v1 (pushed by
+    # release.yml via `oras push --artifact-type`; also shown in pgCK LATEST.md).
     artifact_type: application/vnd.styk.pgck.extension.v1
     attestation_repo: styk-tv/pgCK
     extract:
@@ -384,7 +384,7 @@ extracted_sources:
     extract:
       - { src_path: lib/pgrdf.so, into: /usr/lib/postgresql/17/lib/pgrdf.so }
       - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
-  - source_image: ghcr.io/styk-tv/pgck:0.2.1-pg17-${TARGETARCH}
+  - source_image: ghcr.io/styk-tv/pgck:0.2.2-pg17-${TARGETARCH}
     artifact_type: application/vnd.styk.pgck.extension.v1
     attestation_repo: styk-tv/pgCK
     extract:

@@ -7,18 +7,17 @@ COPY go.sum ./
 COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
-FROM alpine:3.20 AS pgrdf_fetch
+FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgrdf_fetch
 ARG TARGETARCH
-RUN apk add --no-cache curl tar
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  curl -fsSL -o /tmp/pgrdf.tar.gz "https://github.com/styk-tv/pgRDF/releases/download/v0.5.1/pgrdf-0.5.1-pg17-glibc-${TARGETARCH}.tar.gz"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.5.16-pg17-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf /tmp/pgrdf.tar.gz -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.5.16-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.5.1.sql
+  test -s /out/share/extension/pgrdf--0.5.16.sql
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch

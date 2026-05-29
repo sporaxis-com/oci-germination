@@ -71,7 +71,7 @@ echo "[ck-allinone] Version: $PG_VERSION"
 # Test pgRDF
 echo ""
 echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ② pgRDF Extension (0.5.1)"
+echo "[ck-allinone] ② pgRDF Extension (0.5.16)"
 echo "────────────────────────────────────────────────────────────"
 docker exec "$CONTAINER_NAME" psql -U postgres -d postgres -c "CREATE DATABASE ck_test;" || echo "[ck-allinone] Database already exists"
 docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE EXTENSION pgrdf;"

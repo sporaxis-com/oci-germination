@@ -11,10 +11,10 @@ Current public releases:
 - `core-pg17-micro` — smaller scratch-based PostgreSQL 17 runtime
 - `core-pg17-nats` — PostgreSQL 17 + embedded `nats-server` + WebSocket listener
 - `core-pg17-nats-micro` — smaller PostgreSQL 17 + embedded `nats-server` + WebSocket listener
-- `pg17-pgrdf` — PostgreSQL 17 + `pgRDF 0.5.1`
-- `pg17-pgrdf-pgck` — PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2`
-- `pg17-pgrdf-pgck-nats` — PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2` + `nats-server 2.14.1`
-- `pg17-pgrdf-pgck-nats-micro` — smaller PostgreSQL 17 + `pgRDF 0.5.1` + `pgCK 0.1.2` + `nats-server 2.14.1`
+- `pg17-pgrdf` — PostgreSQL 17 + `pgRDF 0.5.16`
+- `pg17-pgrdf-pgck` — PostgreSQL 17 + `pgRDF 0.5.16` + `pgCK 0.1.2`
+- `pg17-pgrdf-pgck-nats` — PostgreSQL 17 + `pgRDF 0.5.16` + `pgCK 0.1.2` + `nats-server 2.14.1`
+- `pg17-pgrdf-pgck-nats-micro` — smaller PostgreSQL 17 + `pgRDF 0.5.16` + `pgCK 0.1.2` + `nats-server 2.14.1`
 
 **Web-serving bundles (CKP v3.8):**
 - `pg17-pgrdf-pgck-web-cklib` — PostgreSQL 17 + pgRDF + pgCK + FastAPI web UI + cklib (no NATS; standard variant)
@@ -34,8 +34,8 @@ All published images are multi-arch manifest lists for `linux/amd64` and `linux/
 | `core-pg17-micro` | `ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.1` | `amd64`, `arm64` | `73.8 / 29.2 MiB` | same SQL/data proof as `core-pg17`, with a smaller scratch final image |
 | `core-pg17-nats` | `ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.1` | `amd64`, `arm64` | `157.9 / 60.3 MiB` | `core-pg17` proof plus NATS core on `4222` and WebSocket on `9222` |
 | `core-pg17-nats-micro` | `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.1` | `amd64`, `arm64` | `92.2 / 36.4 MiB` | `core-pg17-micro` proof plus NATS core on `4222` and WebSocket on `9222` |
-| `pg17-pgrdf` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1` | `amd64`, `arm64` | `not measured yet` | `CREATE EXTENSION pgrdf`; `pg_available_extensions.default_version=0.5.1`; `pg_extension.extversion=0.5.1`; `pgrdf.version()=0.5.1` |
-| `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.1`; `pgck_version()=pgck 0.1.2 (rc3)` |
+| `pg17-pgrdf` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.1` | `amd64`, `arm64` | `not measured yet` | `CREATE EXTENSION pgrdf`; `pg_available_extensions.default_version=0.5.16`; `pg_extension.extversion=0.5.16`; `pgrdf.version()=0.5.16` |
+| `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.16`; `pgck_version()=pgck 0.1.2 (rc3)` |
 | `pg17-pgrdf-pgck-nats` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1` | `amd64`, `arm64` | `170.1 / 65.1 MiB` | triple-bundle proof plus NATS core on `4222`, WebSocket on `9222`, and one-image host relation-file proof |
 | `pg17-pgrdf-pgck-nats-micro` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` | `amd64`, `arm64` | `104.5 / 41.3 MiB` | all-in-one proof on the micro runtime line: `pgrdf`, `pgck`, NATS, and host relation-file proof |
 | `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0` | `amd64`, `arm64` | `~200 / TBD` | ✓ Published | **Standard variant** — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.2.0 + cklib 1.2.0 (no NATS) |
@@ -62,10 +62,10 @@ Pinned manifest digests:
 | `core-pg17-micro` | selective PostgreSQL runtime files + `scratch` final image | none | `ociger-core-pg17-micro` | smaller runtime family with the same SQL/data contract |
 | `core-pg17-nats` | `core-pg17` runtime shape | `nats-server 2.14.1`, tiny supervisor, WebSocket listener | `ociger-core-pg17-nats` | JetStream off by default |
 | `core-pg17-nats-micro` | `core-pg17-micro` runtime shape | `nats-server 2.14.1`, tiny supervisor, WebSocket listener | `ociger-core-pg17-nats-micro` | smaller service bundle, JetStream off by default |
-| `pg17-pgrdf` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` artifact | `ociger-pg17-pgrdf` | working extension bundle |
-| `pg17-pgrdf-pgck` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts | `ociger-pg17-pgrdf-pgck` | triple bundle with `pgck` preloaded by default |
-| `pg17-pgrdf-pgck-nats` | `core-pg17` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats` | all-in-one stable bundle with NATS and both extensions |
-| `pg17-pgrdf-pgck-nats-micro` | `core-pg17-micro` runtime shape | upstream `pgRDF 0.5.1` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats-micro` | smaller all-in-one bundle with the same SQL/NATS contract |
+| `pg17-pgrdf` | `core-pg17` runtime shape | upstream `pgRDF 0.5.16` artifact | `ociger-pg17-pgrdf` | working extension bundle |
+| `pg17-pgrdf-pgck` | `core-pg17` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts | `ociger-pg17-pgrdf-pgck` | triple bundle with `pgck` preloaded by default |
+| `pg17-pgrdf-pgck-nats` | `core-pg17` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats` | all-in-one stable bundle with NATS and both extensions |
+| `pg17-pgrdf-pgck-nats-micro` | `core-pg17-micro` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats-micro` | smaller all-in-one bundle with the same SQL/NATS contract |
 | `pg17-pgrdf-pgck-web-cklib` | `pg17-pgrdf-pgck` (no NATS) | FastAPI web server (pgckweb 0.2.0) + cklib (CK.Lib.Js 1.2.0) OCI layer source | `ociger-pg17-pgrdf-pgck-web-cklib` | **Standard variant** — clean web UI + cklib, no messaging layer |
 | `ck-allinone` | `pg17-pgrdf-pgck-nats-micro` (with NATS) | FastAPI pgckweb 0.1.0 + cklib 1.2.0 + inherited NATS infrastructure + ociger-supervisor for service orchestration | `ociger-ck-allinone` | **[CKP Development Default]** — Complete all-in-one stack for Concept Kernel development: all extensions + web UI + NATS (4222) + WSS bridge (9222) + orchestration |
 
