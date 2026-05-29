@@ -1,6 +1,6 @@
 spec_version: 0.2
 name: bundle-ck-allinone
-description: CKP v3.8 all-in-one — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.2.2 + pgck-web 0.2.6 (additive Shape A) + cklib 1.3.11 + NATS 2.14.1 WSS bridge
+description: CKP v3.8 all-in-one — PostgreSQL 17 + pgRDF 0.5.19 + pgCK 0.2.2 + pgck-web 0.2.6 (additive Shape A) + cklib 1.3.11 + NATS 2.14.1 WSS bridge
 
 # Hand-crafted bundle: thin layer on top of bundle-pg17-pgrdf-pgck-nats-micro
 # with pgckweb (FastAPI) + cklib (CK.Lib.Js) wired in. The current generator
@@ -18,7 +18,7 @@ image:
 
 extensions:
   pgrdf:
-    version: 0.5.1
+    version: 0.5.19
     source: https://github.com/styk-tv/pgRDF
   pgck:
     version: 0.2.2

@@ -4,7 +4,7 @@
 # /usr/share/postgresql/17/*, pgrdf.so + pgck.so + extension SQL/control files,
 # nats-server, ociger-pg-launcher, ociger-supervisor, nats config. Selectively
 # layered onto a scratch final image upstream of us.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.4 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.5 AS pg_base
 
 # Shape A additive — CK.Lib.Js static layer
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source

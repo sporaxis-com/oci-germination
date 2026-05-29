@@ -1,6 +1,6 @@
 spec_version: 0.2
 name: bundle-pg17-pgrdf-pgck-web-cklib
-description: PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.2.2 + pgckweb 0.2.0 + cklib 1.3.11
+description: PostgreSQL 17 + pgRDF 0.5.19 + pgCK 0.2.2 + pgckweb 0.2.0 + cklib 1.3.11
 
 # Hand-crafted bundle: thin layer on top of bundle-pg17-pgrdf-pgck with
 # pgckweb (FastAPI) + cklib (CK.Lib.Js) wired in. The current generator
@@ -18,7 +18,7 @@ image:
 
 extensions:
   pgrdf:
-    version: 0.5.1
+    version: 0.5.19
     source: https://github.com/styk-tv/pgRDF
   pgck:
     version: 0.2.2
