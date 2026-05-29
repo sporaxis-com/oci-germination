@@ -41,14 +41,17 @@ application/vnd.oci.image.index.v1+json     (multi-arch index)
 
 **Example:**
 ```
-ghcr.io/conceptkernel/ck-lib-js:1.3.10   # files at root: ck-client.js, ck-page.js, vendor/, …
-ghcr.io/styk-tv/pgck-web:v0.2.4           # FastAPI runtime image; full Python+app at standard paths
+ghcr.io/conceptkernel/ck-lib-js:1.3.11   # files at root: ck-client.js, ck-page.js, vendor/, …
+ghcr.io/styk-tv/pgck-web:v0.2.3           # consolidated web/ dual-page Display/Board FastAPI runtime
+                                          # image; full Python + uvicorn web.app:app at standard paths
 ```
+
+`ck-lib-js:1.3.11` is the current spec-v0.3-aligned attested CK.Lib.Js release (it fills in the §2.1 Required + Recommended manifest labels; see the §8.1 worked example). `pgck-web:v0.2.3` is the consolidated-`web/` dual-page Display/Board runtime (post the `web_demo/`→`web/` consolidation; see §8.3) — it is developed into a full Shape A consumption example in §8.2.
 
 **Consumer pattern (additive composition):**
 
 ```dockerfile
-FROM ghcr.io/conceptkernel/ck-lib-js:1.3.10 AS cklib
+FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib
 FROM <base>
 COPY --from=cklib / /app/cklib/
 ```
@@ -108,12 +111,16 @@ For Shape A images, the manifest's config blob MUST set:
 | Label | Required | Value example |
 |---|---|---|
 | `org.opencontainers.image.source` | Required | `https://github.com/ConceptKernel/CK.Lib.Js` |
-| `org.opencontainers.image.version` | Required | `1.3.10` |
+| `org.opencontainers.image.version` | Required | `1.3.11` |
 | `org.opencontainers.image.revision` | Required | git SHA of the source commit |
 | `org.opencontainers.image.created` | Required | RFC 3339 UTC |
-| `org.opencontainers.image.licenses` | Recommended | SPDX id |
+| `org.opencontainers.image.licenses` | Recommended | SPDX id (e.g. `MIT`) |
 | `org.opencontainers.image.description` | Recommended | one-liner |
 | `org.opencontainers.image.designation` | Optional | project-specific (e.g. `ckp:static` for CK.Lib.Js) |
+
+CK.Lib.Js `1.3.11` populates all four Required labels plus `licenses=MIT` and `description` — it is the reference example of a fully-labelled Shape A leaf.
+
+For `pgck-web` (the other Shape A image in the fleet), the expected Required labels are `image.source=https://github.com/styk-tv/pgCK`, `image.version` = the `pgck-web/vN.M.K` tag, `image.revision` = the source commit SHA, and `image.created` = the commit/build timestamp.
 
 Shape B artifacts SHOULD set as many of these as possible via ORAS annotations.
 
@@ -222,6 +229,26 @@ The build MUST verify the upstream attestation and the `artifactType` match befo
 
 Unchanged. Equivalent to `layer_sources` with `into: /app/<route>` and an additional generator hook that mounts the directory in the FastAPI app (or static server). v0.2 examples continue to render correctly.
 
+**The two CK.Lib.Js forms are interchangeable.** CK.Lib.Js v1.3.11 explicitly offers both. They produce identical browser-visible content at `/cklib`; pick by what the downstream Dockerfile prefers:
+
+```yaml
+# Form 1 — v0.2-compatible routed mount (static_web): mounted under /cklib by
+# the FastAPI app / static server. Keeps the v0.2 routing semantics verbatim.
+static_web:
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
+    route: /cklib
+    attestation_repo: ConceptKernel/CK.Lib.Js
+
+# Form 2 — additive-merge (layer_sources): CK.Lib.Js files land at a fixed
+# filesystem path; the server is configured to serve that path at /cklib.
+layer_sources:
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
+    into: /app/cklib/
+    attestation_repo: ConceptKernel/CK.Lib.Js
+```
+
+Both are Shape A and both run the §4 attestation gate against `ConceptKernel/CK.Lib.Js`. CK.Lib.Js stays Shape A only — there is no Shape B / `extracted_sources` form for cklib (the whole payload is browser-loadable JS, so additive merge is the natural fit).
+
 ### 3.5 `spec_version`
 
 Bundles MUST declare `spec_version: 0.3` at the top level once they adopt any v0.3-only field. v0.2 bundles continue to work; the generator detects by the highest field requested.
@@ -234,8 +261,19 @@ Every build that consumes any upstream pin MUST gate on the following, in order.
 
 1. **Attestation verify** — for each `source_image` in `layer_sources`, `extracted_sources`, and `static_web`, run `gh attestation verify oci://<source_image> --repo <attestation_repo>`. Fail-fast on any rejection.
 2. **Artifact type match** — for each `extracted_sources` entry, fetch the manifest's `artifactType` and compare against the declared one. Mismatch aborts.
-3. **Digest pin recommended, tag pin permitted** — the spec allows either. A digest pin is preferred for reproducibility; a tag pin requires the consumer to accept whatever the tag currently resolves to (the attestation verify still binds it to a specific signed digest).
+3. **Digest pin recommended, tag pin permitted** — the spec allows either. A digest pin is preferred for reproducibility; a tag pin requires the consumer to accept whatever the tag currently resolves to (the attestation verify still binds it to a specific signed digest). A bundle composite pins every upstream by tag-or-digest, and the attestation verify is what binds the chosen tag to a single signed digest — so a tag pin in a composite is never unverified, it is verified-at-build-time.
 4. **Per-arch coverage** — for `linux/amd64` AND `linux/arm64` per-platform leaves of Shape A images, BOTH must verify. For Shape B per-arch artifacts (e.g. `0.5.16-pg17-amd64` + `0.5.16-pg17-arm64`), both architecture leaves must verify.
+
+**Live evidence pattern.** The attested CK.Lib.Js v1.3.11 release is the canonical Shape A index-leaf example a bundle composite verifies against:
+
+```
+index: sha256:3e6e4ab1569849005544dd6397033f479ab6ad0bc583979d1b25d56fc5301235
+amd64: sha256:b42aab22cfba870ff0a862185f89924e0c3a879dce57c1f5e2b2f7677f7e106a
+arm64: sha256:a3f038109dafb214f72c2401b8277c2d6d6bdd3b2149c995fd6ddd60f4c55461
+verify: gh attestation verify oci://ghcr.io/conceptkernel/ck-lib-js:1.3.11 --repo ConceptKernel/CK.Lib.Js
+```
+
+Both `pgck-web` and `pgck` are likewise published both-arch-verified; a bundle that pins them MUST see `gh attestation verify` accept each per-platform leaf before any composite push.
 
 ---
 
@@ -271,11 +309,17 @@ If your repo composes upstream artifacts into bundles (currently: oci-germinatio
 - [ ] When forced into `extracted_sources` for a payload you'd prefer additively (a `.so` library, etc.), send a NOTIFY to the upstream per SPEC.NOTIFIES.v0.3 with theme `additive-oci-shape-request` proposing a Shape A variant.
 - [ ] Never bypass the attestation gate to ship a bundle. If upstream isn't attested, hold the pin and notify.
 
+**Shape A request status (informational, non-blocking).** The pgRDF and pgCK extension leaves are Shape B today (tarball-in-OCI; the bundle extracts via `extracted_sources`). Parallel Shape A artifacts (`pgrdf-layer`, `pgck-layer`) are open `additive-oci-shape-request` NOTIFY proposals — future direction, not a blocker. Bundles use `extracted_sources` (Shape B) for these leaves today and migrate to `layer_sources` (Shape A) if/when the upstreams ship the parallel artifact. CK.Lib.Js is already Shape A; `pgck-web` is already Shape A (full FastAPI runtime image).
+
 ---
 
-## 8. Example — `bundle-pg17-pgrdf-pgck-static-cklib` under v0.3
+## 8. Worked Examples
 
-This is the static-cklib bundle expressed under v0.3. Fields described in v0.2 stay the same; new fields make the upstream composition explicit.
+Two worked bundles exercise the full v0.3 surface: §8.1 is the production-track static-cklib bundle (Go static server, no Python), §8.2 is the all-in-one dev bundle (FastAPI/pgck-web). §8.3 records the `pgck-web` consolidation and pin matrix both reference. Every entry below carries `attestation_repo` and `spec_version: 0.3`, so the §6/§7 checklists are exemplified, not only stated.
+
+### 8.1 `bundle-pg17-pgrdf-pgck-static-cklib` (production variant — static, no Python)
+
+This is the static-cklib bundle expressed under v0.3. Fields described in v0.2 stay the same; new fields make the upstream composition explicit. It serves `web/static/` and `/cklib` through the Go static server (`ociger-static-server`) — no FastAPI, no Python runtime. This is the v3.8-aligned production variant: browser ↔ NATS only, HTTP serves static assets.
 
 ```yaml
 spec_version: 0.3
@@ -295,15 +339,18 @@ extracted_sources:
       - { src_path: lib/pgrdf.so, into: /usr/lib/postgresql/17/lib/pgrdf.so }
       - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
   - source_image: ghcr.io/styk-tv/pgck:0.2.1-pg17-${TARGETARCH}
+    # NOTE: artifact_type below is the DECLARED expected media type. Confirm it
+    # against the published pgck manifest's artifactType before relying on the
+    # §4 gate (the pgCK extension NOTIFY asks consumers to verify, not assume).
     artifact_type: application/vnd.styk.pgck.extension.v1
     attestation_repo: styk-tv/pgCK
     extract:
       - { src_path: lib/pgck.so, into: /usr/lib/postgresql/17/lib/pgck.so }
       - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
 
-# Shape A — static asset OCI image. Consumer additively merges.
+# Shape A — static asset OCI image. Consumer additively merges (routed at /cklib).
 static_web:
-  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.10
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
     route: /cklib
     attestation_repo: ConceptKernel/CK.Lib.Js
 
@@ -315,6 +362,82 @@ ports:
 ```
 
 Generator output: a Dockerfile with two ORAS fetch stages (pgrdf, pgck), one Shape A stage (ck-lib-js), and a final base that COPYs each into its declared `into:`. All attestation verifies run before any image push.
+
+### 8.2 `bundle-ck-allinone` (dev default — FastAPI / pgck-web, Shape A additive)
+
+The all-in-one bundle composes the `pgck-web` FastAPI runtime additively. `pgck-web` is a full Python + uvicorn image (Shape A), so additive composition supplies the Python runtime that distroless-PG bases lack — this is what closes the "Python-missing-in-distroless" gap for this variant without a hand-edited venv step. The bundle pins the **consolidated `web/`** tree at `pgck-web/v0.2.3` (see §8.3 for why and which tags resolve).
+
+```yaml
+spec_version: 0.3
+name: bundle-ck-allinone
+description: CKP v3.8 all-in-one micro runtime — PG17 + pgRDF + pgCK + pgck-web (FastAPI) + CK.Lib.Js + NATS WSS
+image:
+  registry: ghcr.io/sporaxis-com/ociger-ck-allinone
+  base: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.3
+  runtime_profile: micro
+
+# Shape B — extension OCI artifacts (identical to §8.1).
+extracted_sources:
+  - source_image: ghcr.io/styk-tv/pgrdf-bundle:0.5.16-pg17-${TARGETARCH}
+    artifact_type: application/vnd.styk.pgrdf.bundle.v1+tar
+    attestation_repo: styk-tv/pgRDF
+    extract:
+      - { src_path: lib/pgrdf.so, into: /usr/lib/postgresql/17/lib/pgrdf.so }
+      - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
+  - source_image: ghcr.io/styk-tv/pgck:0.2.1-pg17-${TARGETARCH}
+    artifact_type: application/vnd.styk.pgck.extension.v1
+    attestation_repo: styk-tv/pgCK
+    extract:
+      - { src_path: lib/pgck.so, into: /usr/lib/postgresql/17/lib/pgck.so }
+      - { src_path: share/extension, into: /usr/share/postgresql/17/extension }
+
+# Shape A — pgck-web FastAPI runtime image, additively merged.
+# Supplies the Python runtime distroless-PG lacks (the FastAPI path).
+layer_sources:
+  - source_image: ghcr.io/styk-tv/pgck-web:v0.2.3
+    into: /              # full-root merge: Python + uvicorn + web/ app
+    attestation_repo: styk-tv/pgCK
+
+# Shape A — CK.Lib.Js, routed at /cklib (interchangeable with layer_sources; see §3.4).
+static_web:
+  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
+    route: /cklib
+    attestation_repo: ConceptKernel/CK.Lib.Js
+
+ports:
+  - { name: postgres, container_port: 5432 }
+  - { name: fastapi,  container_port: 8000 }
+  - { name: nats,     container_port: 4222 }
+  - { name: nats-wss, container_port: 9222 }
+```
+
+Generated Shape A composition for `pgck-web`:
+
+```dockerfile
+FROM ghcr.io/styk-tv/pgck-web:v0.2.3 AS pgckweb_layer
+FROM <base>
+COPY --from=pgckweb_layer / /
+# supervisor then starts: uvicorn web.app:app  (+ the PG launcher + NATS)
+```
+
+**Consumption-path decision (per the CKE-4 NOTIFY ask).** oci-germination declares:
+
+- **`bundle-ck-allinone` = FastAPI-supervised (dev default).** It additively merges the `pgck-web` Shape A image and supervises `uvicorn web.app:app` alongside the PG launcher. This is the variant that exercises the full FastAPI surface.
+- **`bundle-pg17-pgrdf-pgck-static-cklib` = static-only (production).** Go static server, no Python; serves `web/static/` + `/cklib`. The Display page is NATS-driven and needs no API calls, so it works static-only. This is the v3.8-aligned production variant.
+
+### 8.3 `pgck-web` consolidation and resolvable-tag matrix
+
+pgCK consolidated `web_demo/` **into** `web/`. The directory name stays `web/`; the content is now the v3.8 dual-page Display/Board surface plus CK.Lib.Js v1.3-aligned CKClient wiring. The legacy single-page `web/` tree (from `pgck-web/v0.1.0`) no longer exists at HEAD. Bundles that still pin `pgck-web/v0.1.0` should advance to the consolidated tree. All listed tags remain resolvable (git tags are immutable):
+
+| Tag | Content |
+|---|---|
+| `pgck-web/v0.1.0` | legacy single-page `web/` (original layout) |
+| `pgck-web/v0.2.0` | final `web_demo/`-as-content snapshot (immediately pre-consolidation) |
+| `pgck-web/v0.2.1` | first consolidated `web/` (rename + import-path rewrite) |
+| `pgck-web/v0.2.2` | interim |
+| `pgck-web/v0.2.3` | **recommended pin** — CKClient v1.3 aligned, dual-page, NATS-broadcast-render verified |
+
+`uvicorn web_demo.app:app` is replaced by `uvicorn web.app:app`. The Python-in-distroless concern is decoupled from pgCK's layout: pgCK ships one `web/` tree regardless of bundle variant; FastAPI-vs-static is the oci-germination policy choice recorded in §8.2.
 
 ---
 
