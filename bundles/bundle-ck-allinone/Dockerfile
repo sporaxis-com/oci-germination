@@ -73,7 +73,7 @@ RUN apt-get update && \
         liblz4-1 \
         libssl3 \
         libgssapi-krb5-2 \
-        libldap-2.6-0 \
+        libldap2 \
         libreadline8 \
         libsystemd0 \
         libsasl2-2 && \
