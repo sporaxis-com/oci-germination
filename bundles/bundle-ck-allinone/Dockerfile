@@ -69,11 +69,11 @@ RUN apt-get update && \
         libpq5 \
         libxml2 \
         libxslt1.1 \
-        libicu72 \
+        libicu76 \
         liblz4-1 \
         libssl3 \
         libgssapi-krb5-2 \
-        libldap-2.5-0 \
+        libldap-2.6-0 \
         libreadline8 \
         libsystemd0 \
         libsasl2-2 && \
