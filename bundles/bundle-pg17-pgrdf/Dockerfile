@@ -17,7 +17,7 @@ RUN set -eux; \
   tar -xzf "pgrdf-0.5.16-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.5.16.sql
+  test -s /out/share/extension/pgrdf--0.5.1.sql  # extension's internal version (per pgrdf.control); 0.5.x releases keep this filename
 
 
 FROM postgres:17-bookworm AS postgres_source
