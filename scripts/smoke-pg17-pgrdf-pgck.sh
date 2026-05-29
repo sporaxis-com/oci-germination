@@ -9,8 +9,7 @@ NETWORK="ociger-pg17-pgrdf-pgck-net"
 CONTAINER="ociger-pg17-pgrdf-pgck-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-pgck-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf-pgck:local}"
-EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.16}"
-EXPECTED_PGRDF_EXTVERSION="${PGRDF_EXPECTED_EXTVERSION:-0.5.1}"  # extension internal version (per pgrdf.control); decoupled from release version
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.1}"
 EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.1.2}"
 EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.1.2 (rc3)}"
 
@@ -148,8 +147,8 @@ PGCK_NATIVE="$(psql_query postgres "SELECT pgck_version();")"
 
 assert_pgrdf_pgatomic postgres
 
-if [[ "$PGRDF_AVAILABLE" != "$EXPECTED_PGRDF_EXTVERSION" ]]; then
-  echo "wrong-version: pgrdf available=$PGRDF_AVAILABLE expected=$EXPECTED_PGRDF_EXTVERSION" >&2
+if [[ "$PGRDF_AVAILABLE" != "$EXPECTED_PGRDF_VERSION" ]]; then
+  echo "wrong-version: pgrdf available=$PGRDF_AVAILABLE expected=$EXPECTED_PGRDF_VERSION" >&2
   exit 1
 fi
 
@@ -158,8 +157,8 @@ if [[ "$PGCK_AVAILABLE" != "$EXPECTED_PGCK_VERSION" ]]; then
   exit 1
 fi
 
-if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_EXTVERSION" ]]; then
-  echo "wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_EXTVERSION" >&2
+if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_VERSION" ]]; then
+  echo "wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_VERSION" >&2
   exit 1
 fi
 
