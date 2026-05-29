@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1.7
-ARG TARGETARCH
+
+# Global ARG TARGETARCH with a default — BuildKit overrides this per-platform
+# in the multi-arch build matrix (sets it to amd64 or arm64). The default
+# value is required for FROM-line substitution; without it BuildKit treats
+# the variable as unset at the FROM line and emits an empty string.
+ARG TARGETARCH=amd64
 
 # Postgres + pgRDF + pgCK + NATS base — provides /usr/lib/postgresql/17/*,
 # /usr/share/postgresql/17/*, pgrdf.so + pgck.so + extension SQL/control files,
