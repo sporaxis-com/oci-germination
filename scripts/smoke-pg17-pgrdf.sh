@@ -10,6 +10,7 @@ CONTAINER="ociger-pg17-pgrdf-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf:local}"
 EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.16}"
+EXPECTED_EXTVERSION="${PGRDF_EXPECTED_EXTVERSION:-0.5.1}"  # extension internal version (per pgrdf.control); decoupled from release version
 
 ensure_repo_data_path() {
   case "$DATA_DIR" in
@@ -119,8 +120,8 @@ fi
 
 assert_pgrdf_pgatomic postgres
 
-if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
-  echo "wrong-version: extversion=$INSTALLED_VERSION expected=$EXPECTED_VERSION" >&2
+if [[ "$INSTALLED_VERSION" != "$EXPECTED_EXTVERSION" ]]; then
+  echo "wrong-version: extversion=$INSTALLED_VERSION expected=$EXPECTED_EXTVERSION" >&2
   exit 1
 fi
 

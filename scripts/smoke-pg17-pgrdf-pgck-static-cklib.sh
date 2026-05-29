@@ -11,6 +11,7 @@ CONTAINER="ociger-pg17-pgrdf-pgck-static-cklib-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-pgck-static-cklib-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf-pgck-static-cklib:local}"
 EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.16}"
+EXPECTED_PGRDF_EXTVERSION="${PGRDF_EXPECTED_EXTVERSION:-0.5.1}"  # extension internal version (per pgrdf.control); decoupled from release version
 EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.1.2}"
 EXPECTED_NATS_VERSION="${NATS_EXPECTED_VERSION:-2.14.1}"
 EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.0}"
@@ -175,8 +176,8 @@ SQL
 PGRDF_INSTALLED="$(psql_query ociger_demo "SELECT extversion FROM pg_extension WHERE extname='pgrdf';")"
 PGCK_INSTALLED="$(psql_query ociger_demo "SELECT extversion FROM pg_extension WHERE extname='pgck';")"
 
-if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_VERSION" ]]; then
-  echo "wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_VERSION" >&2
+if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_EXTVERSION" ]]; then
+  echo "wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_EXTVERSION" >&2
   exit 1
 fi
 if [[ "$PGCK_INSTALLED" != "$EXPECTED_PGCK_VERSION" ]]; then
