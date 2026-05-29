@@ -121,20 +121,20 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
 
-## ociger-pg17-pgrdf — `v0.1.3`
+## ociger-pg17-pgrdf — `v0.1.4`
 
 PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:d97561dc692a906f4f942b59765603da610214d90d46c1d801af4f63685af7e4`  | 2026-05-28 19:00:00 |
-| arm64 | `sha256:4a4d0413fdfb0ab59470ec71e3a54dfd77f61dccac9f543594f9e6aa524f3215`  | 2026-05-28 19:00:00 |
+| amd64 | `sha256:69f09854e5585186e3164186265d32ef19c2536a5089ac5be69117abe071b44d`  | 2026-05-29 11:25:13 |
+| arm64 | `sha256:7890dbcb7df67d4834a384ac9388e5859a631b8f5a0ce6557c2775b814108725`  | 2026-05-29 11:25:13 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.3`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.4`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:049f46c3ea0140da72753c352db51a41e880baf6f646e9e858d3b595b190ef3f`                                                         |
+| Index digest       | `sha256:8077c23fa7c723d8e99054d4b77e309c837b11ed67494227db99f1f3392ee468`                                                         |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf/`](./bundles/bundle-pg17-pgrdf/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf |
