@@ -1,5 +1,12 @@
 name: bundle-pg17-pgrdf-pgck
 description: PostgreSQL 17 with pgRDF and pgCK installed from upstream published artifacts
+
+# Hand-crafted Dockerfile: pgRDF consumed as an ORAS-pulled Shape B artifact
+# (per SPEC.OCI.BUNDLE.v0.3 §1.2). Generator currently only emits the older
+# curl-from-GH-releases pattern; disable rendering until the generator learns
+# extracted_sources.
+skip_render: true
+
 image:
   registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck
   pg_major: 17
