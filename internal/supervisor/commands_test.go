@@ -29,3 +29,16 @@ func TestDefaultPrograms_StaticProfile(t *testing.T) {
 		t.Fatalf("DefaultPrograms(static) = %#v, want %#v", programs, want)
 	}
 }
+
+func TestDefaultPrograms_FastapiProfile(t *testing.T) {
+	t.Setenv("OCIGER_SUPERVISOR_PROFILE", "fastapi")
+	want := []Program{
+		{Name: "postgres", Path: "/usr/local/bin/ociger-pg-launcher"},
+		{Name: "nats", Path: "/usr/local/bin/nats-server", Args: []string{"--config", "/etc/nats/nats-server.conf"}},
+		{Name: "pgckweb", Path: "/usr/local/bin/pgck-web-launcher"},
+	}
+
+	if programs := DefaultPrograms(); !reflect.DeepEqual(programs, want) {
+		t.Fatalf("DefaultPrograms(fastapi) = %#v, want %#v", programs, want)
+	}
+}
