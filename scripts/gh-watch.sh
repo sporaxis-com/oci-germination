@@ -66,32 +66,50 @@ PRIMARY=$(pick_workflow "${TAG}")
 
 echo "Watching: tag=${TAG} sha=${SHORT_SHA} primary=\"${PRIMARY}\""
 
-# Find the primary run id for this SHA + workflow.
-# Poll up to 60s for the run to appear (GitHub queues for a few seconds after push).
+# Find the primary run for THIS tag (multiple tags can point at the same
+# commit; --commit alone isn't enough — also filter on head_branch=<tag>).
 PRIMARY_RUN=""
 for _ in $(seq 1 12); do
-  PRIMARY_RUN=$(gh run list --repo "${REPO}" --workflow "${PRIMARY}" --commit "${SHA}" --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+  PRIMARY_RUN=$(gh run list --repo "${REPO}" --workflow "${PRIMARY}" --commit "${SHA}" --limit 20 \
+    --json databaseId,headBranch \
+    --jq "[.[] | select(.headBranch == \"${TAG}\")] | .[0].databaseId // \"\"")
   [[ -n "${PRIMARY_RUN}" ]] && break
   sleep 5
 done
-[[ -n "${PRIMARY_RUN}" ]] || on_fail "no ${PRIMARY} run found on ${SHORT_SHA}"
+[[ -n "${PRIMARY_RUN}" ]] || on_fail "no ${PRIMARY} run found for ${TAG} on ${SHORT_SHA}"
 
 echo "Primary run: ${PRIMARY_RUN} (gh run watch)"
 gh run watch --repo "${REPO}" "${PRIMARY_RUN}" --exit-status >/dev/null || on_fail "primary build FAILED (${PRIMARY_RUN})"
 
-# Find the update-latest-md.yml run triggered by the successful primary.
-# It's a workflow_run event chained from the primary. Look for runs with the
-# same head_sha and workflow name "update-latest-md".
-ULM_RUN=""
-for _ in $(seq 1 24); do
-  ULM_RUN=$(gh run list --repo "${REPO}" --workflow "update-latest-md" --commit "${SHA}" --limit 1 --json databaseId --jq '.[0].databaseId // ""')
-  [[ -n "${ULM_RUN}" ]] && break
-  sleep 5
-done
-[[ -n "${ULM_RUN}" ]] || on_fail "update-latest-md run never appeared for ${SHORT_SHA}"
+# update-latest-md.yml is chained via workflow_run on the head_sha. Multiple
+# primary runs on the same SHA (sibling tag pushes) all fire update-latest-md
+# at near-same time; concurrency: group: update-latest-md cancels all but the
+# last. So: watch the MOST RECENT update-latest-md run on this SHA; if it
+# ends up cancelled (concurrency loser), look for a newer one and watch
+# that instead. Repeat until one COMPLETES (success or genuine failure).
+attempt=0
+while (( attempt < 18 )); do
+  attempt=$((attempt+1))
 
-echo "update-latest-md run: ${ULM_RUN} (gh run watch)"
-gh run watch --repo "${REPO}" "${ULM_RUN}" --exit-status >/dev/null || on_fail "update-latest-md FAILED (${ULM_RUN})"
+  ULM_RUN=$(gh run list --repo "${REPO}" --workflow "update-latest-md" --commit "${SHA}" --limit 1 \
+    --json databaseId --jq '.[0].databaseId // ""')
+  if [[ -z "${ULM_RUN}" ]]; then
+    sleep 5
+    continue
+  fi
+
+  echo "update-latest-md run: ${ULM_RUN} (attempt ${attempt}, gh run watch)"
+  # Don't use --exit-status here; cancelled is exit 0 from gh but we treat it as
+  # "keep looking for a newer one". Capture conclusion ourselves.
+  gh run watch --repo "${REPO}" "${ULM_RUN}" >/dev/null 2>&1 || true
+  CONCLUSION=$(gh run view --repo "${REPO}" "${ULM_RUN}" --json conclusion --jq '.conclusion // "_"')
+  case "${CONCLUSION}" in
+    success)   break ;;
+    cancelled) echo "  cancelled by concurrency, looking for a newer run..."; sleep 8 ;;
+    *)         on_fail "update-latest-md ${ULM_RUN} ended with: ${CONCLUSION}" ;;
+  esac
+done
+[[ "${CONCLUSION}" == "success" ]] || on_fail "update-latest-md never reached success after ${attempt} attempts"
 
 # Success path.
 echo "✓ Release in: ${TAG}"
