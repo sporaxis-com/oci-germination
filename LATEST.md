@@ -49,14 +49,21 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-static-cklib |
 
-## ociger-pg17-pgrdf-pgck-web-cklib — *no attested release yet*
+## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.5`
 
 PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. ⚠️ Same FastAPI latent gap as ck-allinone. Use `static-cklib` for a working web layer.
 
-> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
+| arch  | Platform digest                                                            | Created (UTC)       |
+|-------|----------------------------------------------------------------------------|---------------------|
+| amd64 | `sha256:6d117346c918854fb0536bfcaef05481da0d0cffb2f9e154cfef36bbcfedc2c3`  | 2026-05-29 14:05:58 |
+| arm64 | `sha256:a2c4ac9b1492f0751e0f2a1bdb2b0110775c590b5c8e5bea7f0347c31d01341d`  | 2026-05-29 14:05:58 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.6.5`                                                            |
+| Also tagged        | `latest`                                                                  |
+| Index digest       | `sha256:8a1d0c3044cd5525a2dc4c74d68b89a64850dcbf0a1ef5983bb14c344804c468`                                                         |
+| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
