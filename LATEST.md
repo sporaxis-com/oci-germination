@@ -13,20 +13,20 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — `v0.6.4`
+## ociger-ck-allinone — `v0.6.5`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI) + CK.Lib.Js mounted at `/cklib/`. Supervisor-orchestrated, scratch base. ⚠️ FastAPI process latent gap — Postgres/pgRDF/pgCK/NATS work; FastAPI dead. Use `static-cklib` (below) for a working web layer.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:7cbb0a27b72c71794e4b52f9fd824ea1bb4edce4e26343fc6c7cd64ca4e3b307`  | 2026-05-29 04:46:53 |
-| arm64 | `sha256:a42c4a4dddb013c09dfbcb5e834497320b0508c288cca6bd58d63e3987a27702`  | 2026-05-29 04:46:53 |
+| amd64 | `sha256:59b5091b2c7e4df87ed6566362953b48e60573097980a835d91787a2f2346748`  | 2026-05-29 12:58:57 |
+| arm64 | `sha256:ae731a8b54a7ad6ca93ebc752e791e6468a31fbbf0f725d351c1941c3007365f`  | 2026-05-29 12:58:57 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.6.4`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.6.5`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:4c8e6d3a445f42135f28cd7c87dc433cafbf6d4484dd086ee431ba3f9479f676`                                                         |
+| Index digest       | `sha256:2b3a71a71d37dc9f76f77ef4b5252002de5efa985bf1c39b330045a3223092bf`                                                         |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
