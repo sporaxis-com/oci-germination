@@ -15,9 +15,9 @@ image:
   runtime_profile: stable
 extensions:
   pgrdf:
-    version: 0.5.16
+    version: 0.5.19
   pgck:
-    version: 0.1.2
+    version: 0.2.2
 platforms:
   - linux/amd64
   - linux/arm64

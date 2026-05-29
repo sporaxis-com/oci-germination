@@ -57,6 +57,28 @@ COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-superv
 # Add cklib at /app/cklib (alongside pgck-web's /app/web)
 COPY --from=cklib_source / /app/cklib/
 
+# Install postgres runtime shared libraries that the pg17 server binaries
+# (copied from pg_base above) link against. pg_base is scratch+selectively-
+# copied so it carries these libs at /usr/lib/<arch>-linux-gnu/, but we
+# rooted from pgck-web (python:3.11-slim Debian bookworm) which doesn't
+# have them. Both pg_base and pgck-web are bookworm-derived so the libs
+# are ABI-compatible. Installed in one apt invocation, list cleaned to
+# keep the layer small.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        libxml2 \
+        libxslt1.1 \
+        libicu72 \
+        liblz4-1 \
+        libssl3 \
+        libgssapi-krb5-2 \
+        libldap-2.5-0 \
+        libreadline8 \
+        libsystemd0 \
+        libsasl2-2 && \
+    rm -rf /var/lib/apt/lists/*
+
 # postgres user 999 (matches pg_base's /etc/passwd convention) + writable dirs
 RUN groupadd -g 999 -r postgres && \
     useradd -u 999 -g 999 -r -d /var/lib/postgresql -s /bin/sh postgres && \
