@@ -42,11 +42,11 @@ application/vnd.oci.image.index.v1+json     (multi-arch index)
 **Example:**
 ```
 ghcr.io/conceptkernel/ck-lib-js:1.3.11   # files at root: ck-client.js, ck-page.js, vendor/, …
-ghcr.io/styk-tv/pgck-web:v0.2.3           # consolidated web/ dual-page Display/Board FastAPI runtime
+ghcr.io/styk-tv/pgck-web:v0.2.4           # consolidated web/ dual-page Display/Board FastAPI runtime
                                           # image; full Python + uvicorn web.app:app at standard paths
 ```
 
-`ck-lib-js:1.3.11` is the current spec-v0.3-aligned attested CK.Lib.Js release (it fills in the §2.1 Required + Recommended manifest labels; see the §8.1 worked example). `pgck-web:v0.2.3` is the consolidated-`web/` dual-page Display/Board runtime (post the `web_demo/`→`web/` consolidation; see §8.3) — it is developed into a full Shape A consumption example in §8.2.
+`ck-lib-js:1.3.11` is the current spec-v0.3-aligned attested CK.Lib.Js release (it fills in the §2.1 Required + Recommended manifest labels; see the §8.1 worked example). `pgck-web:v0.2.4` is the current attested head — the consolidated-`web/` dual-page Display/Board runtime (post the `web_demo/`→`web/` consolidation; see §8.3) — it is developed into a full Shape A consumption example in §8.2. Per the pgCK pgck-web RESPONSE, v0.2.4 supersedes the earlier v0.2.3 recommendation.
 
 **Consumer pattern (additive composition):**
 
@@ -365,7 +365,7 @@ Generator output: a Dockerfile with two ORAS fetch stages (pgrdf, pgck), one Sha
 
 ### 8.2 `bundle-ck-allinone` (dev default — FastAPI / pgck-web, Shape A additive)
 
-The all-in-one bundle composes the `pgck-web` FastAPI runtime additively. `pgck-web` is a full Python + uvicorn image (Shape A), so additive composition supplies the Python runtime that distroless-PG bases lack — this is what closes the "Python-missing-in-distroless" gap for this variant without a hand-edited venv step. The bundle pins the **consolidated `web/`** tree at `pgck-web/v0.2.3` (see §8.3 for why and which tags resolve).
+The all-in-one bundle composes the `pgck-web` FastAPI runtime additively. `pgck-web` is a full Python + uvicorn image (Shape A), so additive composition supplies the Python runtime that distroless-PG bases lack — this is what closes the "Python-missing-in-distroless" gap for this variant without a hand-edited venv step. The bundle pins the **consolidated `web/`** tree at `pgck-web/v0.2.4` (see §8.3 for why and which tags resolve).
 
 ```yaml
 spec_version: 0.3
@@ -394,7 +394,7 @@ extracted_sources:
 # Shape A — pgck-web FastAPI runtime image, additively merged.
 # Supplies the Python runtime distroless-PG lacks (the FastAPI path).
 layer_sources:
-  - source_image: ghcr.io/styk-tv/pgck-web:v0.2.3
+  - source_image: ghcr.io/styk-tv/pgck-web:v0.2.4
     into: /              # full-root merge: Python + uvicorn + web/ app
     attestation_repo: styk-tv/pgCK
 
@@ -414,7 +414,7 @@ ports:
 Generated Shape A composition for `pgck-web`:
 
 ```dockerfile
-FROM ghcr.io/styk-tv/pgck-web:v0.2.3 AS pgckweb_layer
+FROM ghcr.io/styk-tv/pgck-web:v0.2.4 AS pgckweb_layer
 FROM <base>
 COPY --from=pgckweb_layer / /
 # supervisor then starts: uvicorn web.app:app  (+ the PG launcher + NATS)
@@ -435,7 +435,8 @@ pgCK consolidated `web_demo/` **into** `web/`. The directory name stays `web/`; 
 | `pgck-web/v0.2.0` | final `web_demo/`-as-content snapshot (immediately pre-consolidation) |
 | `pgck-web/v0.2.1` | first consolidated `web/` (rename + import-path rewrite) |
 | `pgck-web/v0.2.2` | interim |
-| `pgck-web/v0.2.3` | **recommended pin** — CKClient v1.3 aligned, dual-page, NATS-broadcast-render verified |
+| `pgck-web/v0.2.3` | CKClient v1.3 aligned, dual-page, NATS-broadcast-render verified |
+| `pgck-web/v0.2.4` | **recommended pin** — current attested head; pgCK confirmed `web/` + `uvicorn web.app:app` + port 8000 as stable contracts |
 
 `uvicorn web_demo.app:app` is replaced by `uvicorn web.app:app`. The Python-in-distroless concern is decoupled from pgCK's layout: pgCK ships one `web/` tree regardless of bundle variant; FastAPI-vs-static is the oci-germination policy choice recorded in §8.2.
 
