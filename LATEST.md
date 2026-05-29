@@ -31,39 +31,32 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI)
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-## ociger-pg17-pgrdf-pgck-static-cklib — `v0.6.4`
+## ociger-pg17-pgrdf-pgck-static-cklib — `v0.6.5`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at `/cklib/`. No Python, no FastAPI. Browser ↔ kernel via NATS WSS; HTTP serves only static assets.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:b2945bb422932a1a1b54a2d775cb3a7fe170835526f38f7a0da041a0806c9dbb`  | 2026-05-29 04:45:31 |
-| arm64 | `sha256:12e0277b3c246f82cac03eb788ce6bdc3223ee4473e7d030261c87dd87ac9659`  | 2026-05-29 04:45:31 |
+| amd64 | `sha256:e3c380049ffb58c4a11d9d839575938c98af17fec2519df3946d46429b3ddc8e`  | 2026-05-29 14:04:30 |
+| arm64 | `sha256:5f3f9791fe1bb6fc5b8a2d743de2052814779d885ad1fc45cdb330cfd8887712`  | 2026-05-29 14:04:30 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.4`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.5`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:d8325bc39f383397a6916f7325781098612797f4523162f3c96558d0412a4968`                                                         |
+| Index digest       | `sha256:bf470c5154a5f6ed54043439cbd549368df5ef811374d6fdf048f7bdf426cffd`                                                         |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-static-cklib |
 
-## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.4`
+## ociger-pg17-pgrdf-pgck-web-cklib — *no attested release yet*
 
 PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. ⚠️ Same FastAPI latent gap as ck-allinone. Use `static-cklib` for a working web layer.
 
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:931dff7033e563f13df09e6297352dc85a4b1176c41ff3ee952084d33b8aad8b`  | 2026-05-29 04:46:42 |
-| arm64 | `sha256:a47bdc2848b33d42bcc9823785f740135b8939a03443c67c8c25e616f6cdb22a`  | 2026-05-29 04:46:42 |
+> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.6.4`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:f1a81a64ab5f9b0ac49004e43edaf266d99591e8620b5e87ce560ecb8373372c`                                                         |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
