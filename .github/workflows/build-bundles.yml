@@ -3,9 +3,14 @@ name: Build OCI Bundles
 on:
   push:
     tags:
-      - 'release-pg17-pgrdf-pgck-web-cklib-*'
+      # pg17-pgrdf-pgck-web-cklib retired 2026-05-31 — was FastAPI/Python;
+      # superseded by ck-allinone Delta (s6 + busybox httpd, no Python) +
+      # pg17-pgrdf-pgck-static-cklib (also Python-free).
       - 'release-pg17-pgrdf-pgck-static-cklib-*'
       - 'release-ck-allinone-*'
+      # pgck-bench is the ONLY sanctioned home for Python in the ociger group.
+      # Sibling to ck-allinone (not embedded). Never tagged as prod.
+      - 'release-pgck-bench-*'
 
 env:
   REGISTRY: ghcr.io

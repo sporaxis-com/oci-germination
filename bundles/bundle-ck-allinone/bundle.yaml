@@ -1,19 +1,18 @@
 spec_version: 0.2
 name: bundle-ck-allinone
-description: CKP v3.8 all-in-one — PostgreSQL 17 + pgRDF 0.5.19 + pgCK 0.2.2 + pgck-web 0.2.6 (additive Shape A) + cklib 1.3.11 + NATS 2.14.1 WSS bridge
+description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.x + pgCK 0.2.x + NATS 2.14.1 (core+WSS) + cklib 1.3.x, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no FastAPI. Marketplace-minimal.
 
-# Hand-crafted bundle: thin layer on top of bundle-pg17-pgrdf-pgck-nats-micro
-# with pgckweb (FastAPI) + cklib (CK.Lib.Js) wired in. The current generator
-# (spec_version 0.1) doesn't model FROM-image composition or python venv steps,
-# so this Dockerfile is maintained by hand. Re-enable rendering once the
-# generator learns components: + static_web:.
+# Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib on top of
+# pg17-pgrdf-pgck-nats-micro (scratch + selectively-copied bookworm libs).
+# Generator does not model FROM-image composition or s6-rc.d service trees,
+# so the Dockerfile + s6-services/ tree are maintained by hand.
 skip_render: true
 
 image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 17
-  base_image: postgres:17-bookworm
-  final_image: gcr.io/distroless/base-debian12:latest
+  base_image: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
+  final_image: scratch
   runtime_profile: micro
 
 extensions:
@@ -25,23 +24,27 @@ extensions:
     source: https://github.com/styk-tv/pgCK
 
 components:
-  pgckweb:
-    version: 0.2.6
-    source: ghcr.io/styk-tv/pgck-web:v0.2.6
+  s6-overlay:
+    version: 3.2.3.0
+    source: https://github.com/just-containers/s6-overlay
+    description: Modern init + service supervisor for the container; replaces the previous bespoke ociger-supervisor
+  busybox:
+    version: 1.36.1
+    source: https://hub.docker.com/_/busybox (musl variant)
     port: 8000
-    description: FastAPI web UI for pgCK kernel operations (additive Shape A layer per SPEC.OCI.BUNDLE.v0.3 §1.1)
+    description: Static binary; httpd applet serves /app on :8000 (replaces the previous bespoke ociger-static-server and the prior FastAPI/uvicorn stand-in)
   cklib:
     version: 1.3.11
     source: https://github.com/ConceptKernel/CK.Lib.Js
-    mount_path: /cklib
-    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS
+    mount_path: /app/cklib
+    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP
   nats:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server
     core_port: 4222
     wss_port: 9222
     jetstream: false
-    description: Message bus for kernel communication, WSS bridge for browser clients
+    description: Inherited via pg_base; supervised by s6 as a sibling longrun
 
 services:
   nats:
@@ -50,12 +53,9 @@ services:
     websocket_port: 9222
     jetstream: false
 
-static_web:
-  - source_image: ghcr.io/conceptkernel/ck-lib-js:1.3.11
-    route: /cklib
-
 supervisor:
-  description: Tiny Go supervisor orchestrates PostgreSQL + pgckweb FastAPI + NATS
+  binary: s6-overlay v3.2.3.0
+  description: s6-svscan PID 1 supervises postgres + nats + busybox-httpd as s6-rc longruns
 
 platforms:
   - linux/amd64
@@ -64,7 +64,7 @@ platforms:
 ports:
   - name: postgres
     container_port: 5432
-  - name: fastapi
+  - name: http
     container_port: 8000
   - name: nats
     container_port: 4222

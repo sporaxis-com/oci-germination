@@ -1,0 +1,5 @@
+#!/bin/sh
+# ociger-pg-launcher runs as root, then drops privileges to postgres
+# internally (matches its existing contract as the pg_base entrypoint
+# invoked previously by ociger-supervisor).
+exec /usr/local/bin/ociger-pg-launcher

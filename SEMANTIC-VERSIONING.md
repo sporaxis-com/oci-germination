@@ -22,7 +22,6 @@ Tags follow a **2-number format**:
 - Format: `release-<bundle-name>-vMAJOR.MINOR`
 - Examples:
   - `release-ck-allinone-v0.3`
-  - `release-pg17-pgrdf-pgck-web-cklib-v0.2`
 
 ### 2. `git describe --tags` Conversion
 
@@ -67,11 +66,9 @@ When ready to release a new version:
 ```bash
 # 1. Tag both bundles (or just the one being released)
 git tag release-ck-allinone-v0.4
-git tag release-pg17-pgrdf-pgck-web-cklib-v0.4
 
 # 2. Push tags
 git push origin release-ck-allinone-v0.4
-git push origin release-pg17-pgrdf-pgck-web-cklib-v0.4
 
 # 3. GitHub Actions automatically:
 #    - Detects the tag push
@@ -99,11 +96,9 @@ This allows for patch-level versioning without requiring new tags.
 | Bundle | Latest Tag | Semantic Version |
 |---|---|---|
 | `ck-allinone` | `release-ck-allinone-v0.4` | `v0.4.0` |
-| `pg17-pgrdf-pgck-web-cklib` | `release-pg17-pgrdf-pgck-web-cklib-v0.4` | `v0.4.0` |
 
 Both are published to GHCR as:
 - `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0`
-- `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0`
 
 ## Key Principles
 

@@ -45,7 +45,7 @@ trap 'on_fail FAILED' ERR
 pick_workflow() {
   local tag="$1"
   case "$tag" in
-    release-ck-allinone-v*|release-pg17-pgrdf-pgck-web-cklib-v*|release-pg17-pgrdf-pgck-static-cklib-v*)
+    release-ck-allinone-v*|release-pg17-pgrdf-pgck-static-cklib-v*)
       echo "Build OCI Bundles" ;;
     core-pg17-v*)                      echo "core-pg17-release" ;;
     core-pg17-micro-v*)                echo "core-pg17-micro-release" ;;

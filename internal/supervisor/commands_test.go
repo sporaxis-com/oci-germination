@@ -30,15 +30,15 @@ func TestDefaultPrograms_StaticProfile(t *testing.T) {
 	}
 }
 
-func TestDefaultPrograms_FastapiProfile(t *testing.T) {
+// fastapi profile removed. Unknown profile values must fall back to defaultProfile.
+func TestDefaultPrograms_UnknownProfile_FallsBackToDefault(t *testing.T) {
 	t.Setenv("OCIGER_SUPERVISOR_PROFILE", "fastapi")
 	want := []Program{
 		{Name: "postgres", Path: "/usr/local/bin/ociger-pg-launcher"},
 		{Name: "nats", Path: "/usr/local/bin/nats-server", Args: []string{"--config", "/etc/nats/nats-server.conf"}},
-		{Name: "pgckweb", Path: "/usr/local/bin/pgck-web-launcher"},
 	}
 
 	if programs := DefaultPrograms(); !reflect.DeepEqual(programs, want) {
-		t.Fatalf("DefaultPrograms(fastapi) = %#v, want %#v", programs, want)
+		t.Fatalf("DefaultPrograms(unknown=fastapi) = %#v, want default %#v", programs, want)
 	}
 }

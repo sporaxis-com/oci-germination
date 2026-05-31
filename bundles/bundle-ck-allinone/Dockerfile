@@ -1,95 +1,71 @@
 # syntax=docker/dockerfile:1.7
 
-# Postgres + pgRDF + pgCK + NATS base — provides /usr/lib/postgresql/17/*,
-# /usr/share/postgresql/17/*, pgrdf.so + pgck.so + extension SQL/control files,
-# nats-server, ociger-pg-launcher, ociger-supervisor, nats config. Selectively
-# layered onto a scratch final image upstream of us.
+# ck-allinone Delta — s6-overlay + busybox httpd, scratch base, no Python.
+# Marketplace-minimal: zero bespoke binaries beyond what pg_base already
+# carries (ociger-pg-launcher). Supervisor = s6 (audited, well-known).
+# Web layer = busybox httpd (static, ~1 MB, no config language needed).
+# All extension binaries (pgrdf.so, pgck.so) and the postgres server
+# inherit from pg_base, which is pgRDF's de-facto compile target
+# (Debian bookworm SONAMEs preserved end-to-end).
+
+ARG PG_BASE_VERSION=v0.1.5
+ARG S6_OVERLAY_VERSION=3.2.3.0
+ARG CKLIB_VERSION=1.3.11
+
+# ─── Stage 1: pg base (pg17 + pgRDF + pgCK + NATS + ociger-pg-launcher) ───
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.5 AS pg_base
 
-# Shape A additive — CK.Lib.Js static layer
+# ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
 
-# Shape A additive — pgck-web FastAPI runtime. python:3.11-slim-based Debian
-# image with /usr/local/bin/python3, /opt/venv (uvicorn + deps),
-# /app/web (the consolidated web/ tree), /usr/local/bin/pgck-web-launcher.
-# v0.2.6 ships per-arch tags only (no multi-arch index) per pgCK's pattern,
-# so the tag interpolates TARGETARCH. Per pgCK's pgck-web RESPONSE this is
-# the supported consumption shape.
-FROM ghcr.io/styk-tv/pgck-web:v0.2.6-${TARGETARCH} AS pgckweb_base
+# ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
+FROM busybox:1.36.1-musl AS busybox_src
 
-# Rebuild the ociger-supervisor with fastapi-profile support. The pg_base
-# image's supervisor doesn't know about OCIGER_SUPERVISOR_PROFILE=fastapi
-# yet (that profile lands in this same commit).
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS supervisor_build
+# ─── Stage 4: extract s6-overlay release tarballs into /s6root ────────────
+FROM debian:trixie-slim AS s6_extract
+ARG S6_OVERLAY_VERSION
 ARG TARGETARCH
-WORKDIR /src
-COPY go.mod ./
-COPY go.sum ./
-COPY cmd/ociger-supervisor/main.go ./cmd/ociger-supervisor/main.go
-COPY internal/supervisor ./internal/supervisor
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
-    go build -o /out/ociger-supervisor ./cmd/ociger-supervisor
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl xz-utils ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    case "$TARGETARCH" in \
+        amd64) S6_ARCH=x86_64 ;; \
+        arm64) S6_ARCH=aarch64 ;; \
+        *)     echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    mkdir /s6root; \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" \
+        | tar -C /s6root -Jxpf -; \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" \
+        | tar -C /s6root -Jxpf -
 
-# Final image — pgck-web (Debian + Python + uvicorn + /app/web + pgck-web-launcher)
-# is the base; postgres + nats + pgRDF + pgCK + supervisor + cklib layer on top.
-# This is the inversion of the previous design (which used a scratch+postgres base
-# and tried to inline-printf a tiny FastAPI app — gap was that Python wasn't
-# actually present in the final image; see _WIP/NOTIFIES.pgCK.pgck-web.v0.2.4.*).
-FROM pgckweb_base
+# ─── Final stage: layer everything on pg_base ─────────────────────────────
+FROM pg_base
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.8 all-in-one — PG17 + pgRDF + pgCK + NATS + pgck-web (additive) + cklib"
+LABEL org.opencontainers.image.description="CKP v3.8 all-in-one minimal — PG17 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. No Python, no FastAPI, scratch base."
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Add postgres binaries + libs + extensions
-COPY --from=pg_base /usr/lib/postgresql /usr/lib/postgresql
-COPY --from=pg_base /usr/share/postgresql /usr/share/postgresql
+# s6-overlay — supervisor + init for the container's services
+COPY --from=s6_extract /s6root/ /
 
-# Add nats-server + config
-COPY --from=pg_base /usr/local/bin/nats-server /usr/local/bin/nats-server
-COPY --from=pg_base /etc/nats /etc/nats
+# busybox — single static binary, provides httpd applet
+COPY --from=busybox_src /bin/busybox /bin/busybox
 
-# Add PG launcher
-COPY --from=pg_base /usr/local/bin/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
-
-# Add the supervisor we just built (with fastapi profile)
-COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor
-
-# Add cklib at /app/cklib (alongside pgck-web's /app/web)
+# cklib — browser JavaScript library mounted at /app/cklib/
+# busybox httpd will serve /app on :8000, so cklib is at /cklib/ over HTTP
 COPY --from=cklib_source / /app/cklib/
 
-# Install postgres runtime shared libraries that the pg17 server binaries
-# (copied from pg_base above) link against. pg_base is scratch+selectively-
-# copied so it carries these libs at /usr/lib/<arch>-linux-gnu/, but we
-# rooted from pgck-web (python:3.11-slim Debian bookworm) which doesn't
-# have them. Both pg_base and pgck-web are bookworm-derived so the libs
-# are ABI-compatible. Installed in one apt invocation, list cleaned to
-# keep the layer small.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libpq5 \
-        libxml2 \
-        libxslt1.1 \
-        libicu76 \
-        liblz4-1 \
-        libssl3 \
-        libgssapi-krb5-2 \
-        libldap2 \
-        libreadline8 \
-        libsystemd0 \
-        libsasl2-2 && \
-    rm -rf /var/lib/apt/lists/*
-
-# postgres user 999 (matches pg_base's /etc/passwd convention) + writable dirs
-RUN groupadd -g 999 -r postgres && \
-    useradd -u 999 -g 999 -r -d /var/lib/postgresql -s /bin/sh postgres && \
-    mkdir -p /var/lib/postgresql/data /var/run/postgresql && \
-    chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql && \
-    chmod 700 /var/lib/postgresql/data
+# s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot
+COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
 ENV PGDATA=/var/lib/postgresql/data
-ENV OCIGER_SUPERVISOR_PROFILE=fastapi
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
+ENV S6_KEEP_ENV=1
+ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
+ENV S6_VERBOSITY=1
 
 EXPOSE 5432 8000 4222 9222
 VOLUME ["/var/lib/postgresql/data"]
-ENTRYPOINT ["/usr/local/bin/ociger-supervisor"]
+
+ENTRYPOINT ["/init"]

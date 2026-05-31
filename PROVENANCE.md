@@ -35,7 +35,6 @@ Every artifact this repo publishes — all 11 OCI bundles — is built and pushe
 | Surface | Build / push performed by | Provenance |
 |---|---|---|
 | `ghcr.io/sporaxis-com/ociger-ck-allinone:<ver>` | `Build OCI Bundles` workflow on `release-ck-allinone-v*` tag push | Pre-policy (no attestation yet); will be [SLSA Build Provenance v1](https://slsa.dev/spec/v1.0/provenance) via [`actions/attest-build-provenance@v1`](https://github.com/actions/attest-build-provenance) after the pipeline lands |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:<ver>` | same workflow on `release-pg17-pgrdf-pgck-web-cklib-v*` | same |
 | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:<ver>` | same workflow on `release-pg17-pgrdf-pgck-static-cklib-v*` | same |
 | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:<ver>` | `pg17-pgrdf-pgck-nats-micro-release.yml` on every `main` push | same |
 | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:<ver>` | `pg17-pgrdf-pgck-nats-release.yml` | same |
@@ -102,7 +101,6 @@ GitHub Actions takes over. There is no step in this flow that requires `docker b
 | Bundle | Tag prefix |
 |---|---|
 | `ck-allinone` | `release-ck-allinone-v*` |
-| `pg17-pgrdf-pgck-web-cklib` | `release-pg17-pgrdf-pgck-web-cklib-v*` |
 | `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-v*` |
 | `pg17-pgrdf-pgck-nats-micro` | `release-pg17-pgrdf-pgck-nats-micro-v*` |
 | `pg17-pgrdf-pgck-nats` | `release-pg17-pgrdf-pgck-nats-v*` |
@@ -131,10 +129,8 @@ core-pg17-nats ─┘                                    │                    
                                                      │                            ▼
                                 core-pg17-nats-micro ┴─→ pg17-pgrdf-pgck-nats-micro
                                                                   │
-                                                                  ├─→ ck-allinone
-                                                                  └─→ pg17-pgrdf-pgck-static-cklib
-
-                                              pg17-pgrdf-pgck ──→ pg17-pgrdf-pgck-web-cklib
+                                                                  ├─→ ck-allinone (Delta — s6-overlay + busybox httpd)
+                                                                  └─→ pg17-pgrdf-pgck-static-cklib (ociger-static-server)
 ```
 
 When a base bundle is rebuilt (e.g. `pg17-pgrdf-pgck-nats-micro:v0.1.3`), every downstream bundle that pins it via `FROM` will continue to resolve to the OLD digest until its own `Dockerfile` is bumped to the new tag and a new tag is pushed. The release-turn report (Rule 6) must call out which downstreams are now lagging so the next release sequence picks them up explicitly.

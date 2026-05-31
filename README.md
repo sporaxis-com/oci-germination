@@ -17,8 +17,8 @@ Current public releases:
 - `pg17-pgrdf-pgck-nats-micro` — smaller PostgreSQL 17 + `pgRDF 0.5.16` + `pgCK 0.1.2` + `nats-server 2.14.1`
 
 **Web-serving bundles (CKP v3.8):**
-- `pg17-pgrdf-pgck-web-cklib` — PostgreSQL 17 + pgRDF + pgCK + FastAPI web UI + cklib (no NATS; standard variant)
-- `ck-allinone` — **[CKP Development Default]** All-in-one stack for Concept Kernel: PostgreSQL 17 + pgRDF + pgCK + pgckweb + cklib + NATS core + WSS bridge + supervisor orchestration
+- `pg17-pgrdf-pgck-static-cklib` — PostgreSQL 17 + pgRDF + pgCK + NATS WSS + Go static server + cklib (no Python/FastAPI)
+- `ck-allinone` — **[CKP marketplace-minimal default]** All-in-one for Concept Kernel: PG17 + pgRDF + pgCK + NATS (4222) + WSS (9222) + cklib (Shape A) served on :8000 by busybox httpd, supervised by s6-overlay. Scratch base, no Python, no FastAPI. ~51 MB compressed.
 
 Next target:
 
@@ -38,8 +38,8 @@ All published images are multi-arch manifest lists for `linux/amd64` and `linux/
 | `pg17-pgrdf-pgck` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.1` | `amd64`, `arm64` | `151.7 / 57.8 MiB` | `pgck` preloaded by default; `CREATE EXTENSION pgrdf`; `CREATE EXTENSION pgck CASCADE`; `pgrdf.version()=0.5.16`; `pgck_version()=pgck 0.1.2 (rc3)` |
 | `pg17-pgrdf-pgck-nats` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.1` | `amd64`, `arm64` | `170.1 / 65.1 MiB` | triple-bundle proof plus NATS core on `4222`, WebSocket on `9222`, and one-image host relation-file proof |
 | `pg17-pgrdf-pgck-nats-micro` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1` | `amd64`, `arm64` | `104.5 / 41.3 MiB` | all-in-one proof on the micro runtime line: `pgrdf`, `pgck`, NATS, and host relation-file proof |
-| `pg17-pgrdf-pgck-web-cklib` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0` | `amd64`, `arm64` | `~200 / TBD` | ✓ Published | **Standard variant** — PostgreSQL 17 + pgRDF 0.5.1 + pgCK 0.1.2 + pgckweb 0.2.0 + cklib 1.2.0 (no NATS) |
-| `ck-allinone` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0` | `amd64`, `arm64` | `~150 / TBD` | ✓ Published | **CKP Development Default** — All-in-one for Concept Kernel: pgckweb 0.1.0 + cklib 1.2.0 + NATS core (4222) + WSS (9222) + supervisor. Extends `ociger-pg17-pgrdf-pgck-nats-micro:v0.3` base. |
+| `pg17-pgrdf-pgck-static-cklib` | see `LATEST.md` | `amd64`, `arm64` | `~51 MB compressed` | Static-only — Go static server + cklib, no Python |
+| `ck-allinone` | see `LATEST.md` | `amd64`, `arm64` | `~51 MB compressed` | **Marketplace-minimal** — s6-overlay + busybox httpd + cklib + NATS + pg/pgRDF/pgCK; no Python, no FastAPI, scratch base. See `LATEST.md` for current pinned digest. |
 
 Size values are `uncompressed / compressed` local measurements on `linux/arm64`. New bundles now published to GHCR with multi-platform manifests.
 
@@ -66,12 +66,12 @@ Pinned manifest digests:
 | `pg17-pgrdf-pgck` | `core-pg17` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts | `ociger-pg17-pgrdf-pgck` | triple bundle with `pgck` preloaded by default |
 | `pg17-pgrdf-pgck-nats` | `core-pg17` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats` | all-in-one stable bundle with NATS and both extensions |
 | `pg17-pgrdf-pgck-nats-micro` | `core-pg17-micro` runtime shape | upstream `pgRDF 0.5.16` + `pgCK 0.1.2` artifacts + `nats-server 2.14.1` | `ociger-pg17-pgrdf-pgck-nats-micro` | smaller all-in-one bundle with the same SQL/NATS contract |
-| `pg17-pgrdf-pgck-web-cklib` | `pg17-pgrdf-pgck` (no NATS) | FastAPI web server (pgckweb 0.2.0) + cklib (CK.Lib.Js 1.2.0) OCI layer source | `ociger-pg17-pgrdf-pgck-web-cklib` | **Standard variant** — clean web UI + cklib, no messaging layer |
-| `ck-allinone` | `pg17-pgrdf-pgck-nats-micro` (with NATS) | FastAPI pgckweb 0.1.0 + cklib 1.2.0 + inherited NATS infrastructure + ociger-supervisor for service orchestration | `ociger-ck-allinone` | **[CKP Development Default]** — Complete all-in-one stack for Concept Kernel development: all extensions + web UI + NATS (4222) + WSS bridge (9222) + orchestration |
+| `pg17-pgrdf-pgck-static-cklib` | `pg17-pgrdf-pgck-nats-micro` | ociger-static-server (Go) + cklib (CK.Lib.Js) | `ociger-pg17-pgrdf-pgck-static-cklib` | Static-only web layer, no Python |
+| `ck-allinone` | `pg17-pgrdf-pgck-nats-micro` | s6-overlay + busybox httpd + cklib | `ociger-ck-allinone` | **Marketplace-minimal** — supervised by s6 (PID 1); busybox httpd serves /cklib/ on :8000; scratch base, no Python, no FastAPI |
 
 The NATS service layer is reusable: it copies only `nats-server` from `nats:2.14.1-scratch`, renders a minimal config, and starts PostgreSQL plus NATS through the same tiny supervisor. `pg17-pgrdf-pgck-nats` and `pg17-pgrdf-pgck-nats-micro` prove the same pattern can carry both upstream extensions and the colocated message bus in one OCI image.
 
-Web-serving bundles extend the PostgreSQL+extensions base with FastAPI and static file mounts. The cklib OCI layer is imported additively—no extraction—by referencing `ck-lib-js:1.2.0` in the builder stage and mounting files at `/cklib/` in the final image. For Concept Kernel development, use **ck-allinone** which adds NATS messaging infrastructure for agent coordination.
+Web-serving bundles extend the PostgreSQL+extensions base with a static file server. The cklib OCI layer is imported additively—no extraction—by referencing the upstream `ck-lib-js` image in the builder stage and mounting files at `/app/cklib/` in the final image. Browser clients talk to NATS directly over WSS (`:9222`); HTTP exists only to serve static assets. For marketplace-minimal deployments, use **ck-allinone** (s6-overlay supervised, busybox httpd, no Python).
 
 ## One-Line Launch
 
@@ -208,55 +208,43 @@ nc 127.0.0.1 34222 < /dev/null
 nc -zv 127.0.0.1 39222
 ```
 
-### Standard variant (no NATS)
+### Static-only variant (no Python)
 
-Run the `pg17-pgrdf-pgck-web-cklib` bundle (FastAPI + cklib, no messaging):
+Run the `pg17-pgrdf-pgck-static-cklib` bundle:
 
 ```bash
 docker run --rm -d \
-  --name ociger-pg17-pgrdf-pgck-web-cklib \
+  --name ociger-pg17-pgrdf-pgck-static-cklib \
   -e PGDATA=/var/lib/postgresql/data \
-  -v "$PWD/ociger-pg17-pgrdf-pgck-web-cklib-data:/var/lib/postgresql/data" \
-  -p 15440:5432 \
-  -p 18000:8000 \
-  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0
+  -v "$PWD/ociger-pg17-pgrdf-pgck-static-cklib-data:/var/lib/postgresql/data" \
+  -p 15440:5432 -p 18000:8000 -p 14223:4222 -p 19223:9222 \
+  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.5
 ```
 
-Then verify FastAPI and cklib files:
+### Marketplace-minimal default (ck-allinone Delta)
 
-```bash
-curl http://127.0.0.1:18000/          # pgckweb root endpoint
-curl http://127.0.0.1:18000/cklib/ck-client.js    # cklib JavaScript files
-psql -h 127.0.0.1 -p 15440 -U postgres -d postgres \
-  -c 'CREATE EXTENSION pgrdf; CREATE EXTENSION pgck CASCADE; SELECT pgrdf.version(), pgck_version();'
-```
-
-### CKP Development Default
-
-Run the `ck-allinone` bundle (recommended for Concept Kernel development):
+Run the `ck-allinone` bundle — s6-overlay supervises PG + NATS + busybox httpd; cklib served on `/cklib/` over HTTP; no Python anywhere; scratch base:
 
 ```bash
 docker run --rm -d \
   --name ociger-ck-allinone \
   -e PGDATA=/var/lib/postgresql/data \
   -v "$PWD/ociger-ck-allinone-data:/var/lib/postgresql/data" \
-  -p 15441:5432 \
-  -p 18001:8000 \
-  -p 14222:4222 \
-  -p 19222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0
+  -p 15441:5432 -p 18001:8000 -p 14222:4222 -p 19222:9222 \
+  ghcr.io/sporaxis-com/ociger-ck-allinone:latest
 ```
 
-Then verify the full stack (PostgreSQL + extensions + FastAPI + NATS + cklib):
+Verify:
 
 ```bash
-curl http://127.0.0.1:18001/          # pgckweb with cklib
-curl http://127.0.0.1:18001/cklib/ck-client.js    # cklib client library
+curl -I http://127.0.0.1:18001/cklib/ck-client.js   # busybox httpd serves cklib assets
 psql -h 127.0.0.1 -p 15441 -U postgres -d postgres \
   -c 'CREATE EXTENSION pgrdf; CREATE EXTENSION pgck CASCADE; SELECT pgrdf.version(), pgck_version();'
-nc 127.0.0.1 14222 < /dev/null   # NATS core (for clustering/messaging)
-nc -zv 127.0.0.1 19222           # NATS WSS (browser client connectivity)
+nc 127.0.0.1 14222 < /dev/null   # NATS core
+nc -zv 127.0.0.1 19222           # NATS WSS for browser clients
 ```
+
+For benchmarking pgCK with the upstream pgck-web FastAPI runtime (Python), use the sibling **`ociger-pgck-bench`** bundle that connects to a running ck-allinone over NATS — never bake Python into ck-allinone itself.
 
 ## Verification
 
@@ -301,18 +289,18 @@ bash scripts/smoke-pg17-pgrdf-pgck-nats-micro.sh
 bash scripts/smoke-pg17-pgrdf-pgck-nats-micro.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.1
 ```
 
-Standard variant proof (FastAPI + cklib, no NATS):
+Static-only variant proof (no Python):
 
 ```bash
-bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh
-bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.4.0
+bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh
+bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:latest
 ```
 
-CKP Development Default proof (all-in-one with NATS):
+Marketplace-minimal ck-allinone Delta proof (s6-overlay + busybox httpd, no Python):
 
 ```bash
 bash scripts/smoke-ck-allinone.sh
-bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0
+bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:latest
 ```
 
 Expected `pgRDF` smoke output:

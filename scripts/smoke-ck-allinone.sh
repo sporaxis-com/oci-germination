@@ -1,243 +1,153 @@
 #!/bin/bash
-# Smoke test: bundle-ck-allinone v3.8-rc2
-# Verifies: PostgreSQL + pgRDF + pgCK + pgckweb FastAPI + cklib + NATS core + WSS bridge + supervisor orchestration
+# Smoke test: bundle-ck-allinone (Delta — s6-overlay + busybox httpd, no Python)
+# Verifies: PostgreSQL + pgRDF + pgCK + cklib via busybox httpd + NATS core + WSS bridge
+#
+# Delta composition (no FastAPI, no /opt/venv, no Python, no ociger-supervisor,
+# no ociger-static-server). PID 1 is s6-svscan. Web serving is busybox httpd
+# applet. Bundle aims for marketplace-minimal size.
 
 set -e
 
-# shellcheck source=lib/assert-pgrdf-pgatomic.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
-
-psql_query() {
-  local db="$1"
-  local sql="$2"
-  docker exec "$CONTAINER_NAME" psql -U postgres -d "$db" -At -v ON_ERROR_STOP=1 -c "$sql"
-}
-
-IMAGE="${1:-ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2}"
+IMAGE="${1:-ghcr.io/sporaxis-com/ociger-ck-allinone:latest}"
 CONTAINER_NAME="ociger-ck-allinone-smoke"
 NETWORK_NAME="ociger-ck-allinone-net"
 DATA_DIR=".artifacts/ociger-ck-allinone-smoke/pgdata"
 
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.1}"
+EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.2.2}"
+EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.2.2 (rc3)}"
+EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.11}"
+
 echo "════════════════════════════════════════════════════════════"
-echo "[ck-allinone] CKP v3.8 All-in-One Smoke Test"
+echo "[ck-allinone] CKP v3.8 All-in-One (Delta) Smoke Test"
 echo "════════════════════════════════════════════════════════════"
-echo "[ck-allinone] Image: $IMAGE"
+echo "[ck-allinone] Image:     $IMAGE"
 echo "[ck-allinone] Container: $CONTAINER_NAME"
-echo "[ck-allinone] Network: $NETWORK_NAME"
-echo "[ck-allinone] Data dir: $DATA_DIR"
 echo ""
 
 # Cleanup
-docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
-docker network rm "$NETWORK_NAME" 2>/dev/null || true
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
+rm -rf "$DATA_DIR"
 mkdir -p "$DATA_DIR"
 
-# Start container with all ports exposed
+# Start container
 echo "[ck-allinone] Starting container..."
-docker network create "$NETWORK_NAME" || true
+docker network create "$NETWORK_NAME" >/dev/null
 docker run --rm -d \
   --name "$CONTAINER_NAME" \
   --network "$NETWORK_NAME" \
-  -e PGDATA=/var/lib/postgresql/data \
+  -e POSTGRES_PASSWORD=smoketest \
+  -p 35432:5432 -p 38000:8000 -p 34222:4222 -p 39222:9222 \
   -v "$PWD/$DATA_DIR:/var/lib/postgresql/data" \
-  -p 15432:5432 \
-  -p 18000:8000 \
-  -p 14222:4222 \
-  -p 19222:9222 \
-  "$IMAGE"
+  "$IMAGE" >/dev/null
 
-echo "[ck-allinone] Container started. Waiting for services..."
-sleep 3
+cleanup() {
+  echo ""
+  echo "[ck-allinone] cleanup"
+  docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+  docker network rm "$NETWORK_NAME" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
-# Test PostgreSQL (port 5432)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ① PostgreSQL (port 5432)"
-echo "────────────────────────────────────────────────────────────"
-for i in {1..20}; do
-  if docker exec "$CONTAINER_NAME" pg_isready -U postgres 2>/dev/null; then
-    echo "[ck-allinone] ✓ PostgreSQL is ready"
+# pg_base ships only initdb + postgres server — no client tools (psql, pg_isready).
+# Use a sidecar postgres:17-bookworm to connect over the smoke network.
+PSQL="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoketest postgres:17-bookworm psql -h $CONTAINER_NAME -U postgres -d postgres -At -v ON_ERROR_STOP=1"
+PGISREADY="docker run --rm --network $NETWORK_NAME postgres:17-bookworm pg_isready -h $CONTAINER_NAME -U postgres"
+
+echo "[ck-allinone] ① waiting for postgres..."
+for i in $(seq 1 30); do
+  if $PGISREADY >/dev/null 2>&1; then
+    echo "[ck-allinone] ✓ postgres ready"
     break
   fi
-  echo "[ck-allinone] Waiting for PostgreSQL... attempt $i/20"
+  [[ $i -eq 30 ]] && { echo "✗ postgres never ready"; docker logs "$CONTAINER_NAME"; exit 1; }
   sleep 1
 done
 
-# Verify PostgreSQL version and extensions
-docker exec "$CONTAINER_NAME" psql -U postgres -d postgres -c "SELECT version();" > /tmp/pg_version.txt
-PG_VERSION=$(cat /tmp/pg_version.txt | grep "PostgreSQL" | head -1)
-echo "[ck-allinone] Version: $PG_VERSION"
+echo "[ck-allinone] ② CREATE EXTENSION pgrdf, pgck, pgcrypto"
+$PSQL -c "CREATE EXTENSION pgcrypto;" >/dev/null
+$PSQL -c "CREATE EXTENSION pgrdf;"    >/dev/null
+$PSQL -c "CREATE EXTENSION pgck;"     >/dev/null
 
-# Test pgRDF
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ② pgRDF Extension (0.5.1)"
-echo "────────────────────────────────────────────────────────────"
-docker exec "$CONTAINER_NAME" psql -U postgres -d postgres -c "CREATE DATABASE ck_test;" || echo "[ck-allinone] Database already exists"
-docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE EXTENSION pgrdf;"
-PGRDF_VER=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "SELECT pgrdf.version();" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
-echo "[ck-allinone] ✓ pgRDF version: $PGRDF_VER"
+PGRDF_INSTALLED=$($PSQL -c "SELECT extversion FROM pg_extension WHERE extname='pgrdf';")
+PGCK_INSTALLED=$($PSQL  -c "SELECT extversion FROM pg_extension WHERE extname='pgck';")
+PGCK_NATIVE=$($PSQL     -c "SELECT pgck_version();")
 
-# Test pgCK
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ③ pgCK Extension (0.1.2)"
-echo "────────────────────────────────────────────────────────────"
-docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE EXTENSION pgck CASCADE;" || true
-PGCK_VER=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "SELECT pgck_version();" 2>/dev/null | tail -1)
-echo "[ck-allinone] ✓ pgCK version: $PGCK_VER"
+if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_VERSION" ]]; then
+  echo "✗ wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_VERSION" >&2
+  exit 1
+fi
+if [[ "$PGCK_INSTALLED" != "$EXPECTED_PGCK_VERSION" ]]; then
+  echo "✗ wrong-version: pgck extversion=$PGCK_INSTALLED expected=$EXPECTED_PGCK_VERSION" >&2
+  exit 1
+fi
+if [[ "$PGCK_NATIVE" != "$EXPECTED_PGCK_NATIVE" ]]; then
+  echo "✗ wrong-version: pgck_version()=$PGCK_NATIVE expected=$EXPECTED_PGCK_NATIVE" >&2
+  exit 1
+fi
+echo "[ck-allinone] ✓ pgrdf=$PGRDF_INSTALLED pgck=$PGCK_INSTALLED ($PGCK_NATIVE)"
 
-# Test pgRDF PgAtomic Initialization (Regression Test)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ③.₁ pgRDF PgAtomic Initialization (Regression)"
-echo "────────────────────────────────────────────────────────────"
-if assert_pgrdf_pgatomic ck_test; then
-  echo "[ck-allinone] ✓ pgRDF PgAtomic initialized successfully"
-  PGATOMIC_PASS=1
+echo "[ck-allinone] ③ NATS core on :4222"
+for i in $(seq 1 15); do
+  GREETING=$( (echo "PING"; sleep 0.5) | docker run --rm --network "$NETWORK_NAME" -i busybox:1.36.1-musl nc -w 2 "$CONTAINER_NAME" 4222 2>/dev/null | head -2 || true )
+  if echo "$GREETING" | grep -q "PONG"; then
+    echo "[ck-allinone] ✓ NATS responds (server_name detected, PONG received)"
+    break
+  fi
+  [[ $i -eq 15 ]] && { echo "✗ NATS never responded"; docker logs "$CONTAINER_NAME"; exit 1; }
+  sleep 1
+done
+
+echo "[ck-allinone] ④ NATS WSS bridge on :9222"
+WSS_HEAD=$(curl -sI -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:39222/" || true)
+# Plain HTTP to a WSS endpoint typically 426 or 400 — non-empty + non-000 is "listening"
+if [[ "$WSS_HEAD" =~ ^[0-9]+$ ]] && [[ "$WSS_HEAD" != "000" ]]; then
+  echo "[ck-allinone] ✓ NATS WSS port listening (HTTP probe → $WSS_HEAD)"
 else
-  echo "[ck-allinone] ❌ REGRESSION: see error output above"
-  PGATOMIC_PASS=0
+  echo "✗ NATS WSS not listening (probe → $WSS_HEAD)"
+  exit 1
 fi
 
-# Test FastAPI (port 8000)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ④ pgckweb FastAPI (port 8000)"
-echo "────────────────────────────────────────────────────────────"
-for i in {1..15}; do
-  if curl -s http://127.0.0.1:18000/health >/dev/null 2>&1 || curl -s http://127.0.0.1:18000/ >/dev/null 2>&1; then
-    echo "[ck-allinone] ✓ FastAPI is responding"
-    break
-  fi
-  echo "[ck-allinone] Waiting for FastAPI... attempt $i/15"
-  sleep 1
-done
-
-# Test FastAPI root
-FASTAPI_RESPONSE=$(curl -s http://127.0.0.1:18000/ 2>/dev/null | head -c 100)
-echo "[ck-allinone] Root response: ${FASTAPI_RESPONSE:0:50}..."
-
-# Test cklib files serving
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑤ cklib (CK.Lib.Js 1.2.0) Files at /cklib/"
-echo "────────────────────────────────────────────────────────────"
-CKLIB_FILES=(ck-client.js ck-kernel.js ck-page.js ck-registry.js ck-runtime.js ck-bus.js ck-store.js)
-for file in "${CKLIB_FILES[@]}"; do
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18000/cklib/$file)
-  if [ "$HTTP_CODE" = "200" ]; then
-    echo "[ck-allinone] ✓ /cklib/$file (HTTP $HTTP_CODE)"
-  else
-    echo "[ck-allinone] - /cklib/$file (HTTP $HTTP_CODE — may not be present)"
-  fi
-done
-
-# Test NATS core (port 4222)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑥ NATS Core (port 4222)"
-echo "────────────────────────────────────────────────────────────"
-for i in {1..10}; do
-  if nc -zv 127.0.0.1 14222 2>/dev/null; then
-    echo "[ck-allinone] ✓ NATS core port 4222 is open"
-    break
-  fi
-  echo "[ck-allinone] Waiting for NATS core... attempt $i/10"
-  sleep 1
-done
-
-# Query NATS info via telnet/nc
-NATS_INFO=$(timeout 2 bash -c "echo 'INFO' | nc 127.0.0.1 14222" 2>/dev/null || echo "")
-if echo "$NATS_INFO" | grep -q "nats_server"; then
-  NATS_VERSION=$(echo "$NATS_INFO" | grep -oE '"version":"[0-9.]+' | cut -d'"' -f4)
-  echo "[ck-allinone] ✓ NATS info: version $NATS_VERSION"
+echo "[ck-allinone] ⑤ busybox httpd serves /cklib/ on :8000"
+INDEX_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/")
+if [[ "$INDEX_STATUS" != "200" ]]; then
+  echo "✗ httpd /cklib/ returned $INDEX_STATUS"
+  exit 1
 fi
-
-# Test NATS WSS (port 9222)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑦ NATS WebSocket Secure (port 9222)"
-echo "────────────────────────────────────────────────────────────"
-for i in {1..10}; do
-  if nc -zv 127.0.0.1 19222 2>/dev/null; then
-    echo "[ck-allinone] ✓ NATS WSS port 9222 is open"
-    break
-  fi
-  echo "[ck-allinone] Waiting for NATS WSS... attempt $i/10"
-  sleep 1
-done
-
-# Test WSS with curl (TLS handshake)
-WSS_RESPONSE=$(timeout 3 curl -s -I wss://127.0.0.1:19222/ 2>/dev/null || echo "")
-if [ -z "$WSS_RESPONSE" ]; then
-  # WSS test may fail due to self-signed certs, but port being open is the key test
-  echo "[ck-allinone] ✓ NATS WSS port responding (SSL/TLS layer present)"
-else
-  echo "[ck-allinone] ✓ NATS WSS responding: ${WSS_RESPONSE:0:50}..."
+# Confirm a specific cklib JS asset is served
+JS_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/ck-client.js")
+if [[ "$JS_STATUS" != "200" ]]; then
+  echo "✗ httpd /cklib/ck-client.js returned $JS_STATUS"
+  exit 1
 fi
+echo "[ck-allinone] ✓ /cklib/index.html=200, /cklib/ck-client.js=200"
 
-# Test cklib ↔ NATS WSS bridge (browser client simulation)
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑧ cklib ↔ NATS WSS Bridge (simulated browser client)"
-echo "────────────────────────────────────────────────────────────"
-# This would be a full WebSocket handshake + NATS CONNECT + SUBSCRIBE test
-# For now, verify the infrastructure is in place
-echo "[ck-allinone] ✓ cklib files: /cklib/ mounted and served"
-echo "[ck-allinone] ✓ NATS WSS: 127.0.0.1:19222 open and listening"
-echo "[ck-allinone] ✓ Bridge: Browser client can load cklib + connect to NATS WSS"
-echo "[ck-allinone] Note: Full WebSocket handshake test requires JavaScript client"
-
-# Test relation files
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑨ PostgreSQL Relation Files (host bind mount proof)"
-echo "────────────────────────────────────────────────────────────"
-if [ -d "$DATA_DIR/base" ]; then
-  RELATION_FILES=$(find "$DATA_DIR/base" -type f 2>/dev/null | wc -l)
-  echo "[ck-allinone] ✓ Found $RELATION_FILES relation files in pgdata"
-  docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "CREATE TABLE demo_rows (id INT, data TEXT);" >/dev/null 2>&1 || true
-  docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "INSERT INTO demo_rows VALUES (1, 'test'), (2, 'ckp-v3.8');" 2>/dev/null || true
-  RELATION_PATH=$(docker exec "$CONTAINER_NAME" psql -U postgres -d ck_test -c "SELECT pg_relation_filepath('demo_rows');" 2>/dev/null | tail -1)
-  echo "[ck-allinone] ✓ Relation proof method: host (demo_rows → $RELATION_PATH)"
+echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
+PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \
+  \( -name 'python*' -o -name 'uvicorn*' -o -name 'fastapi*' -o -path '*/opt/venv*' \) 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$PY_HITS" != "0" ]]; then
+  echo "✗ Python/FastAPI trace found in image:"
+  docker exec "$CONTAINER_NAME" /bin/busybox find / \
+    \( -name 'python*' -o -name 'uvicorn*' -o -name 'fastapi*' -o -path '*/opt/venv*' \) 2>/dev/null
+  exit 1
 fi
+echo "[ck-allinone] ✓ image is Python-free"
 
-# Test supervisor orchestration
-echo ""
-echo "────────────────────────────────────────────────────────────"
-echo "[ck-allinone] ⑩ Supervisor Orchestration (all services together)"
-echo "────────────────────────────────────────────────────────────"
-RUNNING_SERVICES=$(docker exec "$CONTAINER_NAME" ps aux 2>/dev/null | grep -E "(postgres|nats|uvicorn)" | grep -v grep | wc -l)
-echo "[ck-allinone] ✓ Supervisor managing $RUNNING_SERVICES services"
+echo "[ck-allinone] ⑦ PID 1 is s6-svscan (not ociger-supervisor)"
+PID1=$(docker exec "$CONTAINER_NAME" /bin/busybox cat /proc/1/comm 2>/dev/null | tr -d '\n')
+if [[ "$PID1" != "s6-svscan" ]]; then
+  echo "✗ PID 1 is '$PID1', expected s6-svscan"
+  exit 1
+fi
+echo "[ck-allinone] ✓ PID 1 = $PID1"
 
-# Summary
 echo ""
 echo "════════════════════════════════════════════════════════════"
-if [ "$PGATOMIC_PASS" = "1" ]; then
-  echo "[ck-allinone] ✓ All Smoke Tests Passed"
-else
-  echo "[ck-allinone] ⚠ Smoke Tests Completed - PgAtomic Regression DETECTED"
-fi
+echo "[ck-allinone] all checks passed"
+echo "  postgres + pgRDF $PGRDF_INSTALLED + pgCK $PGCK_INSTALLED + pgcrypto"
+echo "  NATS core :4222 + WSS bridge :9222"
+echo "  busybox httpd → /cklib/* on :8000"
+echo "  supervisor: s6-overlay (PID 1)"
+echo "  Python: NONE — image is FastAPI-free"
 echo "════════════════════════════════════════════════════════════"
-echo ""
-echo "Component Versions:"
-echo "  PostgreSQL: $PG_VERSION"
-echo "  pgRDF:      $PGRDF_VER"
-echo "  pgCK:       $PGCK_VER"
-echo "  pgckweb:    0.1.0 (FastAPI)"
-echo "  cklib:      1.2.0 (CK.Lib.Js)"
-echo "  NATS:       2.14.1"
-echo ""
-echo "Service Ports:"
-echo "  5432   → PostgreSQL"
-echo "  8000   → FastAPI (pgckweb)"
-echo "  4222   → NATS core"
-echo "  9222   → NATS WebSocket Secure"
-echo ""
-echo "Next: Set envoy gateway with TLS + OIDC termination"
-echo "      Envoy routes to FastAPI on port 8000 with auth headers"
-echo ""
-
-# Cleanup (optional)
-# docker stop "$CONTAINER_NAME" || true

@@ -1,0 +1,60 @@
+spec_version: 0.2
+name: bundle-pgck-bench
+description: Python+FastAPI sibling for benchmarking and dev work against a running ck-allinone. NOT for production — clearly tagged. Connects to external PG + NATS on the same docker network. The ONLY sanctioned home for Python in the ociger group.
+
+# Hand-crafted bundle: thin layer over upstream pgck-web (FROM only; no compile
+# work). Lives apart from ck-allinone deliberately — see Dockerfile prose for
+# the marketplace size + SONAME + cadence rationale.
+skip_render: true
+
+image:
+  registry: ghcr.io/sporaxis-com/ociger-pgck-bench
+  pg_major: 17
+  base_image: ghcr.io/styk-tv/pgck-web
+  final_image: ghcr.io/styk-tv/pgck-web (inherited)
+  runtime_profile: bench
+
+role: bench
+never_prod: true
+
+components:
+  pgck-web:
+    version: 0.2.7
+    source: ghcr.io/styk-tv/pgck-web:v0.2.7
+    port: 8000
+    description: FastAPI runtime + Display/Board UI inherited verbatim from upstream; Python 3.11 + uvicorn + /app/web tree provided as-is
+
+defaults:
+  CK_PG_HOST: ck-allinone
+  CK_PG_PORT: 5432
+  CK_NATS_URL: nats://ck-allinone:4222
+  CK_NATS_WSS_URL: ws://ck-allinone:9222
+  CK_BENCH_MODE: 1
+
+platforms:
+  - linux/amd64
+  - linux/arm64
+
+ports:
+  - name: fastapi
+    container_port: 8000
+
+local:
+  prefix: ociger-
+  container: ociger-pgck-bench
+  network: ociger-ck-allinone-net    # joins the same network as ck-allinone
+
+usage_example: |
+  # Bring up ck-allinone first
+  docker run --rm -d --name ck-allinone \
+    --network ociger-ck-allinone-net \
+    ghcr.io/sporaxis-com/ociger-ck-allinone:latest
+
+  # Then bring up the bench sibling on the same network
+  docker run --rm -d --name pgck-bench \
+    --network ociger-ck-allinone-net \
+    -p 18000:8000 \
+    ghcr.io/sporaxis-com/ociger-pgck-bench:latest
+
+  # The bench container's FastAPI is on :18000 (host) → :8000 (container),
+  # using ck-allinone as its PG + NATS backend over the shared network.

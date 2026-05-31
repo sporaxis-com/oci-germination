@@ -68,8 +68,8 @@ jobs:
       matrix:
         dockerfile:
           - bundles/bundle-ck-allinone/Dockerfile
-          - bundles/bundle-pg17-pgrdf-pgck-web-cklib/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck-static-cklib/Dockerfile
+          - bundles/bundle-pgck-bench/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck-nats-micro/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck-nats/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck/Dockerfile

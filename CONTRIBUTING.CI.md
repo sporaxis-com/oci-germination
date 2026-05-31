@@ -10,22 +10,22 @@ Tags follow the pattern: `release-<bundle-name>-<version>`
 
 | Bundle | Tag Example | Resulting Image |
 |--------|-------------|-----------------|
-| `pg17-pgrdf-pgck-web-cklib` | `release-pg17-pgrdf-pgck-web-cklib-1.0.0` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0` |
+| `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-1.0.0` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0` |
 | `ck-allinone` | `release-ck-allinone-v3.8-rc2` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` |
 
 ### Publishing a New Bundle Version
 
 1. **Test locally** (optional, for pre-release validation):
    ```bash
-   docker build -t ociger-pg17-pgrdf-pgck-web-cklib:1.0.0 \
-     bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+   docker build -t ociger-pg17-pgrdf-pgck-static-cklib:1.0.0 \
+     bundles/bundle-pg17-pgrdf-pgck-static-cklib/
    ```
 
 2. **Create and push a release tag:**
    ```bash
-   git tag -a release-pg17-pgrdf-pgck-web-cklib-1.0.0 \
-     -m "Release pg17-pgrdf-pgck-web-cklib v1.0.0"
-   git push origin release-pg17-pgrdf-pgck-web-cklib-1.0.0
+   git tag -a release-pg17-pgrdf-pgck-static-cklib-1.0.0 \
+     -m "Release pg17-pgrdf-pgck-static-cklib v1.0.0"
+   git push origin release-pg17-pgrdf-pgck-static-cklib-1.0.0
    ```
 
 3. **GitHub Actions will:**
@@ -40,12 +40,12 @@ After the workflow completes, verify the image is available:
 
 ```bash
 # Inspect manifest
-docker manifest inspect ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
+docker manifest inspect ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
 
 # Pull and test
-docker pull ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
-bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh \
-  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
+docker pull ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
+bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh \
+  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
 ```
 
 ### Smoke Tests
@@ -53,8 +53,8 @@ bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh \
 All bundles have comprehensive smoke test suites. Before publishing, run locally:
 
 ```bash
-# Test pg17-pgrdf-pgck-web-cklib
-bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh ociger-pg17-pgrdf-pgck-web-cklib:1.0.0
+# Test pg17-pgrdf-pgck-static-cklib
+bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
 
 # Test ck-allinone
 bash scripts/smoke-ck-allinone.sh ociger-ck-allinone:v3.8-rc2
@@ -96,19 +96,19 @@ For iterating on bundle changes without tagging:
 ```bash
 # 1. Make Dockerfile/bundle.yaml changes
 # 2. Build locally to test
-docker build -t ociger-pg17-pgrdf-pgck-web-cklib:test \
-  bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+docker build -t ociger-pg17-pgrdf-pgck-static-cklib:test \
+  bundles/bundle-pg17-pgrdf-pgck-static-cklib/
 
 # 3. Run smoke tests
-bash scripts/smoke-pg17-pgrdf-pgck-web-cklib.sh ociger-pg17-pgrdf-pgck-web-cklib:test
+bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh ociger-pg17-pgrdf-pgck-static-cklib:test
 
 # 4. When satisfied, commit changes
-git add bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+git add bundles/bundle-pg17-pgrdf-pgck-static-cklib/
 git commit -m "refine: update bundle..."
 
 # 5. Tag for release
-git tag -a release-pg17-pgrdf-pgck-web-cklib-<version> -m "Release message"
-git push origin <branch> release-pg17-pgrdf-pgck-web-cklib-<version>
+git tag -a release-pg17-pgrdf-pgck-static-cklib-<version> -m "Release message"
+git push origin <branch> release-pg17-pgrdf-pgck-static-cklib-<version>
 ```
 
 Multi-platform local builds (with buildx) can be tested before tagging:
@@ -119,12 +119,12 @@ gh auth token | docker login ghcr.io -u $(gh api user --jq .login) --password-st
 
 # Multi-platform build (local, no push)
 docker buildx build --platform linux/amd64,linux/arm64 \
-  --load bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+  --load bundles/bundle-pg17-pgrdf-pgck-static-cklib/
   
 # Or, build and push to dev tag
 docker buildx build --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:dev \
-  --push bundles/bundle-pg17-pgrdf-pgck-web-cklib/
+  --tag ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:dev \
+  --push bundles/bundle-pg17-pgrdf-pgck-static-cklib/
 ```
 
 ---
@@ -136,7 +136,7 @@ Each bundle tracks independent component versions in `bundles/<bundle>/bundle.ya
 - **PostgreSQL** — inherited from base image (17.0)
 - **pgRDF** — from extension artifact (0.5.1)
 - **pgCK** — from extension artifact (0.1.2)
-- **pgckweb** — FastAPI server version (0.1.0)
+- **(retired) pgckweb** — (removed — pgckweb FastAPI deprecated; static-cklib uses ociger-static-server)
 - **cklib** — from OCI layer (1.2.0)
 - **NATS** — from embedded service (2.14.1, all-in-one only)
 
@@ -156,14 +156,14 @@ Include in commit messages and git tags:
 Example:
 
 ```
-Release pg17-pgrdf-pgck-web-cklib v1.0.0
+Release pg17-pgrdf-pgck-static-cklib v1.0.0
 
-- Add pgckweb FastAPI server with /cklib/ mount point
+- Static-only web layer (ociger-static-server) with /cklib/ mount point
 - Import cklib (CK.Lib.Js 1.2.0) as OCI layer source
 - Bundle specification (bundle.yaml) with component attribution
 - Comprehensive 10-point smoke test suite
 
-Smoke test: All 10 integration points pass (PostgreSQL, extensions, FastAPI, cklib serving)
+Smoke test: All integration points pass (PostgreSQL, extensions, static HTTP, cklib serving)
 
 Compatibility: Built on ociger-pg17-pgrdf-pgck:v0.1.1 base
 ```

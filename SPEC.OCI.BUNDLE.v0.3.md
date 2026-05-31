@@ -9,6 +9,8 @@ audience: Every repo in the fleet that publishes OCI artifacts consumed by anoth
 
 # SPEC.OCI.BUNDLE.v0.3 — Authoritative Packaging Protocol
 
+> **2026-05-31 — addendum.** The pgck-web Shape A guidance below was the cross-fleet contract at write time. `ck-allinone` has since pivoted to the **Delta** shape (s6-overlay + busybox httpd, no Python anywhere in the prod image) per the marketplace-minimal mandate. Python-bearing variants of pgck-web are no longer consumed inside any prod bundle; they live as **sibling** images (e.g. `ociger-pgck-bench`) that connect to a running ck-allinone over NATS. The Shape A guidance remains valid for upstream pgck-web's own packaging — only the downstream-consumption pattern in oci-germination has changed. SPEC.OCI.BUNDLE.v0.4 (forthcoming) will codify the s6+busybox+scratch composition contract and the sibling-not-sidecar rule for Python-bearing benchmark containers.
+
 This specification supersedes v0.2 and becomes the binding contract for every OCI artifact published by any repo in the fleet. v0.2 stays valid for already-published artifacts (immutability); v0.3 governs every new publish from this spec's `date:` forward.
 
 **What v0.3 settles, that v0.2 did not:**

@@ -42,11 +42,10 @@ Two parallel tracks give us a place to do both: a calm production line and a wor
 
 | Bundle | Production tag |
 |---|---|
-| `ociger-ck-allinone` | `v0.5.1` |
-| `ociger-pg17-pgrdf-pgck-web-cklib` | `v0.5.1` |
-| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.1.0` |
+| `ociger-ck-allinone` | Delta — see LATEST.md (s6-overlay + busybox httpd, Python-free, marketplace-minimal) |
+| `ociger-pg17-pgrdf-pgck-static-cklib` | see LATEST.md (ociger-static-server, Python-free) |
 
-The `v0.5.x` line for `ck-allinone` and `web-cklib` remains production until a successor is advertised ready. Anything published as `v0.6.x+` for those two bundles is **NOT production** unless this spec's Current Production Heads table is updated.
+> **2026-05-31 — `ociger-pg17-pgrdf-pgck-web-cklib` retired.** That bundle bundled FastAPI/uvicorn/pgck-web in-image; the same web layer needs are now met by `static-cklib` (no Python at all) for static deployments, and by the sibling `ociger-pgck-bench` (Python+FastAPI lives in a separate sidecar) for benchmarking against prod containers. The "FastAPI-in-distroless gap" referenced throughout this spec is **closed** by the ck-allinone Delta migration; historical references are kept below for context.
 
 ### 2.2 Devel Track
 
@@ -232,30 +231,21 @@ about-version: ociger-ck-allinone-devel:v0.6.3 (devel track; not advertised read
 
 | Bundle | Production head | Devel head |
 |---|---|---|
-| `ociger-ck-allinone` | `v0.5.1` | `v0.6.0` (on prod-named image — see §11 migration) |
-| `ociger-pg17-pgrdf-pgck-web-cklib` | `v0.5.1` | `v0.6.0` (on prod-named image — see §11 migration) |
-| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.1.0` | `v0.2.0` (on prod-named image — see §11 migration) |
+| `ociger-ck-allinone` | Delta (s6-overlay + busybox httpd) — see LATEST.md | n/a — Delta is the prod path; Python-bearing benchmark variant lives separately as `ociger-pgck-bench` |
+| `ociger-pg17-pgrdf-pgck-static-cklib` | see LATEST.md | n/a |
 
-The "Devel head" column references images that were published to the production image name before this spec was written. §11 covers the one-time migration to move them to the proper devel image name.
+The track distinction for ck-allinone collapsed in 2026-05-31's Delta migration: the prod variant has no Python at all, so there is no Python-bearing variant to confine to a devel track. The benchmark/devel container with FastAPI lives as a **sibling** bundle (`ociger-pgck-bench`) that connects to a running ck-allinone over NATS — never as a profile of the same image.
 
 ---
 
-## 11. One-Time Migration (Pre-Spec → Spec-Aligned)
+## 11. Historical Migration (Pre-Spec → Spec-Aligned → Delta)
 
-Before this spec, all releases landed on the production image name. Three already-published versions are conceptually devel but were tagged on the production image:
+Before this spec, all releases landed on the production image name. Two then-published versions were conceptually devel:
 
-- `ociger-ck-allinone:v0.6.0` → conceptually devel (FastAPI gap unfixed)
-- `ociger-pg17-pgrdf-pgck-web-cklib:v0.6.0` → conceptually devel (same FastAPI gap)
-- `ociger-pg17-pgrdf-pgck-static-cklib:v0.2.0` → arguably already production-ready, but published before the track distinction was formalized; keep on production track per §2.1 → §10 distinction
+- `ociger-ck-allinone:v0.6.0`/`v0.6.6` — bundled FastAPI/pgck-web. **Retired with the Delta migration (2026-05-31).** Latest prod ck-allinone has no Python.
+- `ociger-pg17-pgrdf-pgck-web-cklib:*` — **bundle deleted entirely (2026-05-31).** Static-cklib + ck-allinone Delta + sibling ociger-pgck-bench replace its use cases without a Python-bearing prod image.
 
-Migration plan:
-
-1. **Re-publish** `v0.6.0` content to `ociger-ck-allinone-devel:v0.6.0` and `ociger-pg17-pgrdf-pgck-web-cklib-devel:v0.6.0`. Original `ociger-<bundle>:v0.6.0` tags **remain** (immutability per §8.1).
-2. **Update** `README.md` and downstream pinners to direct production users at `v0.5.1` until a v0.6.x is advertised ready.
-3. **Keep** `ociger-pg17-pgrdf-pgck-static-cklib:v0.2.0` on production track — it's the recommended pin for v3.8-aligned deployments and has no known critical gaps. Its devel track starts fresh from a future feature increment.
-4. **Document** in `README.md` the §7 pinning guidance.
-
-After migration, production heads remain at v0.5.1 for ck-allinone and web-cklib; static-cklib advances to v0.2.0 on production. Devel heads continue from there.
+Historical tags remain on GHCR per the [[only-forward-never-revert]] discipline; LATEST.md no longer advertises them.
 
 ---
 
