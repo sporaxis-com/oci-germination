@@ -1,6 +1,6 @@
 spec_version: 0.2
 name: bundle-ck-allinone
-description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.x + pgCK 0.2.x + NATS 2.14.1 (core+WSS) + cklib 1.3.x, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no FastAPI. Marketplace-minimal.
+description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.28 + pgCK 0.2.2 + NATS 2.14.1 (core+WSS) + cklib 1.3.11, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no FastAPI. Marketplace-minimal.
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib on top of
 # pg17-pgrdf-pgck-nats-micro (scratch + selectively-copied bookworm libs).
@@ -17,7 +17,7 @@ image:
 
 extensions:
   pgrdf:
-    version: 0.5.19
+    version: 0.5.28
     source: https://github.com/styk-tv/pgRDF
   pgck:
     version: 0.2.2

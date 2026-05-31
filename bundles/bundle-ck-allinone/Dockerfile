@@ -8,12 +8,12 @@
 # inherit from pg_base, which is pgRDF's de-facto compile target
 # (Debian bookworm SONAMEs preserved end-to-end).
 
-ARG PG_BASE_VERSION=v0.1.5
+ARG PG_BASE_VERSION=v0.1.6
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.3.11
 
 # ─── Stage 1: pg base (pg17 + pgRDF + pgCK + NATS + ociger-pg-launcher) ───
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.5 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.6 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source

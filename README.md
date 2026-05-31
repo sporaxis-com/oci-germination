@@ -160,10 +160,14 @@ CONTRIBUTING.CI.md           tag/release flow
 
 ## Discipline
 
+The authoritative packaging contract for the fleet is [`SPEC.OCI.BUNDLE.v0.4.md`](./SPEC.OCI.BUNDLE.v0.4.md). Headlines:
+
 - **No manual GHCR pushes.** Every published image must carry a verifiable SLSA Build Provenance v1 attestation produced by `Build OCI Bundles` (or its sibling workflows). See [`PROVENANCE.md`](./PROVENANCE.md).
 - **`LATEST.md` is auto-rendered.** It refreshes only after `gh attestation verify` accepts the digest. Manual edits are reverted.
-- **This repo never compiles upstream code.** pg17, pgRDF, pgCK, NATS, CK.Lib.Js, pgck-web, s6-overlay, busybox all arrive pre-built. The only binaries this repo produces are tiny in-tree Go tools (`ociger-pg-launcher`, `ociger-supervisor`, `ociger-static-server`, `ociger-gen`).
-- **One Python container, one role.** `ociger-pgck-bench` is the sole sanctioned home for Python; prod images (`ck-allinone`, `static-cklib`) are Python-free by design — marketplace cost discipline.
+- **This repo never compiles upstream code** (SPEC v0.4 §6). pg17, pgRDF, pgCK, NATS, CK.Lib.Js, pgck-web, s6-overlay, busybox all arrive pre-built. The only binaries this repo produces are tiny in-tree Go tools.
+- **Prod images are Python-free** (SPEC v0.4 §4.4). `ociger-pgck-bench` is the sole sanctioned home for Python; it runs as a SIBLING to prod images, never embedded (SPEC v0.4 §5).
+- **Prod Shape A composition = Delta** (SPEC v0.4 §1.4): scratch final base, supervised by s6-overlay, web served by busybox httpd or equivalent statically-linked binary. No apt-install to satisfy upstream-binary NEEDED lists (§4.5).
+- **Every image carries `ck.bundle.role` + `ck.bundle.never-prod` manifest labels** (SPEC v0.4 §2.4) so tooling can refuse a `never-prod=true` image into a prod environment.
 
 ---
 
@@ -177,6 +181,6 @@ CONTRIBUTING.CI.md           tag/release flow
 - pgCK extension + pgck-web: <https://github.com/styk-tv/pgCK>
 - CK.Lib.Js: <https://github.com/ConceptKernel/CK.Lib.Js>
 - Attestation policy: [`PROVENANCE.md`](./PROVENANCE.md)
-- Packaging spec: [`SPEC.OCI.BUNDLE.v0.3.md`](./SPEC.OCI.BUNDLE.v0.3.md)
+- Packaging spec (authoritative): [`SPEC.OCI.BUNDLE.v0.4.md`](./SPEC.OCI.BUNDLE.v0.4.md) (supersedes [v0.3](./SPEC.OCI.BUNDLE.v0.3.md))
 - Devel-vs-prod tracks: [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md)
 - Tag / release flow: [`CONTRIBUTING.CI.md`](./CONTRIBUTING.CI.md)

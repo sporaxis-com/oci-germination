@@ -7,9 +7,9 @@ supersedes: SPEC.OCI.BUNDLE.v0.2
 audience: Every repo in the fleet that publishes OCI artifacts consumed by another fleet repo — currently oci-germination, pgRDF, pgCK (extension + pgck-web), CK.Lib.Js, and any future sibling.
 ---
 
-# SPEC.OCI.BUNDLE.v0.3 — Authoritative Packaging Protocol
+# SPEC.OCI.BUNDLE.v0.3 — Packaging Protocol (superseded)
 
-> **2026-05-31 — addendum.** The pgck-web Shape A guidance below was the cross-fleet contract at write time. `ck-allinone` has since pivoted to the **Delta** shape (s6-overlay + busybox httpd, no Python anywhere in the prod image) per the marketplace-minimal mandate. Python-bearing variants of pgck-web are no longer consumed inside any prod bundle; they live as **sibling** images (e.g. `ociger-pgck-bench`) that connect to a running ck-allinone over NATS. The Shape A guidance remains valid for upstream pgck-web's own packaging — only the downstream-consumption pattern in oci-germination has changed. SPEC.OCI.BUNDLE.v0.4 (forthcoming) will codify the s6+busybox+scratch composition contract and the sibling-not-sidecar rule for Python-bearing benchmark containers.
+> **2026-05-31 — SUPERSEDED by [`SPEC.OCI.BUNDLE.v0.4.md`](./SPEC.OCI.BUNDLE.v0.4.md).** v0.4 codifies the Delta composition contract (s6-overlay + busybox httpd + scratch final), the sibling-not-sidecar rule for Python-bearing benchmark containers, the `ck.bundle.role` / `ck.bundle.never-prod` manifest labels, the no-Python-in-prod build-time gate, the no-apt-install-to-satisfy-upstream-NEEDED rule, the no-compile rule for layer-addition repos, the inbound-NOTIFIES scan as cross-repo pre-condition, and the `_WIP/`-is-confidential rule. v0.3 remains a valid historical reference; new releases conform to v0.4.
 
 This specification supersedes v0.2 and becomes the binding contract for every OCI artifact published by any repo in the fleet. v0.2 stays valid for already-published artifacts (immutability); v0.3 governs every new publish from this spec's `date:` forward.
 

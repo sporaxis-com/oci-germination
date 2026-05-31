@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.5 AS base
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.6 AS base
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="CKP v3.8 static-only bundle — PG17 + pgRDF + pgCK + NATS WSS + ociger-static-server + cklib (no FastAPI/Python)"
 LABEL org.opencontainers.image.licenses="MIT"
