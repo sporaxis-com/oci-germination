@@ -1,4 +1,4 @@
-spec_version: 0.2
+spec_version: 0.4
 name: bundle-pgck-bench
 description: Python+FastAPI sibling for benchmarking and dev work against a running ck-allinone. NOT for production — clearly tagged. Connects to external PG + NATS on the same docker network. The ONLY sanctioned home for Python in the ociger group.
 

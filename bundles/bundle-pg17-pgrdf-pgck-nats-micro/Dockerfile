@@ -97,6 +97,10 @@ RUN set -eux; \
 
 
 FROM scratch
+LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL ck.bundle.role="prod"
+LABEL ck.bundle.never-prod="false"
 ENV PGDATA=/var/lib/postgresql/data
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
 

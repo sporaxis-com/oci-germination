@@ -2,15 +2,21 @@ package bundle
 
 type Spec struct {
 	Name        string        `yaml:"name"`
+	SpecVersion string        `yaml:"spec_version,omitempty"`
 	Description string        `yaml:"description"`
 	BundleDir   string        `yaml:"-"`
 	SkipRender  bool          `yaml:"skip_render,omitempty"`
-	Image       ImageSpec     `yaml:"image"`
-	Extensions  ExtensionSpec `yaml:"extensions"`
-	Platforms   []string      `yaml:"platforms"`
-	Ports       []PortSpec    `yaml:"ports"`
-	Services    ServiceSpec   `yaml:"services"`
-	Local       LocalSpec     `yaml:"local"`
+	// Role + NeverProd surface SPEC.OCI.BUNDLE.v0.4 §2.4 manifest labels
+	// (ck.bundle.role + ck.bundle.never-prod) and §3 bundle.yaml fields.
+	// Valid Role values: "prod" | "devel" | "bench".
+	Role       string        `yaml:"role,omitempty"`
+	NeverProd  bool          `yaml:"never_prod,omitempty"`
+	Image      ImageSpec     `yaml:"image"`
+	Extensions ExtensionSpec `yaml:"extensions"`
+	Platforms  []string      `yaml:"platforms"`
+	Ports      []PortSpec    `yaml:"ports"`
+	Services   ServiceSpec   `yaml:"services"`
+	Local      LocalSpec     `yaml:"local"`
 }
 
 type ImageSpec struct {

@@ -36,6 +36,10 @@ COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/17/exten
 
 
 FROM gcr.io/distroless/base-debian12:latest
+LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL ck.bundle.role="prod"
+LABEL ck.bundle.never-prod="false"
 ENV PGDATA=/var/lib/postgresql/data
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf
 

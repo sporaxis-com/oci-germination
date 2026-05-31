@@ -1,4 +1,7 @@
+spec_version: 0.4
 name: bundle-pg17-pgrdf-pgck-nats
+role: prod
+never_prod: false
 description: PostgreSQL 17 with pgRDF, pgCK, and colocated NATS core and websocket listeners
 
 # Hand-crafted Dockerfile: pgRDF consumed as an ORAS-pulled Shape B artifact

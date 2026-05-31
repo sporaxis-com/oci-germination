@@ -1,4 +1,7 @@
+spec_version: 0.4
 name: core-pg17-nats-micro
+role: prod
+never_prod: false
 description: Minimal PostgreSQL 17 micro runtime with colocated NATS core and websocket listeners
 image:
   registry: ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro

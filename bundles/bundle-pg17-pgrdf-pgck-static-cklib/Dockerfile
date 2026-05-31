@@ -3,6 +3,8 @@ FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.6 AS base
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="CKP v3.8 static-only bundle — PG17 + pgRDF + pgCK + NATS WSS + ociger-static-server + cklib (no FastAPI/Python)"
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL ck.bundle.role="prod"
+LABEL ck.bundle.never-prod="false"
 
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
 

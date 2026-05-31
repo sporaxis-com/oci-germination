@@ -132,6 +132,12 @@ RUN set -eux; \
 {{ end }}
 
 FROM {{ .Image.FinalImage }}
+LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
+LABEL org.opencontainers.image.licenses="MIT"
+{{- if .Role }}
+LABEL ck.bundle.role="{{ .Role }}"
+LABEL ck.bundle.never-prod="{{ neverProdLabel . }}"
+{{- end }}
 ENV PGDATA=/var/lib/postgresql/data
 {{- if needsPreload . }}
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES={{ preloadLibs . }}
@@ -314,6 +320,12 @@ func executeTemplate(source string, spec Spec) (string, error) {
 		},
 		"microHasExtensionDeps": func(spec Spec) bool {
 			return spec.Image.RuntimeProfile == "micro" && (spec.Extensions.PGRDF != nil || spec.Extensions.PGCK != nil)
+		},
+		"neverProdLabel": func(spec Spec) string {
+			if spec.NeverProd {
+				return "true"
+			}
+			return "false"
 		},
 	}).Parse(source)
 	if err != nil {

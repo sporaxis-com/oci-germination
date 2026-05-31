@@ -1,4 +1,7 @@
+spec_version: 0.4
 name: core-pg17-micro
+role: prod
+never_prod: false
 description: Minimal embedded PostgreSQL 17 runtime with aggressively pruned runtime files
 image:
   registry: ghcr.io/sporaxis-com/ociger-core-pg17-micro

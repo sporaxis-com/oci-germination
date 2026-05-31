@@ -45,6 +45,8 @@ FROM pg_base
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="CKP v3.8 all-in-one minimal — PG17 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. No Python, no FastAPI, scratch base."
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL ck.bundle.role="prod"
+LABEL ck.bundle.never-prod="false"
 
 # s6-overlay — supervisor + init for the container's services
 COPY --from=s6_extract /s6root/ /

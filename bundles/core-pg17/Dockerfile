@@ -21,6 +21,10 @@ RUN set -eux; \
   ldd /usr/lib/postgresql/17/bin/initdb | tr ' ' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
 
 FROM gcr.io/distroless/base-debian12:latest
+LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL ck.bundle.role="prod"
+LABEL ck.bundle.never-prod="false"
 ENV PGDATA=/var/lib/postgresql/data
 COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher

@@ -1,5 +1,7 @@
-spec_version: 0.2
+spec_version: 0.4
 name: bundle-pg17-pgrdf-pgck-static-cklib
+role: prod
+never_prod: false
 description: CKP v3.8 static-only bundle — PostgreSQL 17 + pgRDF 0.5.28 + pgCK 0.2.2 + NATS 2.14.1 WSS + ociger-static-server + cklib 1.3.11 (no FastAPI/Python)
 
 # Hand-crafted bundle: thin Go-based static server layer on top of

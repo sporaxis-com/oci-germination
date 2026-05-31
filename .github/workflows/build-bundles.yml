@@ -115,6 +115,34 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # SPEC.OCI.BUNDLE.v0.4 §4.4 gate: prod images MUST be Python-free.
+      # pgck-bench is the SOLE sanctioned home for Python (role=bench);
+      # skip the gate for it. Every other bundle through this workflow
+      # MUST contain zero python/uvicorn/fastapi/venv hits.
+      - name: Verify no Python in prod image (SPEC v0.4 §4.4)
+        if: ${{ steps.extract.outputs.bundle != 'pgck-bench' }}
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          echo "Checking $IMAGE for Python/FastAPI/uvicorn/venv traces..."
+          # busybox find inside the image; image MAY not have its own busybox,
+          # so use a sidecar runner.
+          docker run --rm --entrypoint /bin/sh "$IMAGE" -c '
+            for d in /opt/venv /usr/local/lib/python* /usr/lib/python*; do
+              [ -e "$d" ] && { echo "FOUND $d"; exit 1; }
+            done
+            for n in python python3 uvicorn fastapi; do
+              for p in /usr/bin /usr/local/bin /bin; do
+                [ -x "$p/$n" ] && { echo "FOUND $p/$n"; exit 1; }
+              done
+            done
+            exit 0
+          ' || {
+            echo "✗ SPEC v0.4 §4.4 violation: Python/FastAPI/uvicorn/venv trace in prod image"
+            exit 1
+          }
+          echo "✓ image is Python-free"
+
       # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio
       # CA via the Sigstore keyless flow. The attestation is pushed to
       # GHCR as an OCI referrer alongside the manifest list, so

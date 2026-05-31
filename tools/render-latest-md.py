@@ -204,6 +204,39 @@ def verify_attestation(image_ref: str, repo: str) -> bool:
     return res.returncode == 0
 
 
+def get_image_labels(image_ref: str) -> dict[str, str]:
+    """Use `docker buildx imagetools inspect` to read manifest labels without pulling the image.
+
+    Per SPEC.OCI.BUNDLE.v0.4 §2.4, every image MUST carry `ck.bundle.role` and
+    `ck.bundle.never-prod`. The renderer surfaces these into the LATEST.md block
+    (§2.5). Returns an empty dict on any error — older images that predate v0.4
+    won't have the labels and render as "—".
+    """
+    try:
+        out = subprocess.run(
+            ["docker", "buildx", "imagetools", "inspect", image_ref, "--format", "{{json .Image}}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if out.returncode != 0:
+            return {}
+        payload = json.loads(out.stdout)
+        # multi-arch payload has per-arch entries; pick any one's labels.
+        if isinstance(payload, dict):
+            for entry in payload.values():
+                cfg = (entry or {}).get("config", {})
+                lbl = cfg.get("Labels") or {}
+                if lbl:
+                    return lbl
+            # single-arch fallback
+            cfg = payload.get("config", {})
+            return cfg.get("Labels") or {}
+        return {}
+    except Exception:
+        return {}
+
+
 # ----------------------------------------------------------------------
 # Markdown rendering
 # ----------------------------------------------------------------------
@@ -267,6 +300,14 @@ def render_bundle_section(
     arm64 = platforms.get("arm64", "_unknown_")
     created_fmt = fmt_ts(created_iso)
 
+    # SPEC.OCI.BUNDLE.v0.4 §2.4/§2.5 — read role + never-prod from manifest labels.
+    labels = get_image_labels(image_ref)
+    role = labels.get("ck.bundle.role", "—")
+    never_prod = labels.get("ck.bundle.never-prod", "—")
+    prod_use = "Not for production" if never_prod == "true" else (
+        "Production-ready" if never_prod == "false" else "—"
+    )
+
     lines.append(f"## {pkg} — `{tag}`")
     lines.append("")
     lines.append(desc)
@@ -281,6 +322,8 @@ def render_bundle_section(
     lines.append(f"| Pull URI           | `{image_ref}`                                                            |")
     lines.append(f"| Also tagged        | {also}                                                                  |")
     lines.append(f"| Index digest       | `{index_digest}`                                                         |")
+    lines.append(f"| Role               | `{role}` (per SPEC.OCI.BUNDLE.v0.4 §2.4)                                  |")
+    lines.append(f"| Production use     | {prod_use}                                                              |")
     lines.append(f"| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |")
     lines.append(f"| Source bundle      | [`{bundle_dir}/`](./{bundle_dir}/)                                          |")
     lines.append(f"| Repo packages view | https://github.com/orgs/{owner}/packages/container/package/{pkg} |")
