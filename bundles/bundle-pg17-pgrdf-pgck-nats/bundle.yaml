@@ -15,7 +15,7 @@ image:
   runtime_profile: stable
 extensions:
   pgrdf:
-    version: 0.5.19
+    version: 0.5.28
   pgck:
     version: 0.2.2
 platforms:

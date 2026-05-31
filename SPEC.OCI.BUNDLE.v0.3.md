@@ -480,7 +480,7 @@ This file lives in `oci-germination/SPEC.OCI.BUNDLE.v0.3.md` and is canonical. S
 - [`PROVENANCE.md`](./PROVENANCE.md) — attestation policy.
 - [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md) — production/devel tracks.
 - [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md) — tag-shape conventions.
-- `SPEC.NOTIFIES.v0.3` (canonical at `/Users/neoxr/git_conceptkernel/CK.Lib.Js/_WIP/SPEC.NOTIFIES.v0.3.md`) — cross-repo coordination.
+- `SPEC.NOTIFIES.v0.3` — cross-repo coordination protocol (authored in CK.Lib.Js).
 - OCI Image Spec — https://github.com/opencontainers/image-spec
 - ORAS — https://oras.land
 - SLSA Build Provenance v1 — https://slsa.dev/spec/v1.0/provenance

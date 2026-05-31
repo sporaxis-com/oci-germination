@@ -9,7 +9,7 @@ NETWORK="ociger-pg17-pgrdf-net"
 CONTAINER="ociger-pg17-pgrdf-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf:local}"
-EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.1}"
+EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.28}"
 
 ensure_repo_data_path() {
   case "$DATA_DIR" in

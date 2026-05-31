@@ -12,12 +12,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.5.19-pg17-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.5.28-pg17-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.5.19-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.5.28-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.5.1.sql  # extension's internal version (per pgrdf.control); 0.5.x releases keep this filename
+  test -s /out/share/extension/pgrdf--0.5.28.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM postgres:17-bookworm AS postgres_source

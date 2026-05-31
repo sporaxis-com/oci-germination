@@ -262,6 +262,6 @@ Historical tags remain on GHCR per the [[only-forward-never-revert]] discipline;
 
 - `SEMANTIC-VERSIONING.md` — base tagging scheme (2-number tag + git-distance patch).
 - `SPEC.OCI.BUNDLE.v0.2.md` — bundle.yaml schema referenced by both tracks.
-- `SPEC.NOTIFIES.v0.3` (canonical at `/Users/neoxr/git_conceptkernel/CK.Lib.Js/_WIP/`) — cross-repo coordination protocol used when notifying about either track.
+- `SPEC.NOTIFIES.v0.3` — cross-repo coordination protocol used when notifying about either track (authored in CK.Lib.Js; ask the CK.Lib.Js maintainer for current location).
 - `.github/workflows/build-bundles.yml` — CI implementation point for §4.
 - `README.md` — public-facing surface; receives §7 pinning guidance after this spec lands.

@@ -8,7 +8,7 @@
 #   4. gh run watch the chained update-latest-md.yml run on the same SHA
 #   5. print ✓ + first 20 lines of LATEST.md OR ✗ on any failure
 #
-# Adapted from /Users/neoxr/git_conceptkernel/pgCK/_WIP/SPEC.CLAUDE.GH-WATCH.v0.2.md
+# Adapted from pgCK's SPEC.CLAUDE.GH-WATCH.v0.2 pattern (authored upstream)
 # for oci-germination's workflow graph (Build OCI Bundles + 8 per-bundle
 # release.yml + update-latest-md.yml).
 #
