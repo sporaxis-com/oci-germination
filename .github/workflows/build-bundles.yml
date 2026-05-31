@@ -47,19 +47,20 @@ jobs:
         id: extract
         run: |
           TAG="${{ github.ref_name }}"
-          # Order matters: longer-prefix first to avoid 'web-cklib' matching 'static-cklib' (etc.)
+          # Order matters: longer prefixes first.
+          # pg17-pgrdf-pgck-web-cklib was retired 2026-05-31 (deleted bundle).
           if [[ "$TAG" =~ ^release-pg17-pgrdf-pgck-static-cklib-(.*) ]]; then
             echo "bundle=pg17-pgrdf-pgck-static-cklib" >> $GITHUB_OUTPUT
             echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
             echo "dockerfile=bundles/bundle-pg17-pgrdf-pgck-static-cklib/Dockerfile" >> $GITHUB_OUTPUT
-          elif [[ "$TAG" =~ ^release-pg17-pgrdf-pgck-web-cklib-(.*) ]]; then
-            echo "bundle=pg17-pgrdf-pgck-web-cklib" >> $GITHUB_OUTPUT
-            echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "dockerfile=bundles/bundle-pg17-pgrdf-pgck-web-cklib/Dockerfile" >> $GITHUB_OUTPUT
           elif [[ "$TAG" =~ ^release-ck-allinone-(.*) ]]; then
             echo "bundle=ck-allinone" >> $GITHUB_OUTPUT
             echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
             echo "dockerfile=bundles/bundle-ck-allinone/Dockerfile" >> $GITHUB_OUTPUT
+          elif [[ "$TAG" =~ ^release-pgck-bench-(.*) ]]; then
+            echo "bundle=pgck-bench" >> $GITHUB_OUTPUT
+            echo "base_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "dockerfile=bundles/bundle-pgck-bench/Dockerfile" >> $GITHUB_OUTPUT
           else
             echo "ERROR: Tag format not recognized: $TAG"
             exit 1
