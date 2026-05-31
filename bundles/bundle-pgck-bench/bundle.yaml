@@ -12,7 +12,7 @@ image:
   pg_major: 17
   base_image: ghcr.io/styk-tv/pgck-web
   final_image: ghcr.io/styk-tv/pgck-web (inherited)
-  runtime_profile: bench
+  runtime_profile: stable  # generator enum requires stable|micro; this bundle's role is conveyed by `role: bench` + `never_prod: true` below + the ck.bundle.role manifest label
 
 role: bench
 never_prod: true
