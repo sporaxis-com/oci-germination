@@ -13,20 +13,20 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — `v0.7.3`
+## ociger-ck-allinone — `v0.7.4`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI) + CK.Lib.Js mounted at `/cklib/`. Supervisor-orchestrated, scratch base. ⚠️ FastAPI process latent gap — Postgres/pgRDF/pgCK/NATS work; FastAPI dead. Use `static-cklib` (below) for a working web layer.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:ed40fa6452716c8087964b49077b1db987bc86b7cf3a1bff90ba49c23e2e78b7`  | 2026-06-03 17:29:11 |
-| arm64 | `sha256:5dc9ef0f9ca00614587a6cf1022e2e0b4b353e7829529b40da9bbd5c446e7a45`  | 2026-06-03 17:29:11 |
+| amd64 | `sha256:1db9fcf8b034c161ecbbeb1065e453ed5eb2627b204f07a7980b8e0325e6d38f`  | 2026-06-03 21:55:28 |
+| arm64 | `sha256:6b7d8bc7ba0fbe6b31e58900d70f66daf1d04730b96fede5dedcbb2315391bf7`  | 2026-06-03 21:55:28 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.3`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.4`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:6737c900f9193fcff99e911233ed753597f129e31a650eda882aae2c78cdf4a8`                                                         |
+| Index digest       | `sha256:1374d2427eb1e51dcb7abe03065e90a8ca411ca18271cd2713e01b7925837226`                                                         |
 | Role               | `prod` (per SPEC.OCI.BUNDLE.v0.4 §2.4)                                  |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
