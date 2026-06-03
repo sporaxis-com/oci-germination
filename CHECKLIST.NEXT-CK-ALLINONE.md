@@ -32,17 +32,19 @@ The `nats-relay` (or whichever process pgCK ships that subscribes to `input.kern
 - [ ] **B3.** If the dispatcher is a pg background worker triggered by `pgck.nats_url`: A5 above is sufficient — verify with smoke.
 - [ ] **B4.** Smoke (see D below) must publish a test verb and assert a reply within ~2 seconds.
 
-## C. UX: `http://localhost:8000/` (binding)
+## C. UX: `http://localhost:8000/` — WSS connects + exchanges a message (binding)
 
-Today `/cklib/*` serves; `/` returns the busybox httpd default directory listing of `/app`. This is the first thing a consumer sees, and it currently looks broken.
+The page connects to NATS over WebSocket and proves the round-trip works. That's it.
 
-- [ ] **C1.** Land a minimal `/app/index.html` (or `/app/cklib/index.html` referenced from `/`) that:
-  - States "CKP v3.8 (rc-05) all-in-one is up"
-  - Lists the listening ports (5432/4222/9222/8000)
-  - Embeds CKClient (cklib) and subscribes to a presence/heartbeat verb — render the first received event into the page as proof-of-life.
-- [ ] **C2.** Decide: redirect `/` → `/cklib/` OR ship a dedicated landing at `/`. (Recommend: dedicated `/`, link to `/cklib/` for power users.)
-- [ ] **C3.** No JavaScript build step in this repo (no-compile discipline). Use cklib's existing ESM entrypoints + raw HTML.
-- [ ] **C4.** Optional: include a small "verbs available" panel that calls a SHACL or registry query verb and lists what the kernel can do. Defer to v0.8.x if it requires upstream pgCK support.
+- [ ] **C1.** Ship `/app/index.html` (served at `http://localhost:8000/`) that:
+  - Opens a NATS-WSS connection to `ws://${location.hostname}:9222` on page load (derives the host from `location` so any port-mapping works).
+  - Subscribes to a unique test subject (e.g. `ck.probe.<random>`).
+  - Publishes a message to that same subject.
+  - When the subscription delivers the message back, renders **"✓ WSS round-trip OK"** into the DOM with the bytes received.
+  - If the connection fails or the round-trip doesn't return within 3 s, renders **"✗ WSS round-trip failed"** with the error.
+- [ ] **C2.** `/` serves C1's `index.html` (busybox httpd picks up `index.html` by default; if not, adjust the `-h` root or layout).
+- [ ] **C3.** No JS build. Inline `<script type="module">` + raw HTML. The CK.Lib.Js NATS client is already at `/cklib/*` and is the right thing to import.
+- [ ] **C4.** **Acceptance (binding):** open `http://localhost:<host-port>/` in a fresh browser tab on a fresh container → the page shows ✓ within 3 seconds, no consumer setup. Headless equivalent in CI: spin up the container, point a Playwright/Puppeteer headless Chromium at `/`, assert the DOM contains `✓ WSS round-trip OK` within 5 s.
 
 ## D. Smoke test gate update (binding)
 

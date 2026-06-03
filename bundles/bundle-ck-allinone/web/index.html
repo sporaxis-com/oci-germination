@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ck-allinone — WSS round-trip probe</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { margin-bottom: 0.5rem; }
+  .meta { color: #666; margin-bottom: 1.5rem; }
+  .panel { border: 1px solid #ddd; border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .ok   { border-color: #1aaa3d; background: #f3fff5; }
+  .fail { border-color: #c92020; background: #fff5f5; }
+  .pending { border-color: #888; background: #f8f8f8; }
+  .marker { font-weight: 600; }
+  pre { background: #f4f4f4; padding: 0.5rem; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  a { color: #0366d6; }
+</style>
+</head>
+<body>
+
+<h1>ck-allinone</h1>
+<p class="meta">CKP v3.8 (rc-05) all-in-one — PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + cklib at <a href="/cklib/">/cklib/</a></p>
+
+<div id="result" class="panel pending">
+  <div class="marker" id="status">⌛ Connecting to NATS over WSS…</div>
+  <pre id="detail">waiting</pre>
+</div>
+
+<p class="meta">This page opens a WSS connection to NATS on <code>ws://${host}:9222</code>, subscribes to a unique subject, publishes a message to it, and confirms the round-trip. If you see ✓ above, the wire is alive.</p>
+
+<script type="module">
+const $status = document.getElementById('status');
+const $detail = document.getElementById('detail');
+const $panel  = document.getElementById('result');
+
+function fail(reason, extra) {
+  $panel.className = 'panel fail';
+  $status.textContent = '✗ WSS round-trip failed';
+  $detail.textContent = reason + (extra ? '\n\n' + extra : '');
+}
+function pass(payload) {
+  $panel.className = 'panel ok';
+  $status.textContent = '✓ WSS round-trip OK';
+  $detail.textContent = 'Received: ' + payload;
+}
+
+const SUBJ = 'ck.probe.' + Math.random().toString(36).slice(2, 10);
+const URL  = `ws://${location.hostname}:9222`;
+const TIMEOUT_MS = 3000;
+
+let ws;
+try {
+  ws = new WebSocket(URL);
+} catch (e) {
+  fail('WebSocket constructor threw: ' + e.message, 'url=' + URL);
+  throw e;
+}
+
+const timer = setTimeout(() => {
+  if ($panel.className.includes('pending')) {
+    fail('No round-trip within ' + TIMEOUT_MS + ' ms', 'subject=' + SUBJ + '\nurl=' + URL);
+    try { ws.close(); } catch(_) {}
+  }
+}, TIMEOUT_MS);
+
+ws.binaryType = 'arraybuffer';
+
+// NATS wire protocol over WSS (minimal subset: CONNECT, SUB, PUB, MSG, PING/PONG).
+// Each message ends in CRLF. NATS server sends INFO on connect.
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const send = (s) => ws.send(enc.encode(s + '\r\n'));
+
+let connected = false;
+let subbed = false;
+
+ws.onopen = () => {
+  // Tell NATS we're a no-auth client.
+  send('CONNECT {"verbose":false,"pedantic":false,"protocol":1}');
+};
+
+ws.onmessage = (ev) => {
+  const txt = typeof ev.data === 'string'
+    ? ev.data
+    : dec.decode(new Uint8Array(ev.data));
+
+  for (const line of txt.split('\r\n')) {
+    if (!line) continue;
+
+    if (line.startsWith('INFO ')) {
+      // INFO arrives first; subscribe to our probe subject, then publish.
+      send('SUB ' + SUBJ + ' 1');
+      // PUB <subj> <bytes>\r\n<payload>
+      const payload = 'hello-' + Date.now();
+      const bytes   = enc.encode(payload).length;
+      ws.send(enc.encode('PUB ' + SUBJ + ' ' + bytes + '\r\n' + payload + '\r\n'));
+      connected = true;
+    } else if (line.startsWith('MSG ')) {
+      subbed = true;
+      // Next "line" is the payload (NATS framing splits payload on CRLF).
+      // We approximate by grabbing the next non-empty token from the buffer.
+      const payloadLine = txt.split('\r\n')[txt.split('\r\n').indexOf(line) + 1] || '';
+      clearTimeout(timer);
+      pass(payloadLine || '(empty)');
+      try { ws.close(); } catch(_) {}
+    } else if (line === 'PING') {
+      send('PONG');
+    } else if (line.startsWith('-ERR ')) {
+      clearTimeout(timer);
+      fail('NATS error: ' + line);
+      try { ws.close(); } catch(_) {}
+    }
+  }
+};
+
+ws.onerror = (ev) => {
+  clearTimeout(timer);
+  if (!connected) fail('WebSocket onerror before CONNECT', 'url=' + URL);
+};
+
+ws.onclose = (ev) => {
+  if (!subbed && $panel.className.includes('pending')) {
+    fail('WebSocket closed before round-trip',
+         'code=' + ev.code + ' reason=' + (ev.reason || '(none)'));
+  }
+};
+</script>
+
+</body>
+</html>

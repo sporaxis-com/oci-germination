@@ -123,6 +123,59 @@ if [[ "$JS_STATUS" != "200" ]]; then
 fi
 echo "[ck-allinone] ✓ /cklib/index.html=200, /cklib/ck-client.js=200"
 
+echo "[ck-allinone] ⑤b root / serves the WSS round-trip landing"
+ROOT_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/")
+if [[ "$ROOT_STATUS" != "200" ]]; then
+  echo "✗ httpd / returned $ROOT_STATUS"
+  exit 1
+fi
+ROOT_BODY=$(curl -s "http://127.0.0.1:38000/")
+if ! echo "$ROOT_BODY" | grep -q '9222' ; then
+  echo "✗ / does not reference port 9222 (no WSS round-trip landing)"
+  exit 1
+fi
+if ! echo "$ROOT_BODY" | grep -qE 'WebSocket|CKPage|cklib' ; then
+  echo "✗ / does not reference WebSocket / CKPage / cklib"
+  exit 1
+fi
+echo "[ck-allinone] ✓ / serves WSS round-trip landing"
+
+echo "[ck-allinone] ⑤c WSS round-trip from sidecar (PUB→subscribe→receive)"
+# Use a small node-based WSS client to actually round-trip a message over :9222.
+WSS_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+  cat > /probe.mjs <<EOF
+import { WebSocket } from "ws";
+const url = "ws://'"$CONTAINER_NAME"':9222";
+const subj = "ck.probe.smoke." + Math.random().toString(36).slice(2,8);
+const ws = new WebSocket(url);
+let ok = false;
+const t = setTimeout(() => { if (!ok) { console.log("TIMEOUT"); process.exit(2); } }, 5000);
+ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
+ws.on("message", (data) => {
+  const txt = data.toString();
+  if (txt.startsWith("INFO ")) {
+    ws.send("SUB " + subj + " 1\r\n");
+    const payload = "smoke-" + Date.now();
+    ws.send("PUB " + subj + " " + payload.length + "\r\n" + payload + "\r\n");
+  } else if (txt.includes("MSG ")) {
+    ok = true;
+    clearTimeout(t);
+    console.log("OK");
+    ws.close();
+    process.exit(0);
+  }
+});
+ws.on("error", (e) => { console.log("ERR " + e.message); process.exit(3); });
+EOF
+  cd /tmp && npm install --silent --no-save ws@8 >/dev/null 2>&1
+  node --input-type=module < /probe.mjs
+' 2>&1 | tail -1)
+if [[ "$WSS_OK" != "OK" ]]; then
+  echo "✗ WSS round-trip failed: $WSS_OK"
+  exit 1
+fi
+echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
+
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \
   \( -name 'python*' -o -name 'uvicorn*' -o -name 'fastapi*' -o -path '*/opt/venv*' \) 2>/dev/null | wc -l | tr -d ' ')

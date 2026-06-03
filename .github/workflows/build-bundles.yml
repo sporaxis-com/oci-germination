@@ -143,6 +143,18 @@ jobs:
           }
           echo "✓ image is Python-free"
 
+      # CHECKLIST.NEXT-CK-ALLINONE §D/§E gate: ck-allinone must serve a /
+      # landing that exercises a real NATS-WSS round-trip. The smoke runs
+      # the published image and proves end-to-end behaviour before the
+      # release advances to attestation.
+      - name: Smoke test ck-allinone (WSS round-trip)
+        if: ${{ steps.extract.outputs.bundle == 'ck-allinone' }}
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          echo "Smoking $IMAGE …"
+          bash scripts/smoke-ck-allinone.sh "$IMAGE"
+
       # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio
       # CA via the Sigstore keyless flow. The attestation is pushed to
       # GHCR as an OCI referrer alongside the manifest list, so

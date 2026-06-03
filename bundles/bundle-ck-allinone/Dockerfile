@@ -58,6 +58,11 @@ COPY --from=busybox_src /bin/busybox /bin/busybox
 # busybox httpd will serve /app on :8000, so cklib is at /cklib/ over HTTP
 COPY --from=cklib_source / /app/cklib/
 
+# Landing page: opens NATS over WSS to ws://${host}:9222, does a round-trip
+# subscribe→publish→receive, renders ✓/✗ into the DOM. busybox httpd serves
+# /app/index.html for /  by default.
+COPY bundles/bundle-ck-allinone/web/index.html /app/index.html
+
 # s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
