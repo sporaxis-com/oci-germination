@@ -65,14 +65,30 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-echo "[ck-allinone] ② CREATE EXTENSION pgrdf, pgck, pgcrypto"
-$PSQL -c "CREATE EXTENSION pgcrypto;" >/dev/null
-$PSQL -c "CREATE EXTENSION pgrdf;"    >/dev/null
-$PSQL -c "CREATE EXTENSION pgck;"     >/dev/null
+echo "[ck-allinone] ② §A auto-bootstrap — extensions installed on first boot WITHOUT smoke help"
+PGRDF_INSTALLED=$($PSQL -c "SELECT extversion FROM pg_extension WHERE extname='pgrdf';" || true)
+PGCK_INSTALLED=$($PSQL -c "SELECT extversion FROM pg_extension WHERE extname='pgck';" || true)
+PGCRYPTO=$($PSQL -c "SELECT extname FROM pg_extension WHERE extname='pgcrypto';" || true)
+if [[ -z "$PGRDF_INSTALLED" || -z "$PGCK_INSTALLED" || -z "$PGCRYPTO" ]]; then
+  echo "✗ §A auto-bootstrap FAILED — extensions not installed on first boot (pgrdf=$PGRDF_INSTALLED pgck=$PGCK_INSTALLED pgcrypto=$PGCRYPTO)"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -i bootstrap | head -5
+  exit 1
+fi
 
-PGRDF_INSTALLED=$($PSQL -c "SELECT extversion FROM pg_extension WHERE extname='pgrdf';")
-PGCK_INSTALLED=$($PSQL  -c "SELECT extversion FROM pg_extension WHERE extname='pgck';")
-PGCK_NATIVE=$($PSQL     -c "SELECT pgck_version();")
+# §A5: pgck.nats_url GUC was baked into postgresql.conf by ociger-pg-launcher
+NATS_URL=$($PSQL -c "SHOW pgck.nats_url;" 2>&1 | head -1)
+if [[ "$NATS_URL" != *"nats://"* ]]; then
+  echo "✗ §A5 pgck.nats_url GUC not set ($NATS_URL)"
+  exit 1
+fi
+
+# §A7: marker file present (proves the oneshot ran and wrote it)
+if ! docker exec "$CONTAINER_NAME" /bin/busybox test -f /var/lib/postgresql/data/.ck-allinone.bootstrapped; then
+  echo "✗ §A7 marker file missing"
+  exit 1
+fi
+
+PGCK_NATIVE=$($PSQL -c "SELECT pgck_version();")
 
 if [[ "$PGRDF_INSTALLED" != "$EXPECTED_PGRDF_VERSION" ]]; then
   echo "✗ wrong-version: pgrdf extversion=$PGRDF_INSTALLED expected=$EXPECTED_PGRDF_VERSION" >&2

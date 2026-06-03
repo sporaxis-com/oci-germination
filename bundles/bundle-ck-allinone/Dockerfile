@@ -21,6 +21,33 @@ FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
 
+# ─── Stage 3b: extract psql + its NEEDED libs from bookworm ───────────────
+# Used by the §A bootstrap oneshot to run CREATE EXTENSION on first boot.
+# /usr/bin/psql in bookworm is the pg_wrapper Perl script — the real ELF
+# binary lives at /usr/lib/postgresql/17/bin/psql.
+FROM postgres:17-bookworm AS psql_src
+RUN set -eux; \
+    mkdir -p /out/usr/local/bin; \
+    cp /usr/lib/postgresql/17/bin/psql /out/usr/local/bin/psql; \
+    ldd /usr/lib/postgresql/17/bin/psql \
+      | tr -s '[:space:]' '\n' | grep '^/' | sort -u \
+      | xargs -r -I '{}' cp --parents '{}' /out
+
+# ─── Stage 3c: rebuild ociger-pg-launcher fresh ──────────────────────────
+# pg_base ships an older revision of ociger-pg-launcher that doesn't know
+# about OCIGER_POSTGRES_CONF_EXTRA. Needed for §A to bake pgck.nats_url
+# into postgresql.conf on first initdb (pgCK's bgworker reads the GUC once
+# on first tick — SIGHUP after-the-fact does not wake it).
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pglauncher_build
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod ./
+COPY go.sum ./
+COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
+COPY internal/launcher ./internal/launcher
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
+    go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
+
 # ─── Stage 4: extract s6-overlay release tarballs into /s6root ────────────
 FROM debian:trixie-slim AS s6_extract
 ARG S6_OVERLAY_VERSION
@@ -63,11 +90,21 @@ COPY --from=cklib_source / /app/cklib/
 # /app/index.html for /  by default.
 COPY bundles/bundle-ck-allinone/web/index.html /app/index.html
 
+# §A auto-bootstrap: fresh launcher (knows OCIGER_POSTGRES_CONF_EXTRA),
+# psql + libs, bootstrap-ckp.sh, and the s6 oneshot.
+COPY --from=pglauncher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
+COPY --from=psql_src /out/ /
+COPY bundles/bundle-ck-allinone/scripts/bootstrap-ckp.sh /usr/local/bin/bootstrap-ckp.sh
+RUN chmod +x /usr/local/bin/bootstrap-ckp.sh || true
+
 # s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
 ENV PGDATA=/var/lib/postgresql/data
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
+# §A auto-bootstrap: pgck.nats_url baked into postgresql.conf on first
+# initdb so the pgCK bgworker reads it on its single get_or_init tick.
+ENV OCIGER_POSTGRES_CONF_EXTRA="pgck.nats_url='nats://127.0.0.1:4222'"
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1

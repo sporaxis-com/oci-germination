@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/sporaxis-com/oci-germination/internal/launcher"
@@ -58,6 +59,16 @@ func main() {
 		)
 		appendFile(filepath.Join(pgData, "postgresql.conf"), "listen_addresses='*'\nunix_socket_directories='/var/run/postgresql'\n")
 		appendFile(filepath.Join(pgData, "pg_hba.conf"), "host all all all trust\n")
+		// OCIGER_POSTGRES_CONF_EXTRA: any extra postgresql.conf lines a bundle
+		// wants baked in at first initdb. ck-allinone uses this to set
+		// pgck.nats_url BEFORE postgres starts (pgCK's bgworker only reads
+		// the GUC once on first tick — SIGHUP after-the-fact doesn't wake it).
+		if extra := os.Getenv("OCIGER_POSTGRES_CONF_EXTRA"); extra != "" {
+			if !strings.HasSuffix(extra, "\n") {
+				extra += "\n"
+			}
+			appendFile(filepath.Join(pgData, "postgresql.conf"), extra)
+		}
 	}
 
 	args := launcher.PostgresArgs(pgData, os.Getenv("OCIGER_SHARED_PRELOAD_LIBRARIES"))
