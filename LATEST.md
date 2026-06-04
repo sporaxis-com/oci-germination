@@ -19,16 +19,16 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI)
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `_unknown_`  | 2026-06-04 02:41:26 |
-| arm64 | `_unknown_`  | 2026-06-04 02:41:26 |
+| amd64 | `sha256:bf0d107cc4f15fd8bb58b7f1c25da77d51f343a47e302fd61aa189598f84d1ac`  | 2026-06-04 02:41:26 |
+| arm64 | `sha256:f1cb1cf5ff5129d721e7955d3f1d43c55e630b1404e34a8674ee3065ccbc7149`  | 2026-06-04 02:41:26 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.5`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:dbc726ce2a9a87c19ce7a14534cb53ce059dece970ca5d0fb09ecfc1bab98f92`                                                         |
-| Role               | `—` (per SPEC.OCI.BUNDLE.v0.4 §2.4)                                  |
-| Production use     | —                                                              |
+| Role               | `prod` (per SPEC.OCI.BUNDLE.v0.4 §2.4)                                  |
+| Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
