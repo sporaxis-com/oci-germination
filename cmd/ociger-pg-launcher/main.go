@@ -69,6 +69,19 @@ func main() {
 			}
 			appendFile(filepath.Join(pgData, "postgresql.conf"), extra)
 		}
+		// OCIGER_INITDB_SQL_FILE: a SQL script piped through postgres single-user
+		// mode immediately after initdb, before the normal server starts. Lets
+		// a bundle issue CREATE EXTENSION + similar bootstrap statements without
+		// shipping a postgres client (psql) in the final image. Idempotent by
+		// virtue of the surrounding "PG_VERSION absent → first-boot" gate.
+		if sqlFile := os.Getenv("OCIGER_INITDB_SQL_FILE"); sqlFile != "" {
+			sql, err := os.ReadFile(sqlFile)
+			if err != nil {
+				log.Fatalf("OCIGER_INITDB_SQL_FILE %q: %v", sqlFile, err)
+			}
+			runAsPostgresStdin(runUID, runGID, string(sql),
+				bin("postgres"), "--single", "-D", pgData, "postgres")
+		}
 	}
 
 	args := launcher.PostgresArgs(pgData, os.Getenv("OCIGER_SHARED_PRELOAD_LIBRARIES"))
@@ -84,6 +97,22 @@ func runAsPostgres(uid int, gid int, name string, args ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(uid),
+			Gid: uint32(gid),
+		},
+	}
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("%s failed: %v", name, err)
+	}
+}
+
+func runAsPostgresStdin(uid int, gid int, stdin string, name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = strings.NewReader(stdin)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{
 			Uid: uint32(uid),

@@ -82,11 +82,9 @@ if [[ "$NATS_URL" != *"nats://"* ]]; then
   exit 1
 fi
 
-# §A7: marker file present (proves the oneshot ran and wrote it)
-if ! docker exec "$CONTAINER_NAME" /bin/busybox test -f /var/lib/postgresql/data/.ck-allinone.bootstrapped; then
-  echo "✗ §A7 marker file missing"
-  exit 1
-fi
+# §A7: extension presence (pg_extension rows above) IS the bootstrap-ran marker;
+# v0.7.6 onward uses postgres single-user mode inside the launcher, not an
+# s6 oneshot, so no separate marker file is written.
 
 PGCK_NATIVE=$($PSQL -c "SELECT pgck_version();")
 
