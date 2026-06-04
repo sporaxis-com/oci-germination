@@ -1,64 +1,80 @@
 spec_version: 0.4
 name: bundle-ck-allinone
+version: v0.7.6
 role: prod
 never_prod: false
-description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.28 + pgCK 0.2.2 + NATS 2.14.1 (core+WSS) + cklib 1.3.11, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no FastAPI. Marketplace-minimal.
+description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.28 + pgCK 0.2.2 + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.3.11, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). Marketplace-minimal.
 
-# Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib on top of
-# pg17-pgrdf-pgck-nats-micro (scratch + selectively-copied bookworm libs).
-# Generator does not model FROM-image composition or s6-rc.d service trees,
-# so the Dockerfile + s6-services/ tree are maintained by hand.
+# Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
+# in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
+# does not yet model FROM-image composition or s6-rc.d service trees,
+# so the Dockerfile + s6-services/ tree are maintained by hand. The
+# ontological structure is captured at _WIP scope; see SPEC.INDEX.v1.0
+# for the public catalogue.
 skip_render: true
 
 image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 17
   base_image: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
+  base_image_version: v0.1.7
   final_image: scratch
   runtime_profile: micro
 
 extensions:
+  pgcrypto:
+    version: builtin
+    source: https://www.postgresql.org/docs/17/pgcrypto.html
+    bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
     version: 0.5.28
     source: https://github.com/styk-tv/pgRDF
+    bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
     version: 0.2.2
     source: https://github.com/styk-tv/pgCK
+    bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
 
 components:
   s6-overlay:
     version: 3.2.3.0
     source: https://github.com/just-containers/s6-overlay
-    description: Modern init + service supervisor for the container; replaces the previous bespoke ociger-supervisor
+    description: PID 1 supervisor; s6-svscan + s6-rc compile services from /etc/s6-overlay/s6-rc.d/ at boot.
   busybox:
     version: 1.36.1
-    role: httpd-applet  # per SPEC.OCI.BUNDLE.v0.4 §1.4.3 + §9.1
-    source: https://hub.docker.com/_/busybox (musl variant)
+    role: httpd-applet
+    source: https://hub.docker.com/_/busybox
     port: 8000
-    description: Static binary; httpd applet serves /app on :8000 (replaces the previous bespoke ociger-static-server and the prior FastAPI/uvicorn stand-in)
+    description: Single static binary; httpd applet serves /app on :8000.
   cklib:
     version: 1.3.11
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
-    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP
-  nats:
+    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP.
+  nats-server:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server
     core_port: 4222
     wss_port: 9222
     jetstream: false
-    description: Inherited via pg_base; supervised by s6 as a sibling longrun
-
-services:
-  nats:
-    source_image: nats:2.14.1-scratch
-    core_port: 4222
-    websocket_port: 9222
-    jetstream: false
+    description: Inherited via pg_base; supervised by s6 as a sibling longrun.
+  ociger-pg-launcher:
+    version: in-tree
+    source: ./cmd/ociger-pg-launcher
+    description: PID-stable postgres launcher; handles initdb on first boot, appends OCIGER_POSTGRES_CONF_EXTRA, and pipes OCIGER_INITDB_SQL_FILE through `postgres --single` so the image needs no postgres client.
+  ociger-pgck-relay:
+    version: in-tree
+    role: shim
+    source: ./cmd/ociger-pgck-relay
+    shims_for: pgck@0.2.2
+    notify_ref: pgck/publish-nats-client-feature-build
+    retire_probe: /usr/lib/postgresql/17/lib/pgck.so contains 'input.kernel.pgCK.action'
+    opt_out_env: OCIGER_DISABLE_PGCK_RELAY=1
+    description: Bus-level relay (input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>) covering the compiled-out nats-client path in pgCK 0.2.2.
 
 supervisor:
   binary: s6-overlay v3.2.3.0
-  description: s6-svscan PID 1 supervises postgres + nats + busybox-httpd as s6-rc longruns
+  description: s6-svscan PID 1 supervises postgres + nats + httpd + pgck-relay as longruns. Bootstrap SQL runs in `postgres --single` inside the launcher on first boot; no oneshot service is required.
 
 platforms:
   - linux/amd64
