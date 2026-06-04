@@ -25,12 +25,19 @@ Implementation note: the cleanest place is a new s6 `oneshot` service that depen
 
 ## B. NATS action dispatcher (binding)
 
-The `nats-relay` (or whichever process pgCK ships that subscribes to `input.kernel.pgCK.action.>` and round-trips verbs to the postgres backend) MUST be running before the container reports ready.
+A subscriber on `input.kernel.pgCK.action.>` MUST be running before the container reports ready, fanning each MSG out to `event.kernel.pgCK.<verb>` (the pgCK relay contract per `src/nats_client.rs`).
 
-- [ ] **B1.** Confirm with pgCK upstream which process owns the dispatcher subscription, and where its binary / launcher lives. (May require a NOTIFY to pgCK.)
-- [ ] **B2.** If the dispatcher is a separate process: add an s6 longrun service for it under `s6-services/dispatcher/`.
-- [ ] **B3.** If the dispatcher is a pg background worker triggered by `pgck.nats_url`: A5 above is sufficient — verify with smoke.
-- [ ] **B4.** Smoke (see D below) must publish a test verb and assert a reply within ~2 seconds.
+- [x] **B1.** Upstream owner confirmed: pgCK's bgworker, gated by `#[cfg(feature = "nats-client")]`. The published `pgck:0.2.2` artifact ships `pgck.so` built **without** that feature (verified by `bytes.Contains` on the .so), so the dispatcher is absent from the binary. NOTIFY filed asking for a feature build.
+- [x] **B2.** In-tree shim added: `cmd/ociger-pgck-relay` — bus-level subscriber that performs the identical fan-out pgCK's own relay would. Wired as s6 longrun under `s6-services/pgck-relay/` (depends on `nats`).
+- [x] **B3.** Confirmed not viable on the current pgck.so — the `nats_client::init_relay` block is compiled out. B2 takes over for the time being.
+- [x] **B4.** Smoke step ⑤d publishes to `input.kernel.pgCK.action.smoke.ping.<rand>` over WSS and asserts a `MSG event.kernel.pgCK.smoke.ping.<rand>` arrives within 5 s. Gates the image at CI (E1).
+
+**Coexistence rule.** The shim self-disables when the upstream pgCK build advertises:
+
+1. Boot probe: `ociger-pgck-relay` reads `/usr/lib/postgresql/17/lib/pgck.so` and stands down if it contains the literal string `input.kernel.pgCK.action` (only the `nats-client` feature build embeds this).
+2. Hard kill switch: `OCIGER_DISABLE_PGCK_RELAY=1` parks the longrun as a no-op for forced opt-out.
+
+The shim is therefore not a permanent fork of pgCK behaviour — it's a bus-level bridge that retires automatically the moment the upstream feature build ships. **Public-facing documentation does not advertise the shim as a workaround**; users see "dispatcher is alive" via the smoke + landing page. The NOTIFY at the pgCK side stays open for the proper upstream fix.
 
 ## C. UX: `http://localhost:8000/` — WSS connects + exchanges a message (binding)
 

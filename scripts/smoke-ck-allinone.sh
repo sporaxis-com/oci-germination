@@ -192,6 +192,50 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
+echo "[ck-allinone] ⑤d §B4 dispatcher round-trip — input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>"
+# Publishes to the input subject and asserts a MSG arrives on the matching event
+# subject within 5 s. Closes CHECKLIST §B4. The fan-out is performed by
+# ociger-pgck-relay (in-tree shim) while pgck.so is built without the
+# nats-client feature; the relay self-disables when upstream embeds it.
+DISP_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+  cat > /probe.mjs <<EOF
+import { WebSocket } from "ws";
+const url = "ws://'"$CONTAINER_NAME"':9222";
+const verb = "smoke.ping." + Math.random().toString(36).slice(2,8);
+const inSubj = "input.kernel.pgCK.action." + verb;
+const outSubj = "event.kernel.pgCK." + verb;
+const ws = new WebSocket(url);
+let ok = false;
+const t = setTimeout(() => { if (!ok) { console.log("TIMEOUT"); process.exit(2); } }, 5000);
+ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
+ws.on("message", (data) => {
+  const txt = data.toString();
+  if (txt.startsWith("INFO ")) {
+    ws.send("SUB " + outSubj + " 1\r\n");
+    setTimeout(() => {
+      const payload = "dispatch-" + Date.now();
+      ws.send("PUB " + inSubj + " " + payload.length + "\r\n" + payload + "\r\n");
+    }, 200);
+  } else if (txt.includes("MSG " + outSubj + " ")) {
+    ok = true;
+    clearTimeout(t);
+    console.log("OK");
+    ws.close();
+    process.exit(0);
+  }
+});
+ws.on("error", (e) => { console.log("ERR " + e.message); process.exit(3); });
+EOF
+  cd /tmp && npm install --silent --no-save ws@8 >/dev/null 2>&1
+  node --input-type=module < /probe.mjs
+' 2>&1 | tail -1)
+if [[ "$DISP_OK" != "OK" ]]; then
+  echo "✗ §B4 dispatcher round-trip failed: $DISP_OK"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -i 'pgck-relay' | tail -20
+  exit 1
+fi
+echo "[ck-allinone] ✓ §B4 dispatcher round-trip OK (relay forwarded input→event)"
+
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \
   \( -name 'python*' -o -name 'uvicorn*' -o -name 'fastapi*' -o -path '*/opt/venv*' \) 2>/dev/null | wc -l | tr -d ' ')

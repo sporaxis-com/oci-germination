@@ -8,12 +8,12 @@
 # inherit from pg_base, which is pgRDF's de-facto compile target
 # (Debian bookworm SONAMEs preserved end-to-end).
 
-ARG PG_BASE_VERSION=v0.1.6
+ARG PG_BASE_VERSION=v0.1.7
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.3.11
 
 # ─── Stage 1: pg base (pg17 + pgRDF + pgCK + NATS + ociger-pg-launcher) ───
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.6 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
@@ -47,6 +47,20 @@ COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
+
+# ─── Stage 3d: build ociger-pgck-relay ───────────────────────────────────
+# Bus-level shim that subscribes input.kernel.pgCK.action.> and re-emits
+# event.kernel.pgCK.<verb>. Stands in for the relay code that the current
+# published pgck.so was compiled without. Self-disables (boot probe) the
+# moment an upstream pgck.so ships with the relay strings embedded.
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pgckrelay_build
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ociger-pgck-relay ./cmd/ociger-pgck-relay
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags='-s -w' -o /out/ociger-pgck-relay ./cmd/ociger-pgck-relay
 
 # ─── Stage 4: extract s6-overlay release tarballs into /s6root ────────────
 FROM debian:trixie-slim AS s6_extract
@@ -96,6 +110,12 @@ COPY --from=pglauncher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-la
 COPY --from=psql_src /out/ /
 COPY bundles/bundle-ck-allinone/scripts/bootstrap-ckp.sh /usr/local/bin/bootstrap-ckp.sh
 RUN chmod +x /usr/local/bin/bootstrap-ckp.sh || true
+
+# §B dispatcher: bus-level relay (input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>).
+# Self-disables when upstream pgck.so embeds the relay strings; opt-out via
+# OCIGER_DISABLE_PGCK_RELAY=1 if a future image lands the upstream build before
+# the probe catches it.
+COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay
 
 # s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
