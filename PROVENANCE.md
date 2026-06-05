@@ -143,7 +143,7 @@ When a base bundle is rebuilt (e.g. `pg17-pgrdf-pgck-nats-micro:v0.1.3`), every 
 - Verifier (pending): `gh attestation verify` (built into `gh` 2.49+)
 - Renderer (pending): `tools/render-latest-md.py`
 - Spec: this file ([`PROVENANCE.md`](./PROVENANCE.md)) — the binding contract
-- Related specs: [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md), [`SPEC.OCI.BUNDLE.v0.2.md`](./SPEC.OCI.BUNDLE.v0.2.md), [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md)
+- Related: [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md)
 
 ## Implementation status
 

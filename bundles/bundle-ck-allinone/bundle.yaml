@@ -8,9 +8,7 @@ description: CKP v3.8 all-in-one minimal — PostgreSQL 17 + pgRDF 0.5.28 + pgCK
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
 # does not yet model FROM-image composition or s6-rc.d service trees,
-# so the Dockerfile + s6-services/ tree are maintained by hand. The
-# ontological structure is captured at _WIP scope; see SPEC.INDEX.v1.0
-# for the public catalogue.
+# so the Dockerfile + s6-services/ tree are maintained by hand.
 skip_render: true
 
 image:

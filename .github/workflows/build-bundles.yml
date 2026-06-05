@@ -106,20 +106,18 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           # Each release moves :latest forward on the production image
-          # name (per SPEC.OCIGERMI.TRACKS.DEVEL §4.3). Devel-track images
-          # (when the -devel image name lands) will move their own
-          # :latest independently.
+          # name. Devel-track images (when the -devel image name lands)
+          # will move their own :latest independently.
           tags: |
             ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}
             ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # SPEC.OCI.BUNDLE.v0.4 §4.4 gate: prod images MUST be Python-free.
-      # pgck-bench is the SOLE sanctioned home for Python (role=bench);
-      # skip the gate for it. Every other bundle through this workflow
-      # MUST contain zero python/uvicorn/fastapi/venv hits.
-      - name: Verify no Python in prod image (SPEC v0.4 §4.4)
+      # Python-free gate: prod images MUST contain zero python /
+      # uvicorn / fastapi / venv hits. pgck-bench is the sole sanctioned
+      # home for Python (role=bench) and skips this gate.
+      - name: Verify no Python in prod image
         if: ${{ steps.extract.outputs.bundle != 'pgck-bench' }}
         run: |
           set -euo pipefail

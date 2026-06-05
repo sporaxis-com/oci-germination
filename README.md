@@ -8,7 +8,7 @@ The repo is a **layer-addition shop, not a compile shop**: pg base + extensions 
 
 ## Why concept kernels (light read)
 
-A **Concept Kernel** is a small self-describing, self-governing being that owns a slice of meaning. It carries its own ontology (what types can exist here), its own affordances (what verbs can be invoked), its own instances (the data that lives under it), and — when it climbs the capability tiers — its own sealing and proof. In [BFO](https://basic-formal-ontology.org/) terms a kernel sits as a `BFO:0000040`-class material entity for the purposes of stable identity and part-of relations: it endures, it has parts (ontology / tool / data), and it can be addressed independently. In [PROV-O](https://www.w3.org/TR/prov-o/) terms a kernel is a `prov:Agent` whose affordances generate `prov:Activity` invocations that mutate `prov:Entity` instances under it, each activity producing a sealed, auditable record. CKP v3.8 (rc-05) makes this concrete: kernels live in the pgRDF graph, declare their shape in SHACL, expose verbs over NATS-WSS, and (optionally) carry append-only proof. The discipline lets you describe a real-world or game-world domain as a federation of sovereign-by-design beings rather than a sprawl of tables and endpoints. See `SPEC.CKP.v3.8-rc-05-concepts` for the model; this repo ships the runtime container that hosts it.
+A **Concept Kernel** is a small self-describing, self-governing being that owns a slice of meaning. It carries its own ontology (what types can exist here), its own affordances (what verbs can be invoked), its own instances (the data that lives under it), and — when it climbs the capability tiers — its own sealing and proof. In [BFO](https://basic-formal-ontology.org/) terms a kernel sits as a `BFO:0000040`-class material entity for the purposes of stable identity and part-of relations: it endures, it has parts (ontology / tool / data), and it can be addressed independently. In [PROV-O](https://www.w3.org/TR/prov-o/) terms a kernel is a `prov:Agent` whose affordances generate `prov:Activity` invocations that mutate `prov:Entity` instances under it, each activity producing a sealed, auditable record. The CKP v3.8 line makes this concrete: kernels live in the pgRDF graph, declare their shape in SHACL, expose verbs over NATS-WSS, and (optionally) carry append-only proof. The discipline lets you describe a real-world or game-world domain as a federation of sovereign-by-design beings rather than a sprawl of tables and endpoints. This repo ships the runtime container that hosts it.
 
 ### A gaming example (one sentence)
 
@@ -145,14 +145,13 @@ docker run --rm -d --name pgck-bench --network ckp-net -p 18001:8000 \
 
 ```
 bundles/                     OCI bundle Dockerfiles + bundle.yaml + s6 service trees
-cmd/                         ociger-pg-launcher, ociger-supervisor, ociger-static-server, ociger-gen
+cmd/                         ociger-pg-launcher, ociger-supervisor, ociger-static-server, ociger-gen,
+                             ociger-pgck-relay
 internal/supervisor/         supervisor profile selection (used by static-cklib only; ck-allinone uses s6)
 scripts/                     build-* and smoke-* per bundle
 .github/workflows/           release pipelines (one per bundle line; all attest via SLSA v1)
 LATEST.md                    auto-rendered head per bundle (attestation-gated; no manual edits)
 PROVENANCE.md                publishing rules + attestation chain
-SPEC.OCI.BUNDLE.v0.3.md      authoritative packaging protocol across the fleet
-SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md   devel/prod track separation
 CONTRIBUTING.CI.md           tag/release flow
 ```
 
@@ -160,27 +159,23 @@ CONTRIBUTING.CI.md           tag/release flow
 
 ## Discipline
 
-The authoritative packaging contract for the fleet is [`SPEC.OCI.BUNDLE.v0.4.md`](./SPEC.OCI.BUNDLE.v0.4.md). Headlines:
+Headlines of the fleet packaging contract:
 
-- **No manual GHCR pushes.** Every published image must carry a verifiable SLSA Build Provenance v1 attestation produced by `Build OCI Bundles` (or its sibling workflows). See [`PROVENANCE.md`](./PROVENANCE.md).
+- **No manual GHCR pushes.** Every published image carries a verifiable SLSA Build Provenance v1 attestation produced by the `Build OCI Bundles` workflow (or its siblings). See [`PROVENANCE.md`](./PROVENANCE.md).
 - **`LATEST.md` is auto-rendered.** It refreshes only after `gh attestation verify` accepts the digest. Manual edits are reverted.
-- **This repo never compiles upstream code** (SPEC v0.4 §6). pg17, pgRDF, pgCK, NATS, CK.Lib.Js, pgck-web, s6-overlay, busybox all arrive pre-built. The only binaries this repo produces are tiny in-tree Go tools.
-- **Prod images are Python-free** (SPEC v0.4 §4.4). `ociger-pgck-bench` is the sole sanctioned home for Python; it runs as a SIBLING to prod images, never embedded (SPEC v0.4 §5).
-- **Prod Shape A composition = Delta** (SPEC v0.4 §1.4): scratch final base, supervised by s6-overlay, web served by busybox httpd or equivalent statically-linked binary. No apt-install to satisfy upstream-binary NEEDED lists (§4.5).
-- **Every image carries `ck.bundle.role` + `ck.bundle.never-prod` manifest labels** (SPEC v0.4 §2.4) so tooling can refuse a `never-prod=true` image into a prod environment.
+- **This repo never compiles upstream code.** pg17, pgRDF, pgCK, NATS, CK.Lib.Js, pgck-web, s6-overlay, busybox all arrive pre-built. The only binaries this repo produces are tiny in-tree Go tools.
+- **Prod images are Python-free.** The CI gate refuses any prod-track image carrying python / uvicorn / fastapi / venv. `ociger-pgck-bench` is the sole sanctioned home for Python and runs as a sibling to prod images, never embedded.
+- **Prod Shape A composition = Delta.** Scratch final base, supervised by s6-overlay, web served by busybox httpd or equivalent statically-linked binary. No apt-install to satisfy upstream-binary NEEDED lists.
+- **Every image carries `ck.bundle.role` and `ck.bundle.never-prod` manifest labels** so tooling can refuse a `never-prod=true` image into a prod environment.
 
 ---
 
 ## References
 
-- CKP v3.8 rc-05 concepts spec — in pgCK (ask the pgCK maintainer for current location)
-- CKP v3.8 rc-10 gamification pitch — in pgCK (same)
 - BFO: <https://basic-formal-ontology.org/>
 - PROV-O: <https://www.w3.org/TR/prov-o/>
 - pgRDF: <https://github.com/styk-tv/pgRDF>
 - pgCK extension + pgck-web: <https://github.com/styk-tv/pgCK>
 - CK.Lib.Js: <https://github.com/ConceptKernel/CK.Lib.Js>
 - Attestation policy: [`PROVENANCE.md`](./PROVENANCE.md)
-- Packaging spec (authoritative): [`SPEC.OCI.BUNDLE.v0.4.md`](./SPEC.OCI.BUNDLE.v0.4.md) (supersedes [v0.3](./SPEC.OCI.BUNDLE.v0.3.md))
-- Devel-vs-prod tracks: [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md)
 - Tag / release flow: [`CONTRIBUTING.CI.md`](./CONTRIBUTING.CI.md)

@@ -72,7 +72,6 @@ LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="v0.7.6"
 LABEL ck.bundle.role="prod"
 LABEL ck.bundle.never-prod="false"
-LABEL ck.spec.index="https://github.com/sporaxis-com/oci-germination/blob/main/SPEC.INDEX.v1.0.md"
 
 # s6-overlay — supervisor + init for the container's services
 COPY --from=s6_extract /s6root/ /

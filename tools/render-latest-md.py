@@ -207,10 +207,10 @@ def verify_attestation(image_ref: str, repo: str) -> bool:
 def get_image_labels(image_ref: str) -> dict[str, str]:
     """Use `docker buildx imagetools inspect` to read manifest labels without pulling the image.
 
-    Per SPEC.OCI.BUNDLE.v0.4 §2.4, every image MUST carry `ck.bundle.role` and
-    `ck.bundle.never-prod`. The renderer surfaces these into the LATEST.md block
-    (§2.5). Returns an empty dict on any error — older images that predate v0.4
-    won't have the labels and render as "—".
+    Every image carries `ck.bundle.role` and `ck.bundle.never-prod` labels;
+    the renderer surfaces these into the LATEST.md block. Returns an empty
+    dict on any error — older images that predate the label contract render
+    those fields as "—".
     """
     try:
         out = subprocess.run(
@@ -300,7 +300,7 @@ def render_bundle_section(
     arm64 = platforms.get("arm64", "_unknown_")
     created_fmt = fmt_ts(created_iso)
 
-    # SPEC.OCI.BUNDLE.v0.4 §2.4/§2.5 — read role + never-prod from manifest labels.
+    # Read role + never-prod from manifest labels (set by each bundle's Dockerfile).
     labels = get_image_labels(image_ref)
     role = labels.get("ck.bundle.role", "—")
     never_prod = labels.get("ck.bundle.never-prod", "—")
@@ -322,7 +322,7 @@ def render_bundle_section(
     lines.append(f"| Pull URI           | `{image_ref}`                                                            |")
     lines.append(f"| Also tagged        | {also}                                                                  |")
     lines.append(f"| Index digest       | `{index_digest}`                                                         |")
-    lines.append(f"| Role               | `{role}` (per SPEC.OCI.BUNDLE.v0.4 §2.4)                                  |")
+    lines.append(f"| Role               | `{role}`                                                                |")
     lines.append(f"| Production use     | {prod_use}                                                              |")
     lines.append(f"| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |")
     lines.append(f"| Source bundle      | [`{bundle_dir}/`](./{bundle_dir}/)                                          |")
@@ -370,7 +370,7 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 - Tagged versions are immutable on GHCR.
 - All bundles are multi-arch manifest lists — pulling by the multi-arch `latest` or `vX.Y.Z` tag resolves to the right platform automatically.
 - From the first attested release forward, every entry on this page ships with a verifiable **SLSA Build Provenance v1** attestation tying it to a specific GitHub Actions workflow run on this repo.
-- See [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md), [`SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md`](./SPEC.OCIGERMI.TRACKS.DEVEL.v1.0.md), and [`PROVENANCE.md`](./PROVENANCE.md) for the full policy.
+- See [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md) and [`PROVENANCE.md`](./PROVENANCE.md) for the full policy.
 """
     sections.append(footer)
 
