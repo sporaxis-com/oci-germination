@@ -35,7 +35,7 @@ BUNDLES = [
     (
         "ociger-ck-allinone",
         "CKP Development Default",
-        "PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI) + CK.Lib.Js mounted at `/cklib/`. Supervisor-orchestrated, scratch base. ⚠️ FastAPI process latent gap — Postgres/pgRDF/pgCK/NATS work; FastAPI dead. Use `static-cklib` (below) for a working web layer.",
+        "PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.",
         "bundles/bundle-ck-allinone",
     ),
     (
@@ -46,8 +46,8 @@ BUNDLES = [
     ),
     (
         "ociger-pg17-pgrdf-pgck-web-cklib",
-        "Standard web bundle (no NATS)",
-        "PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. ⚠️ Same FastAPI latent gap as ck-allinone. Use `static-cklib` for a working web layer.",
+        "Standard web bundle (no NATS) — retired",
+        "Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. Replaced by `static-cklib` for the web layer.",
         "bundles/bundle-pg17-pgrdf-pgck-web-cklib",
     ),
     (
