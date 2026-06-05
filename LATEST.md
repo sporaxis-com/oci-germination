@@ -15,7 +15,7 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 
 ## ociger-ck-allinone — `v0.7.6`
 
-PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + pgckweb (FastAPI) + CK.Lib.Js mounted at `/cklib/`. Supervisor-orchestrated, scratch base. ⚠️ FastAPI process latent gap — Postgres/pgRDF/pgCK/NATS work; FastAPI dead. Use `static-cklib` (below) for a working web layer.
+PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
@@ -55,7 +55,7 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at
 
 ## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.5`
 
-PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. ⚠️ Same FastAPI latent gap as ck-allinone. Use `static-cklib` for a working web layer.
+Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. Replaced by `static-cklib` for the web layer.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
