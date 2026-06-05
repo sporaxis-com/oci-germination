@@ -25,13 +25,18 @@
 # non-prod nature unmistakable on GHCR.
 
 ARG PGCKWEB_VERSION=v0.2.7
+# Build-arg supplied by CI from the git tag; default `dev` keeps local
+# `docker build` invocations clearly distinguished from a release.
+ARG BUNDLE_VERSION=dev
 
 FROM ghcr.io/styk-tv/pgck-web:v0.2.7-${TARGETARCH:-amd64} AS upstream
 
 FROM upstream
+ARG BUNDLE_VERSION
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="Python+FastAPI sibling for benchmarking and dev against a running ck-allinone. NOT for production. Connects to external PG (5432) and NATS WSS (9222) on the same network."
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="bench"
 LABEL ck.bundle.never-prod="true"
 

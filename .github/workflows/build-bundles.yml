@@ -111,6 +111,12 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}
             ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:latest
+          # BUNDLE_VERSION is consumed by each bundle's Dockerfile final
+          # stage to emit an explicit LABEL org.opencontainers.image.version,
+          # overriding whatever the parent FROM image advertises. Prevents
+          # the bundle from misadvertising its parent's version.
+          build-args: |
+            BUNDLE_VERSION=${{ steps.semver.outputs.semantic_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

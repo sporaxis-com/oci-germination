@@ -25,6 +25,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-static-server ./cmd/ociger-static-server
 
 FROM base
+# Build-arg supplied by CI from the git tag; default `dev` keeps local
+# `docker build` invocations clearly distinguished from a release.
+ARG BUNDLE_VERSION=dev
+LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 ENV OCIGER_SUPERVISOR_PROFILE=static
 
 COPY --from=cklib_source / /app/cklib/

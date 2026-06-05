@@ -8,6 +8,9 @@
 ARG PG_BASE_VERSION=v0.1.7
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.3.11
+# Build-arg supplied by CI from the git tag. Default `dev` means a local
+# `docker build` without --build-arg lands a clearly-distinguished image.
+ARG BUNDLE_VERSION=dev
 
 # ─── Stage 1: pg base (pg17 + pgRDF + pgCK + NATS + ociger-pg-launcher) ───
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7 AS pg_base
@@ -66,10 +69,11 @@ RUN set -eux; \
 
 # ─── Final stage: layer everything on pg_base ─────────────────────────────
 FROM pg_base
+ARG BUNDLE_VERSION
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="CKP v3.8 all-in-one minimal — PG17 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.version="v0.7.6"
+LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
 LABEL ck.bundle.never-prod="false"
 
