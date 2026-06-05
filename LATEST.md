@@ -47,7 +47,7 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:99513229cddaebc917b56826983723ccd2a0c5377a87b1827d9a8c309a23bf54`                                                         |
-| Role               | `prod`|
+| Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
@@ -67,7 +67,7 @@ PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distr
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.6.5`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:8a1d0c3044cd5525a2dc4c74d68b89a64850dcbf0a1ef5983bb14c344804c468`                                                         |
-| Role               | `—`|
+| Role               | `—`                                                                |
 | Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
@@ -87,7 +87,7 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:87d1a8ecb5fd3df9fc3e12cc104b0f5afa21746c2ff09506178dc626a0f21d4d`                                                         |
-| Role               | `prod`|
+| Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
@@ -107,7 +107,7 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:809d74fba8bd01ba72656f7f2030caefd7f7579e59efca56c66f10aca6e06d2f`                                                         |
-| Role               | `prod`|
+| Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats/`](./bundles/bundle-pg17-pgrdf-pgck-nats/)                                          |
@@ -127,7 +127,7 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:4cb5433798280f43e6963d3638d9cdb0c9ec5fa3fde546e0ee464fca97383565`                                                         |
-| Role               | `prod`|
+| Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
@@ -147,7 +147,7 @@ PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:f33aa7ba385ea5d2466432aa04c09844378a811d1016eef8529dccd0121da418`                                                         |
-| Role               | `prod`|
+| Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf/`](./bundles/bundle-pg17-pgrdf/)                                          |
@@ -167,7 +167,7 @@ PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.2`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:988e81a04bce15bf255ab19e48987eefd0e77f6791a2c158d48946fc1e3fc7a1`                                                         |
-| Role               | `—`|
+| Role               | `—`                                                                |
 | Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-nats-micro/`](./bundles/core-pg17-nats-micro/)                                          |
@@ -187,7 +187,7 @@ PostgreSQL 17 + NATS + NATS WSS. No extensions. Distroless base.
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.2`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:07e2a997518a87e3a4a9071de8c0dd3a6c55897e20a2862ecbaaf4c05d552e7b`                                                         |
-| Role               | `—`|
+| Role               | `—`                                                                |
 | Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-nats/`](./bundles/core-pg17-nats/)                                          |
@@ -207,7 +207,7 @@ PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bund
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.2`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:25aca368af58b68d7f07cb837a43f8a20e5b0efff0a5ba5cde5047ae1ccfab11`                                                         |
-| Role               | `—`|
+| Role               | `—`                                                                |
 | Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-micro/`](./bundles/core-pg17-micro/)                                          |
@@ -227,7 +227,7 @@ PostgreSQL 17 only. Distroless base (shell + libc available).
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.3`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:e68908d1e6fbefd2c2723670e96f98a6f0faaecf26cd5858e8ada52bb5af6dc5`                                                         |
-| Role               | `—`|
+| Role               | `—`                                                                |
 | Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17/`](./bundles/core-pg17/)                                          |
