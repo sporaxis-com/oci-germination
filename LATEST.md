@@ -79,16 +79,16 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:386dbcba72a294ee652983581cb8bc5fe2e1fac0aa028badc8e9944de9a6eb9a`  | 2026-05-31 18:43:46 |
-| arm64 | `sha256:3b5ce7e24c6962002ddec6d5746e6bbc23fa51eef298872b7e38332af680e52a`  | 2026-05-31 18:43:46 |
+| amd64 | `_unknown_`  | 2026-05-31 18:43:46 |
+| arm64 | `_unknown_`  | 2026-05-31 18:43:46 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:87d1a8ecb5fd3df9fc3e12cc104b0f5afa21746c2ff09506178dc626a0f21d4d`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
+| Role               | `—`                                                                |
+| Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
@@ -99,8 +99,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:97a6d5201ffb14a3bcce6583c475bd7e16c637f040df2bd338397a627ed4263d`  | 2026-05-31 18:43:19 |
-| arm64 | `sha256:79ef0e0a7d06841f25648dd26bee6afaabf1c7fb5f4c08d7699994e4f51b4024`  | 2026-05-31 18:43:19 |
+| amd64 | `_unknown_`  | 2026-05-31 18:43:19 |
+| arm64 | `_unknown_`  | 2026-05-31 18:43:19 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
