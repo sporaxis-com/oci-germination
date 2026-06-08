@@ -87,8 +87,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:87d1a8ecb5fd3df9fc3e12cc104b0f5afa21746c2ff09506178dc626a0f21d4d`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
+| Role               | `prod`                                                                |
+| Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
