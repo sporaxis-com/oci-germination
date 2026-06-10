@@ -7,7 +7,7 @@
 
 ARG PG_BASE_VERSION=v0.1.7
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.3.11
+ARG CKLIB_VERSION=1.4.0
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
@@ -16,7 +16,10 @@ ARG BUNDLE_VERSION=dev
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-FROM ghcr.io/conceptkernel/ck-lib-js:1.3.11 AS cklib_source
+# Bumped to 1.4.0 as the immediate intermediary so web2/ can develop today
+# against the latest-shipped attested cklib. Re-bump to 1.5.0 the moment
+# CK.Lib.Js fires EI-P-1 (the dispatch-only / RDF-removed surface).
+FROM ghcr.io/conceptkernel/ck-lib-js:1.4.0 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
