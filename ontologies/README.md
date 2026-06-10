@@ -13,7 +13,7 @@ Current policy:
 
 Import source used for the current snapshot:
 
-- Local checkout: `/Users/neoxr/git_conceptkernel/pgCK/ontology/core.ttl`
+- Upstream: `https://github.com/styk-tv/pgCK/blob/main/ontology/core.ttl`
 - Imported on: `2026-05-25`
 
 ## Fixture Table
