@@ -1,9 +1,9 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.8
+version: v0.7.9
 role: prod
 never_prod: false
-description: CKP v3.9 Critical Isolation Alpha — PostgreSQL 17 + pgRDF 0.5.40 + pgCK 0.3.3 (Track A role-floor + Track B sealed registry + Track C plan compiler) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.0, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
+description: CKP v3.9 Critical Isolation Alpha — PostgreSQL 17 + pgRDF 0.5.41 + pgCK 0.3.4 (Track A role-floor + Track B sealed registry + Track C plan compiler + Track D governance plane) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.1 (Stripped Alpha cut, attested 2026-06-10), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
@@ -25,11 +25,11 @@ extensions:
     source: https://www.postgresql.org/docs/17/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.5.40
+    version: 0.5.41
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.3.3
+    version: 0.3.4
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,10 +46,10 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.4.0
+    version: 1.4.1
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
-    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. Intermediary cut; next bump targets cklib 1.5.0 (dispatch-only L2 facade, RDF removed) on CK.Lib.Js EI-P-1 ship.
+    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.4.1 "Stripped Alpha" — the CK.Lib.Js half of CKP v3.9 Critical Isolation Alpha (SLSA-attested 2026-06-10). Bundle bytes byte-identical to 1.4.0; file-level RDF surface excise (ck-rdf-bridge.js, ck-hex-store.js) is forward work on the v1.5.0 line. Next bump targets v1.5.0 (dispatch-only L2 facade, RDF removed) when CK.Lib.Js ships it.
   nats-server:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server
@@ -65,11 +65,11 @@ components:
     version: in-tree
     role: shim
     source: ./cmd/ociger-pgck-relay
-    shims_for: pgck@0.2.2
+    shims_for: pgck@0.3.x (nats-client Cargo feature OFF through Track D; not a v0.4.0 gate)
     notify_ref: pgck/publish-nats-client-feature-build
-    retire_probe: /usr/lib/postgresql/17/lib/pgck.so contains 'input.kernel.pgCK.action'
+    retire_probe: pgck.so contains BOTH 'RELAY_OUT_PREFIX' AND 'async_nats::' (multi-marker conjunction; ratified with pgCK upstream 2026-06-10)
     opt_out_env: OCIGER_DISABLE_PGCK_RELAY=1
-    description: Bus-level relay (input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>) covering the compiled-out nats-client path in pgCK 0.2.2.
+    description: Bus-level relay (input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>) covering the compiled-out nats-client path in pgCK 0.3.x.
 
 supervisor:
   binary: s6-overlay v3.2.3.0

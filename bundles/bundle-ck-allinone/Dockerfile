@@ -5,25 +5,28 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.8
+ARG PG_BASE_VERSION=v0.1.9
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.4.0
+ARG CKLIB_VERSION=1.4.1
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.5.40 + pgCK 0.3.3 + NATS + ociger-pg-launcher) ───
-# v0.1.8 brings pgCK v0.3.3 (Track A role-floor + Track B sealed registry + Track C
-# plan compiler) and pgRDF v0.5.40 (TA-6 dict-path for quad streams). The CI-A roles
+# ─── Stage 1: pg base (pg17 + pgRDF 0.5.41 + pgCK 0.3.4 + NATS + ociger-pg-launcher) ───
+# v0.1.9 brings pgCK v0.3.4 (Track A role-floor + Track B sealed registry + Track C
+# plan compiler + Track D governance plane: Proposal → Vote → Apply for type changes)
+# and pgRDF v0.5.41 (TA-5 verbose-ingest path field). The CI-A roles
 # (ck_substrate / ck_participant) land automatically as a side-effect of CREATE
 # EXTENSION pgck CASCADE in init.sql.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.8 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.9 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# Bumped to 1.4.0 as the immediate intermediary so web2/ can develop today
-# against the latest-shipped attested cklib. Re-bump to 1.5.0 the moment
-# CK.Lib.Js fires EI-P-1 (the dispatch-only / RDF-removed surface).
-FROM ghcr.io/conceptkernel/ck-lib-js:1.4.0 AS cklib_source
+# Bumped to 1.4.1 — the CK.Lib.Js half of CKP v3.9 Critical Isolation Alpha
+# (the "Stripped Alpha" cut, attested 2026-06-10 22:11 UTC). The bundle bytes
+# are byte-identical to 1.4.0 at this tag; the file-level RDF surface excise
+# is forward work on the v1.5.0 line. We bump anyway because 1.4.1 is the
+# version anchor for the alpha narrative and carries its own SLSA attestation.
+FROM ghcr.io/conceptkernel/ck-lib-js:1.4.1 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
