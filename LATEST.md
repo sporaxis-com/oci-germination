@@ -39,8 +39,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `_unknown_`  | 2026-05-31 18:41:52 |
-| arm64 | `_unknown_`  | 2026-05-31 18:41:52 |
+| amd64 | `sha256:1cb141a8196013c3bc476f804e87afdbfc677cc2bf154b727baf3357d7a793c4`  | 2026-05-31 18:41:52 |
+| arm64 | `sha256:632f8660a066a9f4e4168baf4b56e07a286ae0a72f44119c04b3669aad676b92`  | 2026-05-31 18:41:52 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
@@ -87,8 +87,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:87d1a8ecb5fd3df9fc3e12cc104b0f5afa21746c2ff09506178dc626a0f21d4d`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
+| Role               | `—`                                                                |
+| Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
@@ -159,8 +159,8 @@ PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `_unknown_`  | 2026-05-28 19:00:27 |
-| arm64 | `_unknown_`  | 2026-05-28 19:00:27 |
+| amd64 | `sha256:d6fda67f4b21be6ced4e91a96b960b3e2a3b0f65fc1e5849af89f72d2a3b9e31`  | 2026-05-28 19:00:27 |
+| arm64 | `sha256:277f68b09d1150bfcf1f9aea6e0e00f6c2f2079b35db6091903400928a976253`  | 2026-05-28 19:00:27 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
@@ -219,8 +219,8 @@ PostgreSQL 17 only. Distroless base (shell + libc available).
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `_unknown_`  | 2026-05-28 18:59:54 |
-| arm64 | `_unknown_`  | 2026-05-28 18:59:54 |
+| amd64 | `sha256:d81998763e41a04603eb1235ab1c13bd1cb0b355e8ab4ed84e345bc40c7c877a`  | 2026-05-28 18:59:54 |
+| arm64 | `sha256:858a43bad4089840976c9720815f7c9667347ad210edeb10ff020659cbc4d813`  | 2026-05-28 18:59:54 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
