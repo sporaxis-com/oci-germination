@@ -58,6 +58,15 @@ func main() {
 			"--encoding=UTF8",
 		)
 		appendFile(filepath.Join(pgData, "postgresql.conf"), "listen_addresses='*'\nunix_socket_directories='/var/run/postgresql'\n")
+		// OCIGER_CK_PARTICIPANT_HBA: when set to a non-empty value, prepend a
+		// per-role pg_hba.conf line for ck_participant requiring scram-sha-256
+		// BEFORE the catch-all `host all all all trust`. pg_hba is first-match
+		// wins, so the order matters: ck_participant must be matched by the
+		// scram rule, not the trust catch-all. Without this env, the launcher
+		// behaves exactly as v0.1.7 (trust everyone — dev-mode).
+		if os.Getenv("OCIGER_CK_PARTICIPANT_HBA") != "" {
+			appendFile(filepath.Join(pgData, "pg_hba.conf"), "host all ck_participant 0.0.0.0/0 scram-sha-256\n")
+		}
 		appendFile(filepath.Join(pgData, "pg_hba.conf"), "host all all all trust\n")
 		// OCIGER_POSTGRES_CONF_EXTRA: any extra postgresql.conf lines a bundle
 		// wants baked in at first initdb. ck-allinone uses this to set
@@ -79,7 +88,22 @@ func main() {
 			if err != nil {
 				log.Fatalf("OCIGER_INITDB_SQL_FILE %q: %v", sqlFile, err)
 			}
-			runAsPostgresStdin(runUID, runGID, string(sql),
+			sqlStr := string(sql)
+			// OCIGER_CK_PARTICIPANT_PASSWORD: when set, append an ALTER ROLE
+			// statement to the bootstrap SQL so ck_participant becomes a login
+			// role with a scram-sha-256 password. Required for the v3.9 Critical
+			// Isolation Alpha; without it, ck_participant exists but cannot log
+			// in. The password is single-quote-escaped before embedding. If
+			// unset, we log a warning (the bundle README says deploys MUST set
+			// it before external exposure).
+			if pwd := os.Getenv("OCIGER_CK_PARTICIPANT_PASSWORD"); pwd != "" {
+				quoted := strings.ReplaceAll(pwd, "'", "''")
+				sqlStr += fmt.Sprintf("\nALTER ROLE ck_participant WITH LOGIN PASSWORD '%s';\n", quoted)
+				log.Println("ociger-pg-launcher: ck_participant configured with deploy-supplied password")
+			} else if os.Getenv("OCIGER_CK_PARTICIPANT_HBA") != "" {
+				log.Println("ociger-pg-launcher: WARNING — OCIGER_CK_PARTICIPANT_HBA set but OCIGER_CK_PARTICIPANT_PASSWORD unset; ck_participant cannot log in until you set it")
+			}
+			runAsPostgresStdin(runUID, runGID, sqlStr,
 				bin("postgres"), "--single", "-D", pgData, "postgres")
 		}
 	}

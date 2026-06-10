@@ -17,9 +17,9 @@ image:
   runtime_profile: micro
 extensions:
   pgrdf:
-    version: 0.5.28
+    version: 0.5.40
   pgck:
-    version: 0.2.2
+    version: 0.3.3
 platforms:
   - linux/amd64
   - linux/arm64

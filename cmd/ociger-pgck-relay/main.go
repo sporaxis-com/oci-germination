@@ -17,8 +17,19 @@
 //
 //   1. env OCIGER_DISABLE_PGCK_RELAY=1 → block forever, never connect.
 //   2. boot probe: if /usr/lib/postgresql/17/lib/pgck.so contains
-//      the literal string "input.kernel.pgCK.action" we assume the
-//      upstream relay code is in the binary and stand down.
+//      BOTH "RELAY_OUT_PREFIX" AND "async_nats::" — the discriminating
+//      conjunction of (a) the relay-code constant from
+//      src/nats_client.rs and (b) any reachable symbol from the
+//      async_nats Rust crate — we assume the upstream `nats-client`
+//      Cargo feature is compiled in and stand down.
+//
+// The single-string probe used in v0.7.5–v0.7.7 was a false-positive
+// against pgCK v0.3.x (the registry seed and SQL comments contain the
+// literal `input.kernel.pgCK.action` without any relay code present).
+// The two-marker conjunction discriminates "feature compiled in" from
+// "feature off" because either marker alone could appear in unrelated
+// text; ratified with pgCK on 2026-06-10 (the markers will be present
+// in any natural Rust release build with the feature enabled).
 //
 // Standing down means "park as a no-op longrun" rather than exit so
 // s6 doesn't restart-loop us.
@@ -42,7 +53,11 @@ const (
 	relayInPrefix  = "input.kernel.pgCK.action."
 	relayOutPrefix = "event.kernel.pgCK."
 	pgckSoPath     = "/usr/lib/postgresql/17/lib/pgck.so"
-	probeMarker    = "input.kernel.pgCK.action"
+	// The two markers conjoined make the retire-condition discriminating:
+	// either alone can appear in unrelated source/SQL text; the BOTH-present
+	// case is the upstream nats-client feature build.
+	probeMarkerRelay = "RELAY_OUT_PREFIX"
+	probeMarkerAsync = "async_nats::"
 )
 
 func main() {
@@ -55,7 +70,7 @@ func main() {
 	}
 
 	if pgckHasRelayCode(pgckSoPath) {
-		log.Printf("%s contains %q — assuming upstream nats-client build is live; standing down", pgckSoPath, probeMarker)
+		log.Printf("%s contains both %q and %q — upstream nats-client build is live; standing down", pgckSoPath, probeMarkerRelay, probeMarkerAsync)
 		park()
 	}
 
@@ -105,14 +120,22 @@ func main() {
 	log.Println("shutting down")
 }
 
-// pgckHasRelayCode reads the extension .so and looks for the wire
-// constant only the upstream nats-client build embeds.
+// pgckHasRelayCode reads the extension .so and returns true only when
+// BOTH discriminating markers are present: the relay-code constant
+// (RELAY_OUT_PREFIX, from src/nats_client.rs — always lives in .rodata
+// because it's a `const &str`) AND a symbol from the async-nats crate
+// path (async_nats:: — appears in the binary symbol table from any
+// reachable call). Either alone can appear incidentally in SQL
+// comments or unrelated source text; the conjunction discriminates
+// "feature compiled in" from "feature off". Verified against pgCK
+// v0.3.3 (both markers absent → shim runs, correct).
 func pgckHasRelayCode(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	return bytes.Contains(data, []byte(probeMarker))
+	return bytes.Contains(data, []byte(probeMarkerRelay)) &&
+		bytes.Contains(data, []byte(probeMarkerAsync))
 }
 
 func park() {

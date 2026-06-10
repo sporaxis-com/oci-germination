@@ -5,15 +5,19 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.7
+ARG PG_BASE_VERSION=v0.1.8
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.4.0
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF + pgCK + NATS + ociger-pg-launcher) ───
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.7 AS pg_base
+# ─── Stage 1: pg base (pg17 + pgRDF 0.5.40 + pgCK 0.3.3 + NATS + ociger-pg-launcher) ───
+# v0.1.8 brings pgCK v0.3.3 (Track A role-floor + Track B sealed registry + Track C
+# plan compiler) and pgRDF v0.5.40 (TA-6 dict-path for quad streams). The CI-A roles
+# (ck_substrate / ck_participant) land automatically as a side-effect of CREATE
+# EXTENSION pgck CASCADE in init.sql.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.8 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # Bumped to 1.4.0 as the immediate intermediary so web2/ can develop today
@@ -109,6 +113,13 @@ ENV PGDATA=/var/lib/postgresql/data
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
 ENV OCIGER_POSTGRES_CONF_EXTRA="pgck.nats_url='nats://127.0.0.1:4222'"
 ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
+# v3.9 Critical Isolation Alpha — opt the bundle into the role floor:
+# the launcher appends `host all ck_participant 0.0.0.0/0 scram-sha-256`
+# to pg_hba.conf on first initdb. Deploys MUST set
+# OCIGER_CK_PARTICIPANT_PASSWORD before external exposure; without it,
+# ck_participant exists but cannot log in (no default password — a default
+# would make the role floor cosmetic per pgCK v3.9 §7).
+ENV OCIGER_CK_PARTICIPANT_HBA=1
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1
