@@ -13,23 +13,14 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — `v0.7.14`
+## ociger-ck-allinone — *no attested release yet*
 
 PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.
 
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:3fec3f410418d21aeaef9363699a11e4bf2f7fb516e9f16b0279e61dfcce3de1`  | 2026-06-11 15:14:39 |
-| arm64 | `sha256:b9f6e715e8712d9c3dd55e4cabdc2249ff05fc43780172310ef3d098b6c4dda1`  | 2026-06-11 15:14:39 |
+> Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, `LATEST.md` does not advertise unattested releases. The most recent GHCR tag for this bundle does not carry a SLSA Build Provenance v1 attestation (yet). This block will populate when the next release crosses the attestation gate.
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.14`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:85475218c60ad4bd70a23d107f9d380360c64dee356cc99e258044dd9198a8de`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
