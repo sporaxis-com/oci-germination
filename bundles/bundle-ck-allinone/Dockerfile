@@ -121,6 +121,14 @@ COPY --from=pglauncher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-la
 # Bootstrap SQL — piped through `postgres --single` by the launcher on first boot.
 COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 
+# pgCK ontology fixtures vendored from styk-tv/pgCK at the matching release.
+# pgCK 0.4.1's ckp.import_module(<module>, <project>) reads `/ontology/<module>.ttl`
+# but the installed extension package does NOT ship these fixtures. Without them,
+# every kernel-bootstrap dispatch fails with `could not open file "/ontology/X.ttl"`.
+# The bundle vendors them so the dispatch path works without external setup. See
+# bundles/bundle-ck-allinone/ontologies/README.md for license + upstream context.
+COPY bundles/bundle-ck-allinone/ontologies/ /ontology/
+
 # Bus-level dispatcher shim (CHECKLIST §B4). Self-disables when upstream
 # pgck.so embeds the relay strings; opt-out via OCIGER_DISABLE_PGCK_RELAY=1.
 COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay

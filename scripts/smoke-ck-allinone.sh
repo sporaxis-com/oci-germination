@@ -285,11 +285,14 @@ echo "[ck-allinone] ②d pgCK 'demo' kernel bootstrap via vendored ontology fixt
 # Without this step the per-verb seal handlers would fail with `could not open
 # file "/ontology/task.ttl"` — see bundles/bundle-ck-allinone/ontologies/
 # README.md for the upstream gap that motivates the vendoring.
-$PSQL -c "CALL ckp.import_module('task', 'demo', '/ontology');" >/dev/null 2>&1
-$PSQL -c "CALL ckp.import_module('goal', 'demo', '/ontology');" >/dev/null 2>&1
+IMPORT_TASK_OUT=$($PSQL -c "CALL ckp.import_module('task', 'demo', '/ontology');" 2>&1) || true
+IMPORT_GOAL_OUT=$($PSQL -c "CALL ckp.import_module('goal', 'demo', '/ontology');" 2>&1) || true
 DEMO_KERNEL_BOOTED=$($PSQL -c "SELECT (SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri LIKE 'urn:ckp:demo%') > 0;" 2>&1 | tr -d ' ')
 if [[ "$DEMO_KERNEL_BOOTED" != "t" ]]; then
-  echo "✗ pgCK kernel bootstrap failed: demo kernel graphs absent (import_module didn't fire; check /ontology/{task,goal}.ttl)"
+  echo "✗ pgCK kernel bootstrap failed: demo kernel graphs absent"
+  echo "   import task said: $IMPORT_TASK_OUT"
+  echo "   import goal said: $IMPORT_GOAL_OUT"
+  echo "   (most likely /ontology/{task,goal}.ttl missing from the image — check the Dockerfile COPY)"
   exit 1
 fi
 echo "[ck-allinone] ✓ demo kernel bootstrapped via ckp.import_module(task, demo) + (goal, demo)"

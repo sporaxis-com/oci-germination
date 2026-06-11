@@ -145,6 +145,24 @@ func main() {
 
 // handleMsg parses the inbound subject, calls ckp.dispatch, and
 // publishes the typed reply.
+//
+// pgCK 0.3.x..0.4.x ships TWO `ckp.dispatch` overloads:
+//
+//   ckp.dispatch(verb text, payload jsonb)                                 — the GOVERNED 2-arg
+//   ckp.dispatch(verb text, kernel_urn text, payload jsonb, identity text) — the CI-A-2 STUB
+//
+// The 2-arg form runs the per-verb seal handlers and returns a sealed
+// instance + proof_digest on success. The 4-arg form is a CI-A-2 stub
+// that returns `{"ok":false,"error":"verb not governed yet (CI-B)",…}`
+// for every verb — useful for the role-floor probe, useless for a real
+// relay. v0.7.11..v0.7.13 called the 4-arg form by mistake, which
+// CK.Lib.Js verify-v150 caught with the not-governed reply. v0.7.14+
+// calls the 2-arg form — the one that actually seals.
+//
+// We retain the kernelName + identity locally for trace context but they
+// no longer go into the dispatch call. pgCK reads project/identity from
+// session GUCs (when seal-handlers want them); when they're absent the
+// 2-arg path still seals against the default kernel substrate.
 func handleMsg(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn, m *nats.Msg) {
 	// Subject: input.kernel.<K>.action.<verb…>
 	// Split off the first 4 tokens; the rest is the verb (which may
@@ -156,13 +174,6 @@ func handleMsg(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn, m *nats.M
 	}
 	kernelName := parts[2]
 	verb := parts[4]
-	kernelURN := "ckp://Kernel#" + kernelName
-
-	// Identity from inbound header (optional); empty otherwise.
-	identity := ""
-	if m.Header != nil {
-		identity = m.Header.Get("X-Identity-Key")
-	}
 
 	// payload defaults to '{}' if the inbound is empty so the jsonb cast holds.
 	payload := string(m.Data)
@@ -170,12 +181,14 @@ func handleMsg(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn, m *nats.M
 		payload = "{}"
 	}
 
-	// SELECT ckp.dispatch(verb, kernel_urn, payload::jsonb, identity)::text
-	// — the cast to text gives us the raw JSON bytes.
+	// Call the GOVERNED 2-arg dispatch — `SELECT ckp.dispatch($verb::text,
+	// $payload::jsonb)::text`. pgCK seals against the payload's own
+	// kernel/target_kernel field per the per-verb handlers in
+	// pgck--0.4.x.sql.
 	var resultBytes []byte
 	row := pool.QueryRow(ctx,
-		"SELECT ckp.dispatch($1::text, $2::text, $3::jsonb, $4::text)::text",
-		verb, kernelURN, payload, identity)
+		"SELECT ckp.dispatch($1::text, $2::jsonb)::text",
+		verb, payload)
 	if err := row.Scan(&resultBytes); err != nil {
 		log.Printf("dispatch %s on %s failed: %v", verb, kernelName, err)
 		resultBytes = encodeError(err.Error())

@@ -97,24 +97,23 @@ jobs:
           echo "semantic_version=$SEMANTIC_VERSION" >> $GITHUB_OUTPUT
           echo "Semantic version: $SEMANTIC_VERSION (bundle=$BUNDLE, base=$BASE_VERSION)"
 
-      - name: Build and push to GHCR
-        id: push
+      # GATE-BEFORE-PUSH (since the v0.7.15 incident): build the native-arch
+      # image locally FIRST, run every gate (Python-free, smoke) against it,
+      # and only then build+push the multi-arch manifest. The previous order
+      # (push, then gate) left an unattested :latest on GHCR whenever a gate
+      # failed after the push — v0.7.15 shipped that way and had to be
+      # superseded. The gha layer cache makes the second build nearly free
+      # for the native arch; only the cross-arch half builds after the gates.
+      - name: Build native image for gating (no push)
+        id: build_local
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ${{ steps.extract.outputs.dockerfile }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          # Each release moves :latest forward on the production image
-          # name. Devel-track images (when the -devel image name lands)
-          # will move their own :latest independently.
+          push: false
+          load: true
           tags: |
-            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}
-            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:latest
-          # BUNDLE_VERSION is consumed by each bundle's Dockerfile final
-          # stage to emit an explicit LABEL org.opencontainers.image.version,
-          # overriding whatever the parent FROM image advertises. Prevents
-          # the bundle from misadvertising its parent's version.
+            ociger-${{ steps.extract.outputs.bundle }}:ci-gate
           build-args: |
             BUNDLE_VERSION=${{ steps.semver.outputs.semantic_version }}
           cache-from: type=gha
@@ -127,7 +126,7 @@ jobs:
         if: ${{ steps.extract.outputs.bundle != 'pgck-bench' }}
         run: |
           set -euo pipefail
-          IMAGE="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          IMAGE="ociger-${{ steps.extract.outputs.bundle }}:ci-gate"
           echo "Checking $IMAGE for Python/FastAPI/uvicorn/venv traces..."
           # busybox find inside the image; image MAY not have its own busybox,
           # so use a sidecar runner.
@@ -155,9 +154,36 @@ jobs:
         if: ${{ steps.extract.outputs.bundle == 'ck-allinone' }}
         run: |
           set -euo pipefail
-          IMAGE="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}"
+          IMAGE="ociger-${{ steps.extract.outputs.bundle }}:ci-gate"
           echo "Smoking $IMAGE …"
           bash scripts/smoke-ck-allinone.sh "$IMAGE"
+
+      # All gates green — NOW build + push the multi-arch manifest. The
+      # native-arch layers come straight from the gha cache populated by
+      # the gating build; only the cross-arch half builds here. A gate
+      # failure above means nothing was pushed and :latest never moved.
+      - name: Build and push to GHCR (post-gate)
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ steps.extract.outputs.dockerfile }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          # Each release moves :latest forward on the production image
+          # name. Devel-track images (when the -devel image name lands)
+          # will move their own :latest independently.
+          tags: |
+            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }}
+            ${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:latest
+          # BUNDLE_VERSION is consumed by each bundle's Dockerfile final
+          # stage to emit an explicit LABEL org.opencontainers.image.version,
+          # overriding whatever the parent FROM image advertises. Prevents
+          # the bundle from misadvertising its parent's version.
+          build-args: |
+            BUNDLE_VERSION=${{ steps.semver.outputs.semantic_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio
       # CA via the Sigstore keyless flow. The attestation is pushed to
