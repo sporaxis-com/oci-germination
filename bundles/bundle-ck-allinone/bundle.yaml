@@ -1,9 +1,9 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.12
+version: v0.7.17
 role: prod
 never_prod: false
-description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.5.43 + pgCK 0.4.1 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.2 (Air-gapped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL ckp.dispatch(verb, kernel_urn, payload, identity) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."
+description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.6.0 + pgCK 0.4.2 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.3 (byte-verified stripped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL the GOVERNED 2-arg ckp.dispatch(verb, payload) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
@@ -15,7 +15,7 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 17
   base_image: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
-  base_image_version: v0.1.7
+  base_image_version: v0.1.12
   final_image: scratch
   runtime_profile: micro
 
@@ -25,11 +25,11 @@ extensions:
     source: https://www.postgresql.org/docs/17/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.5.43
+    version: 0.6.0
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.4.1
+    version: 0.4.2
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,7 +46,7 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.4.2
+    version: 1.4.3
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
     description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.4.2 "Air-gapped" — requested explicitly by CK.Lib.Js for the bundled all-in-one (SLSA-attested 2026-06-10 22:27 UTC). OCI bundle file set is byte-identical to 1.4.1 and 1.4.0 (verified empirically); the vendoring claim applies to the npm package, not the OCI bundle. File-level RDF surface excise + L2 facade remain forward work on the v1.5.0 line.

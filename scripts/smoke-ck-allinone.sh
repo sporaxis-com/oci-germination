@@ -13,9 +13,14 @@ CONTAINER_NAME="ociger-ck-allinone-smoke"
 NETWORK_NAME="ociger-ck-allinone-net"
 DATA_DIR=".artifacts/ociger-ck-allinone-smoke/pgdata"
 
-EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.5.43}"
-EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.1}"
-EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.1 (rc3)}"
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
+EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.2}"
+EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
+# cklib 1.4.3+ byte-set contract (adopted by both sides of the cklib-stale
+# thread): /app/cklib MUST contain EXACTLY this file set — the attested
+# stripped bundle, nothing more, nothing less. Bump together with
+# CKLIB_VERSION in the Dockerfile.
+EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE README.md ck-client.js vendor/msgpack.js vendor/nats.ws.js}"
 EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.11}"
 
 echo "════════════════════════════════════════════════════════════"
@@ -179,19 +184,34 @@ else
   exit 1
 fi
 
-echo "[ck-allinone] ⑤ busybox httpd serves /cklib/ on :8000"
-INDEX_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/")
-if [[ "$INDEX_STATUS" != "200" ]]; then
-  echo "✗ httpd /cklib/ returned $INDEX_STATUS"
+echo "[ck-allinone] ⑤ busybox httpd serves the cklib client on :8000"
+# cklib 1.4.3+ ships NO index.html (the stripped set), so the gate is the
+# client entrypoint + the vendored transport deps, each 200.
+for asset in ck-client.js vendor/nats.ws.js vendor/msgpack.js; do
+  STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/${asset}")
+  if [[ "$STATUS" != "200" ]]; then
+    echo "✗ httpd /cklib/${asset} returned $STATUS"
+    exit 1
+  fi
+done
+echo "[ck-allinone] ✓ /cklib/ck-client.js + vendor/{nats.ws,msgpack}.js all 200"
+
+echo "[ck-allinone] ⑤± cklib byte-set gate — /app/cklib is EXACTLY the attested stripped bundle"
+# The packaging contract from the cklib-stale thread: every file under
+# /app/cklib must come from the attested ck-lib-js bundle, and the attested
+# bundle's whole file set must be present. Surplus files (e.g. the pre-strip
+# RDF tier reappearing) or missing files both fail. Compare sorted listings.
+# The image's busybox is a single static binary without applet symlinks, so
+# call the find applet explicitly and normalize host-side.
+ACTUAL_CKLIB_FILES=$(docker exec "$CONTAINER_NAME" /bin/busybox find /app/cklib -type f | sed 's|^/app/cklib/||' | sort | tr '\n' ' ' | sed 's/ $//')
+EXPECTED_SORTED=$(echo "$EXPECTED_CKLIB_FILES" | tr ' ' '\n' | sort | tr '\n' ' ' | sed 's/ $//')
+if [[ "$ACTUAL_CKLIB_FILES" != "$EXPECTED_SORTED" ]]; then
+  echo "✗ cklib byte-set mismatch (stale/pre-strip surface or missing files)"
+  echo "   expected: $EXPECTED_SORTED"
+  echo "   actual:   $ACTUAL_CKLIB_FILES"
   exit 1
 fi
-# Confirm a specific cklib JS asset is served
-JS_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/ck-client.js")
-if [[ "$JS_STATUS" != "200" ]]; then
-  echo "✗ httpd /cklib/ck-client.js returned $JS_STATUS"
-  exit 1
-fi
-echo "[ck-allinone] ✓ /cklib/index.html=200, /cklib/ck-client.js=200"
+echo "[ck-allinone] ✓ /app/cklib byte-set matches the attested stripped bundle ($EXPECTED_SORTED)"
 
 echo "[ck-allinone] ⑤+ reserved web surfaces — /web/, /web2/, /wss/ all served"
 # Every advertised surface MUST be present + served. A missing path silently
@@ -276,26 +296,32 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ②d pgCK 'demo' kernel bootstrap via vendored ontology fixtures"
-# v0.7.14+ : assert the vendored /ontology/<module>.ttl fixtures resolve via
-# ckp.import_module. pgCK 0.4.1's task.create resolver currently looks up the
-# 'demo' project regardless of the payload's target_kernel — so the smoke uses
-# 'demo' as the bootstrap project. When pgCK generalizes the lookup so any
-# target_kernel works, this smoke can switch to a unique per-run kernel name.
-# Without this step the per-verb seal handlers would fail with `could not open
-# file "/ontology/task.ttl"` — see bundles/bundle-ck-allinone/ontologies/
-# README.md for the upstream gap that motivates the vendoring.
-IMPORT_TASK_OUT=$($PSQL -c "CALL ckp.import_module('task', 'demo', '/ontology');" 2>&1) || true
-IMPORT_GOAL_OUT=$($PSQL -c "CALL ckp.import_module('goal', 'demo', '/ontology');" 2>&1) || true
+echo "[ck-allinone] ②d 'demo' board armed at FIRST BOOT (init.sql import_module from artifact-shipped /ontology)"
+# v0.7.17+ : init.sql arms the demo project board itself (CALL ckp.import_module
+# × 2 from the /ontology the pgCK 0.4.2 artifact ships). The smoke asserts the
+# arming HAPPENED at boot — no smoke-side CALL — so the gate proves the bundle
+# dispatches out of the box with zero manual steps, the pgCK s34 posture.
 DEMO_KERNEL_BOOTED=$($PSQL -c "SELECT (SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri LIKE 'urn:ckp:demo%') > 0;" 2>&1 | tr -d ' ')
 if [[ "$DEMO_KERNEL_BOOTED" != "t" ]]; then
-  echo "✗ pgCK kernel bootstrap failed: demo kernel graphs absent"
-  echo "   import task said: $IMPORT_TASK_OUT"
-  echo "   import goal said: $IMPORT_GOAL_OUT"
-  echo "   (most likely /ontology/{task,goal}.ttl missing from the image — check the Dockerfile COPY)"
+  echo "✗ demo board not armed at first boot — init.sql import_module didn't run or /ontology fixtures missing from pg_base"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'import_module|ontology|ERROR' | head -5
   exit 1
 fi
-echo "[ck-allinone] ✓ demo kernel bootstrapped via ckp.import_module(task, demo) + (goal, demo)"
+echo "[ck-allinone] ✓ demo board armed at first boot (graphs present, no smoke-side CALL needed)"
+
+echo "[ck-allinone] ②e v3.9 floor — ck_participant reaches NOTHING beyond ckp.dispatch"
+# The Critical Isolation contract (SPEC.CKP.v3.9 §7 / P8): participant
+# credentials confer dispatch, nothing more. In particular NO reach into
+# schema pgrdf — the v0.7.14..v0.7.16 init.sql granted pgrdf to
+# ck_participant as a workaround for a pgCK 0.4.1 install gap; pgCK 0.4.2
+# removed the need and flagged the grant as a floor breach. This gate makes
+# the breach class unshippable.
+PART_PGRDF=$($PSQL -c "SELECT has_schema_privilege('ck_participant','pgrdf','USAGE');" 2>&1 | tr -d ' ')
+if [[ "$PART_PGRDF" != "f" ]]; then
+  echo "✗ v3.9 floor breach: ck_participant has USAGE on schema pgrdf (must be f)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ floor intact: ck_participant has no pgrdf reach"
 
 echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + GOVERNED seal (semantic pass: ok=true + proof_digest)"
 # v0.7.14+ : the round-trip asserts not just envelope shape but envelope

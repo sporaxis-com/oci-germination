@@ -22,12 +22,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.5.43-pg17-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.0-pg17-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.5.43-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.0-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.5.43.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.0.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -35,10 +35,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.1-pg17-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.2-pg17-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.1.sql
+  test -s /work/share/extension/pgck--0.4.2.sql; \
+  test -s /work/ontology/task.ttl; \
+  test -s /work/ontology/goal.ttl
 
 
 FROM nats:2.14.1-scratch AS nats_source
@@ -82,6 +84,11 @@ COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/17/exten
 
 COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so
 COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/17/extension/
+# pgCK v0.4.2+ ships its ontology modules WITH the extension artifact (their
+# install-cascade ask-3 fix). /ontology is the documented default root for
+# ckp.boot() / ckp.import_module(). This makes the artifact the canonical
+# fixture source — downstream bundles no longer vendor their own copies.
+COPY --from=pgck_fetch /work/ontology/ /out/ontology/
 
 RUN set -eux; \
   if [ -f /out/usr/lib/postgresql/17/lib/pgrdf.so ]; then \

@@ -5,9 +5,9 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.11
+ARG PG_BASE_VERSION=v0.1.12
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.4.2
+ARG CKLIB_VERSION=1.4.3
 # v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
 # bridge calling ckp.dispatch over TCP+scram as ck_participant); the
 # bridge itself is unchanged in v0.7.12+ — only the upstream pg_base
@@ -17,23 +17,22 @@ ARG OCIGER_RELAY_GENERATION=v0.7.11
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.5.43 + pgCK 0.4.1 + NATS + ociger-pg-launcher) ───
-# v0.1.11 carries pgCK v0.4.1 — patch follow-on to the v0.4.0 "Critical
-# Isolation enforced" milestone (CI-A/B/C/D/E all in place; connection
-# contract unchanged) — and pgRDF v0.5.43. The CI-A roles (ck_substrate
-# / ck_participant) continue to land automatically via CREATE EXTENSION
-# pgck CASCADE in init.sql.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.11 AS pg_base
+# ─── Stage 1: pg base (pg17 + pgRDF 0.6.0 + pgCK 0.4.2 + NATS + ociger-pg-launcher) ───
+# v0.1.12 carries pgCK v0.4.2 "install-from-zero" — durable tables are
+# top-level install DDL born owned by ck_substrate, ontology modules ship
+# WITH the artifact at /ontology, and the floor pass covers everything —
+# plus pgRDF v0.6.0 (LUBM-100 milestone; engine surface identical to
+# v0.5.46). CREATE EXTENSION pgck CASCADE is now genuinely sufficient.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.12 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# Bumped to 1.4.2 — the "Air-gapped" cut requested by CK.Lib.Js for the
-# bundled all-in-one (attested 2026-06-10 22:27 UTC). At the OCI bundle
-# layer the file set is byte-identical to 1.4.1 and 1.4.0; the vendoring
-# claim refers to the npm package, not the OCI bundle we consume. We pin
-# the latest version anchor with its own SLSA attestation as CK.Lib.Js
-# requested. File-level RDF surface excise + L2 facade remain forward
-# work on the v1.5.0 line.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.4.2 AS cklib_source
+# 1.4.3 — the FIRST genuinely-stripped OCI bundle (CK.Lib.Js's publish
+# pipeline had been packaging stale `main` for 1.4.0..1.4.2; our byte audit
+# surfaced it; their corrective 1.4.3 is byte-verified). Ships EXACTLY:
+# LICENSE, README.md, ck-client.js, vendor/{msgpack,nats.ws}.js — no RDF
+# tier, no esm.sh runtime fetches. The smoke asserts this exact file set
+# (the byte-set gate adopted into the packaging contract by both sides).
+FROM ghcr.io/conceptkernel/ck-lib-js:1.4.3 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -121,13 +120,9 @@ COPY --from=pglauncher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-la
 # Bootstrap SQL — piped through `postgres --single` by the launcher on first boot.
 COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 
-# pgCK ontology fixtures vendored from styk-tv/pgCK at the matching release.
-# pgCK 0.4.1's ckp.import_module(<module>, <project>) reads `/ontology/<module>.ttl`
-# but the installed extension package does NOT ship these fixtures. Without them,
-# every kernel-bootstrap dispatch fails with `could not open file "/ontology/X.ttl"`.
-# The bundle vendors them so the dispatch path works without external setup. See
-# bundles/bundle-ck-allinone/ontologies/README.md for license + upstream context.
-COPY bundles/bundle-ck-allinone/ontologies/ /ontology/
+# /ontology now arrives from pg_base (pgCK v0.4.2+ ships its ontology modules
+# with the extension artifact — canonical source). The vendor copy this bundle
+# carried for v0.7.14..v0.7.16 is retired.
 
 # Bus-level dispatcher shim (CHECKLIST §B4). Self-disables when upstream
 # pgck.so embeds the relay strings; opt-out via OCIGER_DISABLE_PGCK_RELAY=1.
