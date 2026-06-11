@@ -6,7 +6,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 LABEL ck.bundle.role="prod"
 LABEL ck.bundle.never-prod="false"
 
-FROM ghcr.io/conceptkernel/ck-lib-js:1.4.1 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.4.2 AS cklib_source
 
 # Rebuild ociger-supervisor + ociger-static-server from this repo's source
 # so the supervisor knows the 'static' profile (the v0.1.2 base ships an

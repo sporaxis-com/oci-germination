@@ -1,9 +1,9 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.9
+version: v0.7.10
 role: prod
 never_prod: false
-description: CKP v3.9 Critical Isolation Alpha — PostgreSQL 17 + pgRDF 0.5.41 + pgCK 0.3.4 (Track A role-floor + Track B sealed registry + Track C plan compiler + Track D governance plane) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.1 (Stripped Alpha cut, attested 2026-06-10), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
+description: CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 17 + pgRDF 0.5.42 + pgCK 0.4.0 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.2 (Air-gapped cut, attested 2026-06-10), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
@@ -25,11 +25,11 @@ extensions:
     source: https://www.postgresql.org/docs/17/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.5.41
+    version: 0.5.42
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.3.4
+    version: 0.4.0
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,10 +46,10 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.4.1
+    version: 1.4.2
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
-    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.4.1 "Stripped Alpha" — the CK.Lib.Js half of CKP v3.9 Critical Isolation Alpha (SLSA-attested 2026-06-10). Bundle bytes byte-identical to 1.4.0; file-level RDF surface excise (ck-rdf-bridge.js, ck-hex-store.js) is forward work on the v1.5.0 line. Next bump targets v1.5.0 (dispatch-only L2 facade, RDF removed) when CK.Lib.Js ships it.
+    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.4.2 "Air-gapped" — requested explicitly by CK.Lib.Js for the bundled all-in-one (SLSA-attested 2026-06-10 22:27 UTC). OCI bundle file set is byte-identical to 1.4.1 and 1.4.0 (verified empirically); the vendoring claim applies to the npm package, not the OCI bundle. File-level RDF surface excise + L2 facade remain forward work on the v1.5.0 line.
   nats-server:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server

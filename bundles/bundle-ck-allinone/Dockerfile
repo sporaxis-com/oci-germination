@@ -5,28 +5,30 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.9
+ARG PG_BASE_VERSION=v0.1.10
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.4.1
+ARG CKLIB_VERSION=1.4.2
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.5.41 + pgCK 0.3.4 + NATS + ociger-pg-launcher) ───
-# v0.1.9 brings pgCK v0.3.4 (Track A role-floor + Track B sealed registry + Track C
-# plan compiler + Track D governance plane: Proposal → Vote → Apply for type changes)
-# and pgRDF v0.5.41 (TA-5 verbose-ingest path field). The CI-A roles
-# (ck_substrate / ck_participant) land automatically as a side-effect of CREATE
-# EXTENSION pgck CASCADE in init.sql.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.9 AS pg_base
+# ─── Stage 1: pg base (pg17 + pgRDF 0.5.42 + pgCK 0.4.0 + NATS + ociger-pg-launcher) ───
+# v0.1.10 brings pgCK v0.4.0 — the "CKP v3.9 Critical Isolation enforced" milestone
+# (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane +
+# CI-E typed reads all live) — and pgRDF v0.5.42 (TA-4 dict-path parity matrix; test-
+# only additive). The CI-A roles (ck_substrate / ck_participant) land automatically as
+# a side-effect of CREATE EXTENSION pgck CASCADE in init.sql.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.10 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# Bumped to 1.4.1 — the CK.Lib.Js half of CKP v3.9 Critical Isolation Alpha
-# (the "Stripped Alpha" cut, attested 2026-06-10 22:11 UTC). The bundle bytes
-# are byte-identical to 1.4.0 at this tag; the file-level RDF surface excise
-# is forward work on the v1.5.0 line. We bump anyway because 1.4.1 is the
-# version anchor for the alpha narrative and carries its own SLSA attestation.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.4.1 AS cklib_source
+# Bumped to 1.4.2 — the "Air-gapped" cut requested by CK.Lib.Js for the
+# bundled all-in-one (attested 2026-06-10 22:27 UTC). At the OCI bundle
+# layer the file set is byte-identical to 1.4.1 and 1.4.0; the vendoring
+# claim refers to the npm package, not the OCI bundle we consume. We pin
+# the latest version anchor with its own SLSA attestation as CK.Lib.Js
+# requested. File-level RDF surface excise + L2 facade remain forward
+# work on the v1.5.0 line.
+FROM ghcr.io/conceptkernel/ck-lib-js:1.4.2 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
