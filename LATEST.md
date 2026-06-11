@@ -127,8 +127,8 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.7`                                                            |
 | Also tagged        | `latest`                                                                  |
 | Index digest       | `sha256:4cb5433798280f43e6963d3638d9cdb0c9ec5fa3fde546e0ee464fca97383565`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
+| Role               | `—`                                                                |
+| Production use     | —                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
