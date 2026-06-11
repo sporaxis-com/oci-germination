@@ -1,108 +1,77 @@
 ---
 title: Semantic Versioning for OCI Bundles
-version: 1.0
-date: 2026-05-27
+version: 2.0
+date: 2026-06-11
+supersedes: v1.0 (2026-05-27 — 2-number tag scheme, retired)
 ---
 
 # Semantic Versioning Scheme
 
-This document defines how container image versions are calculated for OCI bundles in this repository.
+This document defines how container image versions are calculated for OCI bundles in this repository. The current scheme is a strict SemVer with explicit per-bundle tag prefixes and a hard rule that **version numbers are monotonic and never reused** (see [PROVENANCE.md](./PROVENANCE.md) §Hard rules 9 and 10).
 
 ## Version Format
 
 **Semantic Version:** `vMAJOR.MINOR.PATCH`
 
-Example: `v0.3.0`, `v0.3.5`, `v1.0.10`
+Examples: `v0.7.12` (ck-allinone), `v0.1.11` (pg_base), `v0.6.7` (static-cklib).
 
-## How Versions Are Calculated
+The tag string IS the published image tag — no conversion, no `git describe` arithmetic.
 
-### 1. Git Tags (Source of Truth)
+## Git Tags (source of truth)
 
-Tags follow a **2-number format**:
-- Format: `release-<bundle-name>-vMAJOR.MINOR`
-- Examples:
-  - `release-ck-allinone-v0.3`
+Each bundle has its own tag prefix because the GitHub Actions workflows trigger off matching patterns:
 
-### 2. `git describe --tags` Conversion
+| Bundle | Tag pattern | Example | Resulting image |
+|---|---|---|---|
+| `ck-allinone` | `release-ck-allinone-v<MAJOR.MINOR.PATCH>` | `release-ck-allinone-v0.7.12` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12` |
+| `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-v<…>` | `release-pg17-pgrdf-pgck-static-cklib-v0.6.7` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.7` |
+| `pg17-pgrdf-pgck-nats-micro` (pg_base) | `pg17-pgrdf-pgck-nats-micro-v<…>` (**no `release-` prefix**) | `pg17-pgrdf-pgck-nats-micro-v0.1.11` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.11` |
+| `pg17-pgrdf-pgck-nats` | `pg17-pgrdf-pgck-nats-v<…>` | `pg17-pgrdf-pgck-nats-v0.1.7` | matching GHCR tag |
+| `pg17-pgrdf-pgck` | `pg17-pgrdf-pgck-v<…>` | same shape | matching GHCR tag |
+| `pg17-pgrdf` | `pg17-pgrdf-v<…>` | same shape | matching GHCR tag |
+| `core-pg17-{nats,nats-micro,micro,min}` | `core-pg17-<…>-v<…>` | `core-pg17-nats-micro-v0.1.2` | matching GHCR tag |
+| `pgck-bench` | `pgck-bench-v<…>` | `pgck-bench-v0.1.1` | matching GHCR tag |
 
-The semantic version is derived from `git describe --tags`:
+**Rule:** tag prefix must match the workflow trigger or the workflow won't fire. The pg_base family deliberately does NOT use the `release-` prefix because that prefix is consumed by `build-bundles.yml`, which builds layered bundles on top of pg_base.
 
-```
-git describe --tags --match "release-ck-allinone-*"
-```
+## How CI uses the tag
 
-This command returns one of two forms:
+1. The tag push triggers the matching workflow.
+2. The workflow extracts the `v<MAJOR.MINOR.PATCH>` suffix and uses it directly as the published image tag.
+3. The same string is written into the OCI manifest as `org.opencontainers.image.version`.
+4. SLSA Build Provenance v1 attestation is issued binding the digest to the tag.
+5. `update-latest-md.yml` runs on `workflow_run` completion, verifies the attestation, and writes the new head into `LATEST.md`.
 
-**At a tag (distance = 0):**
-```
-release-ck-allinone-v0.3
-→ Semantic version: v0.3.0
-```
+No `git describe` distance arithmetic. No 2-number → 3-number conversion. The tag string IS the version, end to end.
 
-**N commits since tag:**
-```
-release-ck-allinone-v0.3-10-gabc1234
-→ Semantic version: v0.3.10
-                     ↑   ↑  ↑
-              MAJOR.MINOR.PATCH
-              (patch = distance since tag)
-```
+## Bumping the version
 
-### 3. CI/CD Automation
+| Change shape | Bump |
+|---|---|
+| Compositional pin change (upstream extension, library, base image) | PATCH |
+| New in-tree feature (new launcher env, new smoke gate, new relay generation) | PATCH (alpha track) or MINOR (once a stable surface is declared) |
+| Breaking surface change (Dockerfile arg removed, env semantics inverted, init.sql restructured) | MINOR (alpha track) or MAJOR (post-1.0) |
 
-The GitHub Actions workflow (`.github/workflows/build-bundles.yml`) automatically:
+These bundles are on the `0.x.y` alpha track. The MAJOR=0 stays until the CKP v3.x runtime contract stabilises; until then, breaking changes ride MINOR bumps, with the breakage documented in `CHANGELOG.md`.
 
-1. Extracts the base version from the tag name (e.g., `v0.3`)
-2. Runs `git describe --tags` to get the distance since tag
-3. Calculates the semantic version (e.g., `v0.3.10`)
-4. Tags the built container with the semantic version
+## Monotonic + never-reused (the hard rule)
 
-## Release Process
+Once `vN.M.K` has a tag, that number is **permanently spent**, regardless of outcome:
 
-### Creating a New Release
+- **SHIPPED** — the CI run completed, the image is on GHCR, the attestation verifies. Next bump is `v(N).(M).(K+1)`.
+- **FAILED** — the CI run failed; no artifact reached GHCR. The version is **still spent**. Next bump is `v(N).(M).(K+1)`, NOT a re-push of `vN.M.K`. The failure is recorded in [CHANGELOG.md](./CHANGELOG.md) with the failing step + cause.
 
-When ready to release a new version:
+Operationally: do not run `git push origin :refs/tags/<name>`. Do not run `git tag -f <name>`. The fix is a new commit with the next version number.
 
-```bash
-# 1. Tag both bundles (or just the one being released)
-git tag release-ck-allinone-v0.4
+## Cross-bundle pin discipline
 
-# 2. Push tags
-git push origin release-ck-allinone-v0.4
+When a base bundle moves (`pg_base` is the common case), downstream bundles that consume it as a FROM-image must roll forward to consume the new tag. Today only `ck-allinone` consumes `pg_base` directly; the others in the family are sibling-composed.
 
-# 3. GitHub Actions automatically:
-#    - Detects the tag push
-#    - Calculates semantic version v0.4.0
-#    - Builds and pushes ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0
-```
+A ripple is reported in the release turn's user-facing summary (per PROVENANCE.md rule 6).
 
-### Between Releases
+## Cross-references
 
-If you push commits after tagging:
-
-```
-git tag release-ck-allinone-v0.3
-<push 5 new commits>
-
-git describe --tags --match "release-ck-allinone-*"
-# Output: release-ck-allinone-v0.3-5-gabc1234
-# Semantic version: v0.3.5
-```
-
-This allows for patch-level versioning without requiring new tags.
-
-## Current State
-
-| Bundle | Latest Tag | Semantic Version |
-|---|---|---|
-| `ck-allinone` | `release-ck-allinone-v0.4` | `v0.4.0` |
-
-Both are published to GHCR as:
-- `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.4.0`
-
-## Key Principles
-
-- **Never republish the same semantic version** — each container image must have a unique version
-- **Tags use 2-number format** — the patch number is calculated from git distance
-- **CI/CD is automatic** — the workflow handles version calculation; developers just push tags
-- **Backwards compatible** — existing images with v0.3 tags remain unchanged and available
+- [CHANGELOG.md](./CHANGELOG.md) — every release **attempt**, SHIPPED and FAILED, with verdict + cause.
+- [LATEST.md](./LATEST.md) — auto-rendered head of each bundle, attestation-gated.
+- [PROVENANCE.md](./PROVENANCE.md) — the full release policy (Rules 1–10).
+- [CONTRIBUTING.CI.md](./CONTRIBUTING.CI.md) — the day-to-day "how do I cut a release" walkthrough.

@@ -20,35 +20,41 @@ A `Space.Ship` is a kernel: it declares the `Ship` class, the SHACL shape that s
 
 Three production bundles + one benchmark sibling + four core bundles (pg-only). All multi-arch (`linux/amd64`, `linux/arm64`), all SLSA Build Provenance v1 attested via GitHub Actions, all published to GHCR. Current heads:
 
-| Bundle | Current tag | Compressed size (amd64) | Role |
+| Bundle | Current tag | Last release | Role |
 |---|---|---|---|
-| **`ociger-ck-allinone`** | `v0.7.0` | **48.42 MB** | Marketplace-minimal CKP v3.8 runtime — pg17 + pgRDF + pgCK + NATS + cklib, supervised by `s6-overlay`, web by `busybox httpd`. **No Python, no FastAPI, scratch base.** Default for prod. |
-| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.5` | 51.10 MB | Same composition but with the in-tree `ociger-static-server` Go binary instead of busybox httpd — kept for downstreams that already pin to it. |
-| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.5` | 44.94 MB | The shared base for the two above — pg17 + pgRDF + pgCK + NATS in a scratch + selectively-copied bookworm layout. |
-| `ociger-pg17-pgrdf-pgck-nats` | `v0.1.5` | 69.30 MB | Same with distroless final (instead of scratch). |
-| `ociger-pg17-pgrdf-pgck` | `v0.1.5` | 61.20 MB | pg17 + extensions, no NATS. |
-| `ociger-pg17-pgrdf` | `v0.1.5` | 60.80 MB | pg17 + pgRDF only. |
-| `ociger-core-pg17-{nats,nats-micro,micro,min}` | `v0.1.2` / `v0.1.3` | 29.2–60.3 MB | pg17 cores without extensions. |
-| `ociger-pgck-bench` | `v0.1.0` | 203 MB | **Sibling devel / benchmark image** (Python + FastAPI + pgck-web). Runs **outside** ck-allinone on the same NATS network; never used in prod. The only sanctioned home for Python in this group. |
+| **`ociger-ck-allinone`** | `v0.7.12` | 2026-06-11 | Marketplace-minimal CKP v3.9 Critical Isolation Alpha runtime — pg17 + pgRDF + pgCK + NATS + cklib, supervised by `s6-overlay`, web by `busybox httpd`, with the in-tree `ociger-pgck-relay` dispatch bridge wired to `ckp.dispatch`. **No Python, no FastAPI, scratch base.** Default for prod. |
+| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.11` | 2026-06-11 | The shared base for `ck-allinone` — pg17 + pgRDF + pgCK + NATS in a scratch + selectively-copied bookworm layout. Tracks the upstream pgRDF / pgCK release cadence directly. |
+| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.7` | 2026-05-31 | Same composition family but with the in-tree `ociger-static-server` Go binary instead of busybox httpd — kept for downstreams that already pin to it. **Frozen at the 2026-05-31 component pins**; next cut will roll forward when the static-cklib track is needed. |
+| `ociger-pg17-pgrdf-pgck-nats` | `v0.1.7` | 2026-05-31 | Same as `-nats-micro` with distroless final (instead of scratch). |
+| `ociger-pg17-pgrdf-pgck` | `v0.1.7` | 2026-05-31 | pg17 + pgRDF + pgCK, no NATS. |
+| `ociger-pg17-pgrdf` | `v0.1.7` | 2026-05-31 | pg17 + pgRDF only. |
+| `ociger-core-pg17-{nats,nats-micro,micro,min}` | `v0.1.2` / `v0.1.3` | 2026-05-28 | pg17 cores without extensions. |
+| `ociger-pgck-bench` | `v0.1.1` | 2026-05-31 | **Sibling devel / benchmark image** (Python + FastAPI + pgck-web). Runs **outside** ck-allinone on the same NATS network; never used in prod. The only sanctioned home for Python in this group. |
+| `ociger-pg17-pgrdf-pgck-web-cklib` | `v0.6.5` | 2026-05-29 | **Retired surface**. Superseded by `ck-allinone`; the `static-cklib` variant continues for downstreams that need the in-tree static server. Not advertised in `LATEST.md`. |
 
-Component versions baked in at the latest heads:
+Component versions baked into the `v0.7.12` / `v0.1.11` heads (the actively maintained pair):
 
 | Component | Version | Source |
 |---|---|---|
 | PostgreSQL | 17.10 (Debian bookworm build) | upstream |
-| pgRDF | v0.5.28 (extversion `0.5.28` — pgRDF v0.5.25+ closed the long-standing label-stuck bug; release tag advertised per `LATEST.md`, SLSA Build Provenance v1 attested) | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF) |
-| pgCK | 0.2.2 (rc3) | [styk-tv/pgCK](https://github.com/styk-tv/pgCK) |
-| pgck-web (sibling bench only) | 0.2.7 | styk-tv/pgCK |
-| NATS server | 2.14.1 (core + WSS bridge on `:4222` / `:9222`) | upstream |
-| CK.Lib.Js | 1.3.11 | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js) |
-| s6-overlay | 3.2.3.0 | upstream |
-| busybox | 1.36.1-musl | upstream |
+| pgRDF | `0.5.43` | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF), SLSA-attested |
+| pgCK | `0.4.1` (CKP v3.9 Critical Isolation enforced — CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance + CI-E typed reads) | [styk-tv/pgCK](https://github.com/styk-tv/pgCK), SLSA-attested |
+| NATS server | `2.14.1` (core on `:4222` + WSS bridge on `:9222`) | upstream |
+| CK.Lib.Js | `1.4.2` ("Air-gapped" cut) | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js), SLSA-attested |
+| s6-overlay | `3.2.3.0` | upstream |
+| busybox | `1.36.1-musl` | upstream |
+| `ociger-pg-launcher` (in-tree) | rolls with bundle | this repo |
+| `ociger-pgck-relay` (in-tree dispatch bridge) | rolls with bundle (v0.7.11 generation) | this repo |
+
+Older bundles in the matrix carry their 2026-05-31-era component pins (pgRDF 0.5.28, pgCK 0.2.2, cklib 1.3.11). They have not been re-cut on the v3.9 alpha components — they are not part of the integration critical path. The next time any of them needs to move, the wave will fold in the current heads.
 
 See [`LATEST.md`](./LATEST.md) for the auto-rendered attestation-verified head of each bundle.
 
 ---
 
-## Inside `ck-allinone:v0.7.0` — what's in those 48 MB
+## Inside `ck-allinone:v0.7.12` — layer composition
+
+The numbers below are illustrative — they were last measured against `v0.7.0` (the size profile is close enough to the current cut that the relative shape still holds; v0.7.11+ added the `pgx`-equipped relay binary, which moves the bundle from ~125 MiB to ~128 MiB). For exact byte counts on a specific tag, run `docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12`.
 
 Layer composition (compressed, amd64; 9 layers total, 5 inherited from `pg_base`, 4 added in this repo):
 

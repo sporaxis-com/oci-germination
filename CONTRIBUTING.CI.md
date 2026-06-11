@@ -1,169 +1,150 @@
 # CI/CD Pipeline — OCI Bundle Builds
 
-## Automated Builds via GitHub Actions
+How releases are cut and what guards keep the published artifacts honest. The full policy lives in [PROVENANCE.md](./PROVENANCE.md); the versioning scheme lives in [SEMANTIC-VERSIONING.md](./SEMANTIC-VERSIONING.md); the historical record (good and bad) is in [CHANGELOG.md](./CHANGELOG.md). This file walks through the day-to-day "I want to ship a bump" loop.
 
-OCI bundles are built and published to GHCR automatically when version tags are pushed.
+## Automated builds via GitHub Actions
 
-### Tag Convention
+Every published GHCR artifact is built and pushed by a GitHub Actions workflow — never from a workstation. The workflows trigger on tag pushes whose prefix matches the bundle:
 
-Tags follow the pattern: `release-<bundle-name>-<version>`
+| Bundle | Tag pattern (workflow trigger) | Workflow file | Resulting image |
+|---|---|---|---|
+| `ck-allinone` | `release-ck-allinone-v*` | `build-bundles.yml` | `ghcr.io/sporaxis-com/ociger-ck-allinone:<v>` |
+| `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-v*` | `build-bundles.yml` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:<v>` |
+| `pg17-pgrdf-pgck-nats-micro` (pg_base) | `pg17-pgrdf-pgck-nats-micro-v*` (**no `release-` prefix**) | `pg17-pgrdf-pgck-nats-micro-release.yml` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:<v>` |
+| `pg17-pgrdf-pgck-nats` | `pg17-pgrdf-pgck-nats-v*` | `pg17-pgrdf-pgck-nats-release.yml` | matching GHCR tag |
+| `pg17-pgrdf-pgck` | `pg17-pgrdf-pgck-v*` | `pg17-pgrdf-pgck-release.yml` | matching GHCR tag |
+| `pg17-pgrdf` | `pg17-pgrdf-v*` | `pg17-pgrdf-release.yml` | matching GHCR tag |
+| `core-pg17-{min,micro,nats,nats-micro}` | `core-pg17-<variant>-v*` | `core-pg17-<variant>-release.yml` | matching GHCR tag |
 
-| Bundle | Tag Example | Resulting Image |
-|--------|-------------|-----------------|
-| `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-1.0.0` | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0` |
-| `ck-allinone` | `release-ck-allinone-v3.8-rc2` | `ghcr.io/sporaxis-com/ociger-ck-allinone:v3.8-rc2` |
+Each tagged release goes through these gates inside CI before any artifact lands on GHCR:
 
-### Publishing a New Bundle Version
+1. **Verify job** — Go unit tests, generator round-trip (`scripts/generate.sh` re-emits the bundle outputs from `bundle.yaml`), generated-files-committed assertion (so hand-edits don't drift from the generator), pgRDF preload contract lint.
+2. **Build** — multi-arch (`linux/amd64` + `linux/arm64`) image build.
+3. **Smoke** — bundle-specific smoke script (`scripts/smoke-<bundle>.sh`) against the freshly built local image. Must exit 0.
+4. **Python-free assertion** (ck-allinone only) — `docker exec` searches the prod image for `python*`, `uvicorn*`, `fastapi*` paths; any hit fails the build.
+5. **Push to GHCR** — multi-arch manifest published.
+6. **SLSA Build Provenance v1 attestation** — `actions/attest-build-provenance@v1` issues a signed attestation binding the digest to the workflow run + tag.
 
-1. **Test locally** (optional, for pre-release validation):
-   ```bash
-   docker build -t ociger-pg17-pgrdf-pgck-static-cklib:1.0.0 \
-     bundles/bundle-pg17-pgrdf-pgck-static-cklib/
-   ```
+If any step fails, **no artifact reaches GHCR**. The version number is permanently spent (see Rule 9 below).
 
-2. **Create and push a release tag:**
-   ```bash
-   git tag -a release-pg17-pgrdf-pgck-static-cklib-1.0.0 \
-     -m "Release pg17-pgrdf-pgck-static-cklib v1.0.0"
-   git push origin release-pg17-pgrdf-pgck-static-cklib-1.0.0
-   ```
-
-3. **GitHub Actions will:**
-   - Automatically detect the tag
-   - Build multi-platform images (linux/amd64, linux/arm64)
-   - Push to GHCR with the specified version
-   - Report completion in Actions tab
-
-### Verifying Published Images
-
-After the workflow completes, verify the image is available:
+## Publishing a new bundle version — step-by-step
 
 ```bash
-# Inspect manifest
-docker manifest inspect ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
+# 1. Edit the bundle's Dockerfile + bundle.yaml + smoke-script defaults if needed.
+#    Make ALL changes for this cut on one commit so the version number is atomic.
 
-# Pull and test
-docker pull ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
-bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh \
-  ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
+# 2. Run the local smoke against the local build before tagging.
+docker build --platform linux/arm64 \
+    --build-arg BUNDLE_VERSION=v0.7.13 \
+    -f bundles/bundle-ck-allinone/Dockerfile \
+    -t ociger-ck-allinone:v0.7.13-local .
+bash scripts/smoke-ck-allinone.sh ociger-ck-allinone:v0.7.13-local
+# 10/10 green is the gate. If smoke fails, fix on the same commit, re-smoke.
+
+# 3. Commit. Push main first.
+git add bundles/bundle-ck-allinone/
+git commit -m "feat(ck-allinone v0.7.13): …"
+git push origin main
+
+# 4. Tag with the next monotonic version. Push the tag.
+git tag release-ck-allinone-v0.7.13
+git push origin release-ck-allinone-v0.7.13
+
+# 5. The workflow fires. Watch the run; if it fails, see "When CI fails" below.
+
+# 6. On green, gh attestation verify confirms the digest:
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.13 \
+    --repo sporaxis-com/oci-germination
+# Then update-latest-md.yml fires on workflow_run and advances LATEST.md.
 ```
 
-### Smoke Tests
+## When CI fails — the hard rule
 
-All bundles have comprehensive smoke test suites. Before publishing, run locally:
+**The version number is permanently spent.** Do NOT delete the tag and re-push. Do NOT force-move the tag.
+
+The fix is a new commit on `main` plus the **next** version number:
 
 ```bash
-# Test pg17-pgrdf-pgck-static-cklib
-bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh ociger-pg17-pgrdf-pgck-static-cklib:1.0.0
+# CI failed at v0.7.13. Do NOT touch the v0.7.13 tag — it stays where it is.
 
-# Test ck-allinone
-bash scripts/smoke-ck-allinone.sh ociger-ck-allinone:v3.8-rc2
+# Author the fix.
+git add scripts/smoke-ck-allinone.sh
+git commit -m "fix(smoke): bump expected pgCK version default
+
+The v0.7.13 CI run failed because the smoke script's default
+PGCK_EXPECTED_VERSION hadn't been bumped to track the new pin.
+This commit ships the fix; the next release is v0.7.14."
+git push origin main
+
+# Tag the fix with the NEXT version.
+git tag release-ck-allinone-v0.7.14
+git push origin release-ck-allinone-v0.7.14
 ```
 
-### Workflow File
+Then record the failure in `CHANGELOG.md`:
 
-The workflow is defined in `.github/workflows/build-bundles.yml` and:
+```markdown
+### v0.7.13 — 2026-06-XX — FAILED
+- **Tried:** intent of this cut
+- **Tested:** which CI step ran and which one failed
+- **Cause:** root cause
+- **Fix:** what changed
+- **Verdict:** FAILED. CI run <id>. No artifact reached GHCR.
+```
 
-- Triggers on `release-*` tag pushes only
-- Uses `docker/setup-buildx-action` for multi-platform builds
-- Authenticates with GHCR using `GITHUB_TOKEN` (no secrets needed)
-- Caches build layers for faster rebuilds
-- Publishes both amd64 and arm64 manifests to a single image:tag
+And the SHIPPED v0.7.14 entry that follows it.
 
-### Troubleshooting
+This honors three things at once: the immutable container digest history on GHCR stays clean (no orphan digests under deleted tags), the CI run history reads unambiguously (`v0.7.13 FAILED` then `v0.7.14 SUCCESS`), and the audit trail in `CHANGELOG.md` makes the version-number gap self-explanatory.
+
+## Smoke tests
+
+Bundle-specific smoke scripts under `scripts/`:
+
+- `smoke-pg17-pgrdf-pgck-nats-micro.sh` — pg_base 10-check (pg ready, pgRDF + pgCK + pgcrypto install + version match, parse_turtle pgatomic, NATS core PONG, NATS WSS port up).
+- `smoke-ck-allinone.sh` — ck-allinone bundle-specific (auto-bootstrap, NATS, WSS round-trip, §B4 dispatch-bridge round-trip, Python-free, PID 1 = s6-svscan).
+- `smoke-pg17-pgrdf-pgck-static-cklib.sh`, `smoke-pg17-pgrdf-pgck-nats.sh`, `smoke-pg17-pgrdf-pgck.sh`, `smoke-pg17-pgrdf.sh` — sibling bundles in the matrix.
+
+Each smoke takes the image tag as `$1` and exits non-zero on any failure. Override expected component versions via env (`PGRDF_EXPECTED_VERSION=…`, `PGCK_EXPECTED_VERSION=…`) when you need to.
+
+## Workstation pushes are prohibited at every tier
+
+`docker push`, `docker buildx --push`, `gh release create` against this org's GHCR namespaces — none of them are allowed from a workstation. The single sanctioned publish path is the tag-pushes-trigger-Actions loop above. The reasoning is the SLSA attestation gate: a workstation push cannot produce a GitHub-issued OIDC attestation; the next `update-latest-md.yml` run would reject it and `LATEST.md` would refuse to advance.
+
+For pre-tag local validation, `docker build` + local smoke is fine. `docker buildx build --load` is fine. Anything with `--push` is not.
+
+## Verifying a published image
+
+```bash
+# Manifest (multi-arch).
+docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12
+
+# Attestation (the gate).
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12 \
+    --repo sporaxis-com/oci-germination
+
+# Smoke against the published image.
+bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12
+```
+
+## Troubleshooting
 
 **Workflow didn't trigger:**
-- Check that tag matches pattern: `release-<bundle-name>-<version>`
-- Verify tag was pushed (not just created locally): `git push origin <tag>`
-- Check Actions tab for any errors
+- Check the tag exactly matches the workflow's prefix (notably: pg_base bundles do NOT use `release-`).
+- Confirm the tag was pushed: `git ls-remote --tags origin | grep <tag>`.
+- Check the Actions tab for an event but a skipped run (sometimes path filters block).
 
 **Build failed:**
-- Review workflow logs in the Actions tab
-- Run smoke tests locally to debug Dockerfile issues
-- Push a fix commit and retag: `git tag -f <tag> && git push origin -f <tag>`
+- Check the failed-step log: `gh run view <id> --log-failed`.
+- Do **not** re-tag the failed version. Fix on a new commit and bump to the next version per the rule above.
+- Update `CHANGELOG.md` with the FAILED entry.
 
-**Image not appearing in GHCR:**
-- Workflow may still be running (check Actions)
-- Verify authentication: `gh auth status`
-- Check package visibility in GHCR settings (should be public or org-accessible)
+**Image not appearing in GHCR after a green run:**
+- Check that the "Push to GHCR" step actually ran (some matrix bundles have separate push jobs).
+- Verify the package visibility on GHCR (should be public; `gh api /orgs/sporaxis-com/packages/container/<name>` shows the current state).
 
----
+## Cross-references
 
-## Local Development Workflow
-
-For iterating on bundle changes without tagging:
-
-```bash
-# 1. Make Dockerfile/bundle.yaml changes
-# 2. Build locally to test
-docker build -t ociger-pg17-pgrdf-pgck-static-cklib:test \
-  bundles/bundle-pg17-pgrdf-pgck-static-cklib/
-
-# 3. Run smoke tests
-bash scripts/smoke-pg17-pgrdf-pgck-static-cklib.sh ociger-pg17-pgrdf-pgck-static-cklib:test
-
-# 4. When satisfied, commit changes
-git add bundles/bundle-pg17-pgrdf-pgck-static-cklib/
-git commit -m "refine: update bundle..."
-
-# 5. Tag for release
-git tag -a release-pg17-pgrdf-pgck-static-cklib-<version> -m "Release message"
-git push origin <branch> release-pg17-pgrdf-pgck-static-cklib-<version>
-```
-
-Multi-platform local builds (with buildx) can be tested before tagging:
-
-```bash
-# Authenticate with GHCR
-gh auth token | docker login ghcr.io -u $(gh api user --jq .login) --password-stdin
-
-# Multi-platform build (local, no push)
-docker buildx build --platform linux/amd64,linux/arm64 \
-  --load bundles/bundle-pg17-pgrdf-pgck-static-cklib/
-  
-# Or, build and push to dev tag
-docker buildx build --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:dev \
-  --push bundles/bundle-pg17-pgrdf-pgck-static-cklib/
-```
-
----
-
-## Component Versioning
-
-Each bundle tracks independent component versions in `bundles/<bundle>/bundle.yaml`:
-
-- **PostgreSQL** — inherited from base image (17.0)
-- **pgRDF** — from extension artifact (0.5.1)
-- **pgCK** — from extension artifact (0.1.2)
-- **(retired) pgckweb** — (removed — pgckweb FastAPI deprecated; static-cklib uses ociger-static-server)
-- **cklib** — from OCI layer (1.2.0)
-- **NATS** — from embedded service (2.14.1, all-in-one only)
-
-Update `bundle.yaml` to reflect changes; the bundle version tag is independent.
-
----
-
-## Release Notes
-
-Include in commit messages and git tags:
-
-- **What changed:** component updates, bug fixes, new features
-- **Why it matters:** security, compatibility, performance improvement
-- **Breaking changes:** if any API/schema changes
-- **Smoke test results:** summary of integration test outcomes
-
-Example:
-
-```
-Release pg17-pgrdf-pgck-static-cklib v1.0.0
-
-- Static-only web layer (ociger-static-server) with /cklib/ mount point
-- Import cklib (CK.Lib.Js 1.2.0) as OCI layer source
-- Bundle specification (bundle.yaml) with component attribution
-- Comprehensive 10-point smoke test suite
-
-Smoke test: All integration points pass (PostgreSQL, extensions, static HTTP, cklib serving)
-
-Compatibility: Built on ociger-pg17-pgrdf-pgck:v0.1.1 base
-```
+- [PROVENANCE.md](./PROVENANCE.md) — full release policy (Rules 1–10, including the monotonic-version rule).
+- [SEMANTIC-VERSIONING.md](./SEMANTIC-VERSIONING.md) — tag prefix table + version-number scheme.
+- [CHANGELOG.md](./CHANGELOG.md) — every release attempt, with verdict.
+- [LATEST.md](./LATEST.md) — auto-rendered head of each bundle, attestation-gated.

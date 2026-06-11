@@ -13,18 +13,41 @@
    - **Cross-bundle ripple:** if a base image (`core-pg17-*` or `pg17-pgrdf-pgck-*`) was bumped, list which downstream bundles also need to roll forward
 7. **Verify upstream attestation BEFORE doing any work that depends on an upstream artifact.** Before consuming `pgrdf`, `pgck`, `ck-lib-js`, or any other external OCI image in a `Dockerfile`, `bundle.yaml`, smoke script, or release note, run `gh attestation verify oci://<image>:<tag>` against the digest you intend to pin. A 404 or rejection means the artifact is NOT consumable under this policy. The work pauses; the user is notified; we do not proceed until either (a) the upstream ships a valid attestation for that exact digest, or (b) the user explicitly overrides for that specific bump with the override recorded in the commit message and in `LATEST.md` notes.
 8. **Voice inconsistencies between upstream `LATEST.md` and actual attestation state immediately, do not accept them.** If an upstream repo's `LATEST.md` advertises a version (e.g. pgRDF's `LATEST.md` listing `0.5.9-pg17-*` as the head) but `gh attestation verify` returns 404 or rejects that digest, that is a verifiable inconsistency. The agent surfaces it in the same turn the discrepancy is found, refuses to consume that version, and recommends one of: bug-report NOTIFY to the upstream, hold-back to the last attested version of theirs, or user-driven explicit override. Silent acceptance of an unattested upstream artifact is prohibited.
+9. **Version numbers are monotonic and never reused.** A failed CI run at `vN.M.K` retires that number permanently. The next attempt is `vN.M.(K+1)`, never a re-push of `vN.M.K`. Do not `git push origin :refs/tags/<name>` to delete a failed tag; do not `git tag -f` to move one. The tag stays where the failure happened; the fix is a new commit with a new tag. Gaps in the version sequence are expected — they are explained by the corresponding FAILED entries in `CHANGELOG.md`.
+10. **`CHANGELOG.md` records every release attempt, successful or failed; git tags exist only for successful attempts.** Failed attempts (CI failure, attestation failure, smoke failure, etc.) get a FAILED entry in `CHANGELOG.md` describing what was tried and why it failed. They do **not** get a git tag. The version number is permanently spent. `CHANGELOG.md` is the audit trail for gaps in the tag sequence; `LATEST.md` is the audit trail for what's live in production.
 
 Everything else in this document explains how those rules are enforced.
 
-### One-time bootstrap (Rules 2, 3, 4 transition)
+### Release attempt policy (Rules 9, 10 — the changelog ↔ tag separation)
 
-These rules take effect from the **first attested release** onward, per bundle. Releases that predate the attestation wiring (everything published as of 2026-05-28) live in GHCR and on the [Repo packages view](https://github.com/orgs/sporaxis-com/packages?repo_name=oci-germination) but do **not** appear in `LATEST.md` once the attestation gate ships. Re-publishing them with attestations would change their digests and break the immutability promise on GHCR.
+The three files have distinct jobs, and writers must not cross them:
 
-For each bundle, the next tag pushed AFTER the `actions/attest-build-provenance@v1` integration lands in `.github/workflows/build-bundles.yml` is the bootstrap point. That workflow run will issue an attestation for the first time, `update-latest-md.yml` will verify and populate `LATEST.md`, and from that point Rule 4 holds strictly for every successor of that bundle.
+| File | What it captures | Write trigger |
+|---|---|---|
+| `CHANGELOG.md` | **Every** release attempt for the attestable bundles — SHIPPED entries with digest + CI run ID, and FAILED entries with cause + CI run ID. The honest narrative of how each version got to GHCR or didn't. | Hand-authored on the same commit that tags a successful release, OR on the commit that lands the fix for a previously-failed attempt. |
+| Git tags | **Only** successful attempts. One tag per successful release. Failed attempts are never tagged. | `git tag <name>; git push origin <name>` only after the SLSA attestation gate passes locally, OR after CI green for the same content. |
+| `LATEST.md` | **Only** the latest attested digest per bundle. Auto-rendered. | `.github/workflows/update-latest-md.yml` only — refuses to advertise any digest that `gh attestation verify` rejects. No manual edit. |
 
-Bootstrap exception is one-time **per bundle**. Once the gate has fired once for `ociger-ck-allinone`, "previous tag must be in `LATEST.md`" is strict for ck-allinone — even if other bundles haven't crossed their own bootstrap yet.
+A failure flow looks like this:
 
-**Current pre-policy LATEST.md state (2026-05-28):** the current `LATEST.md` was hand-rendered ahead of the attestation pipeline and ships pre-policy versions. That file will be torn down to the "no attested release yet" template on the same commit that lands the attestation workflow, and rebuilt entry-by-entry as each bundle crosses its bootstrap point.
+```
+attempt v0.1.K → tag v0.1.K → CI fails → FAILED entry in CHANGELOG.md → fix commit on main →
+attempt v0.1.(K+1) → tag v0.1.(K+1) → CI green → attestation verified →
+SHIPPED entry in CHANGELOG.md → LATEST.md auto-regen advances
+```
+
+The tag `v0.1.K` is never moved. The fix commit gets `v0.1.(K+1)`. The CI history shows `v0.1.K ref FAILED` followed by `v0.1.(K+1) ref SUCCESS` — unambiguous.
+
+### Bootstrap status (2026-06-11)
+
+The attestation pipeline and `update-latest-md.yml` auto-regen are **landed and in steady-state operation**. As of 2026-06-11:
+
+- `actions/attest-build-provenance@v1` runs on every release workflow.
+- `update-latest-md.yml` is the only writer of `LATEST.md`; it runs on `workflow_run` of every successful release build and gates each entry on `gh attestation verify`.
+- Both `ociger-ck-allinone` and `ociger-pg17-pgrdf-pgck-nats-micro` have crossed their per-bundle bootstrap. Rule 4 (predecessor must be in `LATEST.md`) holds strictly for them.
+- The other 9 matrix bundles (`ociger-core-pg17-*`, `ociger-pg17-pgrdf{,-pgck{,-nats,-static-cklib,-web-cklib}}`, `ociger-pgck-bench`) crossed their bootstrap on the 2026-05-28 .. 2026-05-31 wave; their last attested digests are reflected in `LATEST.md`. Future cuts on those bundles inherit the full Rule 1–10 contract.
+
+The earlier "Current pre-policy LATEST.md state" warning is retired; everything currently advertised in `LATEST.md` is attested.
 
 ---
 
