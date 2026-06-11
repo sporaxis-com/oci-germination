@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ck-allinone — /web2/ reserved surface</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { margin-bottom: 0.5rem; }
+  .meta { color: #666; margin-bottom: 1.5rem; }
+  .panel { border: 1px solid #ddd; border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; background: #f8f8f8; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>ck-allinone — <code>/web2/</code></h1>
+<p class="meta">Reserved surface for the web2 demo — the dispatch-only client front-end against CKP v3.9 Critical Isolation. Currently a stub.</p>
+<div class="panel">
+  <p>This surface is mounted under busybox httpd at <code>/web2/</code>. Once the CK.Lib.Js v1.5.0 line lands (dispatch-only L2 facade), the next ck-allinone cut will ship the web2 demo content here directly.</p>
+  <p>In the meantime, the dispatch wire is already alive end-to-end: the in-tree <code>ociger-pgck-relay</code> bridges <code>input.kernel.&lt;K&gt;.action.&lt;verb&gt;</code> (NATS WSS) to <code>ckp.dispatch</code> in Postgres and publishes the typed reply on <code>result.kernel.&lt;K&gt;.&lt;verb&gt;</code> (preserves Trace-Id). The landing page at <a href="/">/</a> confirms the round-trip; the bridge handles the dispatch.</p>
+  <p>See also: <a href="/cklib/">/cklib/</a> (CK.Lib.Js bundle — what the demo will consume), <a href="/wss/">/wss/</a> (NATS WSS endpoint routing info).</p>
+</div>
+</body>
+</html>

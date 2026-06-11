@@ -20,14 +20,15 @@
 <body>
 
 <h1>ck-allinone</h1>
-<p class="meta">CKP v3.8 (rc-05) all-in-one — PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + cklib at <a href="/cklib/">/cklib/</a></p>
+<p class="meta">CKP v3.9 Critical Isolation Alpha — PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222) + cklib at <a href="/cklib/">/cklib/</a> + ociger-pgck-relay dispatch bridge.</p>
 
 <div id="result" class="panel pending">
   <div class="marker" id="status">⌛ Connecting to NATS over WSS…</div>
   <pre id="detail">waiting</pre>
 </div>
 
-<p class="meta">This page opens a WSS connection to NATS on <code>ws://${host}:9222</code>, subscribes to a unique subject, publishes a message to it, and confirms the round-trip. If you see ✓ above, the wire is alive.</p>
+<p class="meta">This page opens a NATS WSS connection appropriate for the topology it's loaded under, subscribes to a unique subject, publishes a message to it, and confirms the round-trip. If you see ✓ above, the wire is alive.</p>
+<p class="meta">Topology auto-detect — <code>https://&lt;host&gt;/</code> → <code>wss://&lt;host&gt;/wss</code> (envoy / gateway); <code>http://&lt;host&gt;:8000/</code> → <code>ws://&lt;host&gt;:9222</code> (direct docker run). Override the URL with <code>?wss=ws://…</code> in the query string if your topology is non-standard.</p>
 
 <script type="module">
 const $status = document.getElementById('status');
@@ -46,7 +47,24 @@ function pass(payload) {
 }
 
 const SUBJ = 'ck.probe.' + Math.random().toString(36).slice(2, 10);
-const URL  = `ws://${location.hostname}:9222`;
+
+// WSS URL is derived from the topology this page is loaded under so the
+// container's built-in self-test works in both supported shapes:
+//
+//   direct-port docker run    →  http://<host>:8000/   →  ws://<host>:9222
+//   envoy / gateway in front  →  https://<host>/       →  wss://<host>/wss
+//
+// `?wss=…` query-string override is honored for any non-standard topology
+// (e.g. an HTTP reverse proxy on a custom path).
+const URL = (() => {
+  const override = new URLSearchParams(location.search).get('wss');
+  if (override) return override;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const directHttpd = location.port === '8000';
+  return directHttpd
+    ? `${proto}://${location.hostname}:9222`
+    : `${proto}://${location.host}/wss`;
+})();
 const TIMEOUT_MS = 3000;
 
 let ws;

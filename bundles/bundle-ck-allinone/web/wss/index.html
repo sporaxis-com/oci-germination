@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ck-allinone — /wss/ endpoint routing info</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 4rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { margin-bottom: 0.5rem; }
+  .meta { color: #666; margin-bottom: 1.5rem; }
+  .panel { border: 1px solid #ddd; border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; background: #f8f8f8; }
+  .warn { border-color: #c9870b; background: #fffbe6; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  pre  { background: #f4f4f4; padding: 0.5rem; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<h1>ck-allinone — <code>/wss/</code></h1>
+<p class="meta">NATS WebSocket endpoint. You only see this page if you hit <code>/wss/</code> with a plain HTTP GET (not a WebSocket upgrade) and you don't have a gateway in front of the container.</p>
+
+<div class="panel warn">
+  <p><strong>This path is the routing contract, not the WebSocket itself.</strong> Inside the container, the NATS WSS listener is on <code>:9222</code>. Busybox httpd serves THIS static info page at <code>/wss/</code> as a documentation surface; it does NOT proxy WebSocket upgrades.</p>
+</div>
+
+<div class="panel">
+  <h3>Two valid topologies</h3>
+
+  <p><strong>Direct docker run</strong> — publish <code>:9222</code> on the host and talk to it directly:</p>
+  <pre>docker run -p 8000:8000 -p 9222:9222 ghcr.io/sporaxis-com/ociger-ck-allinone:latest
+# Browser:  ws://&lt;host&gt;:9222
+# CLI:      nats --server ws://&lt;host&gt;:9222 ...</pre>
+
+  <p><strong>Behind envoy / gateway (TLS-fronted)</strong> — route the public <code>/wss</code> path to <code>ws://&lt;container&gt;:9222</code>. Example envoy route:</p>
+  <pre>routes:
+- match: { prefix: /wss }
+  route:
+    cluster: ck-allinone-nats-wss
+    upgrade_configs:
+    - upgrade_type: websocket</pre>
+  <p>Browser then opens <code>wss://&lt;host&gt;/wss</code>; the gateway upgrades and proxies to <code>:9222</code> inside the container. The landing page at <a href="/">/</a> auto-detects this topology from <code>location.protocol</code>.</p>
+</div>
+
+<div class="panel">
+  <h3>Verifying the WSS endpoint</h3>
+  <p>Direct mode:</p>
+  <pre>curl -sI -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+     -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: x' \
+     http://&lt;host&gt;:9222/  # 101 Switching Protocols</pre>
+  <p>Gateway mode:</p>
+  <pre>curl -sI -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+     -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: x' \
+     https://&lt;host&gt;/wss  # 101 Switching Protocols</pre>
+</div>
+</body>
+</html>

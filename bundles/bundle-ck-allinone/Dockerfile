@@ -104,7 +104,16 @@ COPY --from=busybox_src /bin/busybox /bin/busybox
 COPY --from=cklib_source / /app/cklib/
 
 # Landing page: opens NATS over WSS, does a round-trip, renders ✓/✗ into the DOM.
+# The page auto-detects topology (https → wss://host/wss, http :8000 → ws://host:9222).
 COPY bundles/bundle-ck-allinone/web/index.html /app/index.html
+
+# Reserved surfaces. /web/ and /web2/ stage the web1 and web2 demo paths so
+# downstream consumers can rely on them being served from busybox httpd. /wss/
+# is a static documentation page that explains the routing contract — busybox
+# does NOT proxy WebSockets; gateways MUST route /wss → :9222 internally.
+COPY bundles/bundle-ck-allinone/web/web/index.html  /app/web/index.html
+COPY bundles/bundle-ck-allinone/web/web2/index.html /app/web2/index.html
+COPY bundles/bundle-ck-allinone/web/wss/index.html  /app/wss/index.html
 
 # Fresh launcher (OCIGER_POSTGRES_CONF_EXTRA + OCIGER_INITDB_SQL_FILE).
 COPY --from=pglauncher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher

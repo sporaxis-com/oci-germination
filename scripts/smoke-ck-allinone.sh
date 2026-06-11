@@ -137,6 +137,27 @@ if [[ "$JS_STATUS" != "200" ]]; then
 fi
 echo "[ck-allinone] ✓ /cklib/index.html=200, /cklib/ck-client.js=200"
 
+echo "[ck-allinone] ⑤+ reserved web surfaces — /web/, /web2/, /wss/ all served"
+# Every advertised surface MUST be present + served. A missing path silently
+# breaks downstream consumers in topologies the smoke didn't exercise; the
+# v0.7.5..v0.7.12 cuts shipped without these surfaces and only an envoy-fronted
+# downstream discovered the gap. See feedback_static_surface_completeness.md.
+for surface in web web2 wss; do
+  STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/${surface}/")
+  if [[ "$STATUS" != "200" ]]; then
+    echo "✗ httpd /${surface}/ returned $STATUS (reserved surface missing or broken)"
+    exit 1
+  fi
+  # Sanity: the page must self-identify so a future regression that serves the
+  # wrong content still fails the smoke.
+  BODY=$(curl -s "http://127.0.0.1:38000/${surface}/")
+  if ! echo "$BODY" | grep -qE "/${surface}/" ; then
+    echo "✗ /${surface}/ served HTML doesn't self-identify (suspect wrong content at this path)"
+    exit 1
+  fi
+done
+echo "[ck-allinone] ✓ /web/=200, /web2/=200, /wss/=200 (all reserved surfaces present)"
+
 echo "[ck-allinone] ⑤b root / serves the WSS round-trip landing"
 ROOT_STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/")
 if [[ "$ROOT_STATUS" != "200" ]]; then
@@ -144,15 +165,24 @@ if [[ "$ROOT_STATUS" != "200" ]]; then
   exit 1
 fi
 ROOT_BODY=$(curl -s "http://127.0.0.1:38000/")
+# Assert BOTH topology branches are present in the JS — the gateway-aware
+# branch (wss://host/wss for https) AND the direct-port branch (ws://host:9222
+# for the docker-run posture). v0.7.5..v0.7.12 shipped a direct-port-only
+# probe that broke every envoy-fronted consumer; this smoke catches that class
+# of regression. See feedback_static_surface_completeness.md.
+if ! echo "$ROOT_BODY" | grep -q '/wss' ; then
+  echo "✗ / landing JS missing the gateway-aware /wss branch (direct-port-only regression)"
+  exit 1
+fi
 if ! echo "$ROOT_BODY" | grep -q '9222' ; then
-  echo "✗ / does not reference port 9222 (no WSS round-trip landing)"
+  echo "✗ / landing JS missing the direct-port :9222 branch"
   exit 1
 fi
 if ! echo "$ROOT_BODY" | grep -qE 'WebSocket|CKPage|cklib' ; then
   echo "✗ / does not reference WebSocket / CKPage / cklib"
   exit 1
 fi
-echo "[ck-allinone] ✓ / serves WSS round-trip landing"
+echo "[ck-allinone] ✓ / serves WSS round-trip landing (both topology branches present)"
 
 echo "[ck-allinone] ⑤c WSS round-trip from sidecar (PUB→subscribe→receive)"
 # Use a small node-based WSS client to actually round-trip a message over :9222.
