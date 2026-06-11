@@ -5,25 +5,25 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.10
+ARG PG_BASE_VERSION=v0.1.11
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.4.2
 # v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
-# bridge calling ckp.dispatch over Unix-socket pg connection as
-# ck_participant). Pinning the version here so future ARG changes
-# are visible.
+# bridge calling ckp.dispatch over TCP+scram as ck_participant); the
+# bridge itself is unchanged in v0.7.12+ — only the upstream pg_base
+# pin moves with pgRDF/pgCK release cadence.
 ARG OCIGER_RELAY_GENERATION=v0.7.11
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.5.42 + pgCK 0.4.0 + NATS + ociger-pg-launcher) ───
-# v0.1.10 brings pgCK v0.4.0 — the "CKP v3.9 Critical Isolation enforced" milestone
-# (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane +
-# CI-E typed reads all live) — and pgRDF v0.5.42 (TA-4 dict-path parity matrix; test-
-# only additive). The CI-A roles (ck_substrate / ck_participant) land automatically as
-# a side-effect of CREATE EXTENSION pgck CASCADE in init.sql.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.10 AS pg_base
+# ─── Stage 1: pg base (pg17 + pgRDF 0.5.43 + pgCK 0.4.1 + NATS + ociger-pg-launcher) ───
+# v0.1.11 carries pgCK v0.4.1 — patch follow-on to the v0.4.0 "Critical
+# Isolation enforced" milestone (CI-A/B/C/D/E all in place; connection
+# contract unchanged) — and pgRDF v0.5.43. The CI-A roles (ck_substrate
+# / ck_participant) continue to land automatically via CREATE EXTENSION
+# pgck CASCADE in init.sql.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.11 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # Bumped to 1.4.2 — the "Air-gapped" cut requested by CK.Lib.Js for the
