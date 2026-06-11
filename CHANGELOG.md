@@ -33,6 +33,12 @@ See [PROVENANCE.md](./PROVENANCE.md) §Release attempt policy for the rules that
 
 ## ociger-ck-allinone
 
+### v0.7.16 — 2026-06-11 — SHIPPED (the complete v0.7.14 recovery; first cut under gate-before-push CI)
+- **Tried:** land the final two files from the v0.7.14 autostash incident (the Dockerfile `/ontology/` COPY + the relay's GOVERNED 2-arg dispatch switch), restructure `build-bundles.yml` to gate-before-push, and release-gate the CKP v3.9 governance plane.
+- **Tested:** CI green under the NEW order (build native → Python gate → 16-gate smoke → multi-arch push → attest). Smoke includes ⑤d STRONG seal (`ok:true` + `proof_digest` + `task-` id over the NATS relay — no PENDING branch; `does not exist` hard-fails) and ⑤e governance plane (`kernel.propose_change` → sealed Proposal{pending} → `kernel.vote` quorum met → `kernel.apply` state=applied → **kernel epoch advances**), both as `ck_participant`. SLSA attest verified.
+- **Verdict:** SHIPPED. Digest `sha256:267772ad911b54941a2a9cfc9fe8e2f7ab7b97577831109b5b038bc4b7f4787d`. CI run 27368038044. `:latest` moved off the unattested v0.7.15 leak.
+- **What this proves for adopters:** the full CKP v3.9 contract is live in the published bundle — typed seals with proof digests over the NATS wire, and type evolution through the consensus-gated governance plane, all as a participant role holding nothing but `EXECUTE ckp.dispatch`. This is the first cut where both are release-gated.
+
 ### v0.7.15 — 2026-06-11 — FAILED (Dockerfile COPY still missing; image pushed pre-gate then failed smoke — unattested v0.7.15 + :latest leaked to GHCR)
 - **Tried:** land the init.sql dropped from v0.7.14, promote ⑤d to the STRONG seal gate (ok:true + proof_digest, no PENDING branch), add the ⑤e governance-plane gate (propose → vote → apply → epoch advance, per CKP v3.9 §5 — verified working end-to-end in local probes as ck_participant, including over the NATS relay).
 - **Tested:** CI smoke FAILED at ②d (demo kernel bootstrap) — `could not open file "/ontology/task.ttl"`. The commit carried init.sql + the new smoke, but the v0.7.14 autostash had dropped FOUR files, and only init.sql + smoke were re-committed: the Dockerfile (`COPY …/ontologies/ /ontology/`) and the relay's 2-arg switch (main.go) were still uncommitted. The new ②d gate caught the missing fixtures exactly as designed.
