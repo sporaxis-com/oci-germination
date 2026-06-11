@@ -20,6 +20,9 @@ on:
       - pg17-pgrdf-pgck-nats-micro-release
     types:
       - completed
+  # Manual re-trigger for recovery — e.g. when a push race (below) loses, or
+  # an operator wants to force a re-render after registry-side changes.
+  workflow_dispatch:
 
 permissions:
   contents: write        # commit refreshed LATEST.md back to main
@@ -32,7 +35,7 @@ concurrency:
 
 jobs:
   refresh:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,4 +75,15 @@ jobs:
           [skip ci]
           EOF
           )"
+          # Push with rebase-retry: a docs commit landing on main between our
+          # checkout and this push (the 2026-06-11 race) must not strand the
+          # refresh — rebase the one-commit refresh onto the new head and
+          # retry, a few times, before giving up.
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto current main and retrying"
+            git pull --rebase origin main
+          done
           git push origin main
