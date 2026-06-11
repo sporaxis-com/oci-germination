@@ -33,6 +33,13 @@ See [PROVENANCE.md](./PROVENANCE.md) §Release attempt policy for the rules that
 
 ## ociger-ck-allinone
 
+### v0.7.13 — 2026-06-11 — SHIPPED
+- **Tried:** composition-completeness cut. Fixes the bundled `/app/index.html` landing-page WSS probe so it works in both supported topologies (direct docker run with port-mapped `:9222`, and envoy/gateway-fronted with TLS + `/wss` upgrade) — v0.7.5..v0.7.12 hardcoded `ws://${location.hostname}:9222` which silently broke every envoy-fronted consumer. Adds three reserved web surfaces (`/app/web/`, `/app/web2/`, `/app/wss/`) so downstream consumers can rely on them being served by busybox httpd; each ships a self-identifying stub page. Adds two new smoke gates that would have caught both classes of regression on the first failing cut.
+- **Pins:** pg_base v0.1.11, cklib 1.4.2 (unchanged from v0.7.12 — this cut is composition + smoke surface only).
+- **Tested:** multi-arch build OK; "Verify no Python" OK; smoke green on the expanded gate set — ⑤ `/cklib/*` 200, **⑤+ `/web/`, `/web2/`, `/wss/` all 200 + self-identifying** (new gate), ⑤b landing 200 **+ both topology branches (`/wss` AND `:9222`) present in JS** (new gate), ⑤c WSS round-trip via sidecar, ⑤d §B4 dispatch-bridge round-trip. SLSA attest verified.
+- **Verdict:** SHIPPED. Digest `sha256:f959c67b2144f5e5b7ecb20bd84b47383ce767e8ad8e8d9e82a29df0d4bd5d26`. CI run 27349274298.
+- **First release under the new monotonic-version policy** (PROVENANCE rules 9 + 10); next release will be v0.7.14 regardless of outcome.
+
 ### v0.7.12 — 2026-06-11 — SHIPPED
 - **Tried:** patch follow-on consuming the freshly-bumped pg_base v0.1.11 (pgRDF 0.5.43 + pgCK 0.4.1). No bridge or cklib change.
 - **Pins:** pg_base v0.1.11, cklib 1.4.2, relay v0.7.11 generation.
