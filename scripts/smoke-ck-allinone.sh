@@ -38,6 +38,7 @@ docker run --rm -d \
   --name "$CONTAINER_NAME" \
   --network "$NETWORK_NAME" \
   -e POSTGRES_PASSWORD=smoketest \
+  -e OCIGER_CK_PARTICIPANT_PASSWORD=smoke-participant \
   -p 35432:5432 -p 38000:8000 -p 34222:4222 -p 39222:9222 \
   -v "$PWD/$DATA_DIR:/var/lib/postgresql/data" \
   "$IMAGE" >/dev/null
@@ -101,6 +102,61 @@ if [[ "$PGCK_NATIVE" != "$EXPECTED_PGCK_NATIVE" ]]; then
   exit 1
 fi
 echo "[ck-allinone] ✓ pgrdf=$PGRDF_INSTALLED pgck=$PGCK_INSTALLED ($PGCK_NATIVE)"
+
+echo "[ck-allinone] ②a pgRDF actually parses Turtle + stores quads (real round-trip, not just presence)"
+# Inline Turtle fixture — 3 triples, deterministic. parse_turtle returns the
+# parsed-count; we then count the stored rows in the smoke graph and assert
+# both equal 3. The DELETE-before-parse keeps the assertion deterministic
+# when the smoke harness re-runs against a re-used data volume locally; in
+# CI the volume is always fresh.
+RDF_TTL='@prefix ex: <http://example.org/> . ex:s ex:p ex:o . ex:s ex:p2 "lit" . ex:s2 ex:p ex:o2 .'
+$PSQL -c "DELETE FROM pgrdf._pgrdf_quads_default WHERE graph_id = 4242;" >/dev/null 2>&1 || true
+RDF_PARSED=$($PSQL -c "SELECT pgrdf.parse_turtle('$RDF_TTL', 4242::bigint, 'urn:test:smoke');" 2>&1 | tr -d ' ')
+RDF_STORED=$($PSQL -c "SELECT count(*) FROM pgrdf._pgrdf_quads_default WHERE graph_id = 4242;" 2>&1 | tr -d ' ')
+if [[ "$RDF_PARSED" != "3" || "$RDF_STORED" != "3" ]]; then
+  echo "✗ pgRDF round-trip failed: parsed=$RDF_PARSED stored=$RDF_STORED expected both = 3"
+  echo "   (this asserts pgRDF's parser AND its storage path both work end-to-end, not just that the extension installs)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ pgRDF round-trip OK (parsed=3 quads, stored=3 quads in graph_id=4242)"
+
+echo "[ck-allinone] ②b pgCK CI-A role floor + dispatch grants (shape, not just version)"
+# CI-A asserts: ck_substrate is a NOLOGIN owner, ck_participant is LOGIN-capable
+# (with the deploy-supplied password), ckp.dispatch is SECURITY DEFINER, and
+# ck_participant has EXECUTE on the 4-arg dispatch. Any drift here means the
+# v3.9 alpha contract has silently regressed — the alpha cuts ship the floor
+# automatically via CREATE EXTENSION pgck CASCADE; smoke asserts it landed.
+ROLE_SUBSTRATE=$($PSQL -c "SELECT rolcanlogin FROM pg_roles WHERE rolname = 'ck_substrate';" 2>&1 | tr -d ' ')
+ROLE_PARTICIPANT=$($PSQL -c "SELECT rolcanlogin FROM pg_roles WHERE rolname = 'ck_participant';" 2>&1 | tr -d ' ')
+DISPATCH_SECDEF=$($PSQL -c "SELECT prosecdef FROM pg_proc WHERE proname='dispatch' AND pronamespace=(SELECT oid FROM pg_namespace WHERE nspname='ckp') LIMIT 1;" 2>&1 | tr -d ' ')
+DISPATCH_GRANT=$($PSQL -c "SELECT has_function_privilege('ck_participant', 'ckp.dispatch(text,text,jsonb,text)', 'EXECUTE');" 2>&1 | tr -d ' ')
+if [[ "$ROLE_SUBSTRATE" != "f" ]]; then
+  echo "✗ CI-A regression: ck_substrate canlogin=$ROLE_SUBSTRATE (must be f / NOLOGIN — substrate is owner-only)"
+  exit 1
+fi
+if [[ "$ROLE_PARTICIPANT" != "t" ]]; then
+  echo "✗ CI-A regression: ck_participant canlogin=$ROLE_PARTICIPANT (must be t — needs LOGIN for external consumers)"
+  exit 1
+fi
+if [[ "$DISPATCH_SECDEF" != "t" ]]; then
+  echo "✗ CI-A regression: ckp.dispatch SECURITY DEFINER=$DISPATCH_SECDEF (must be t — the trusted-door property is core to the role floor)"
+  exit 1
+fi
+if [[ "$DISPATCH_GRANT" != "t" ]]; then
+  echo "✗ CI-A regression: ck_participant EXECUTE on ckp.dispatch=$DISPATCH_GRANT (must be t — external consumers must be able to call the door)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ CI-A floor OK (ck_substrate NOLOGIN, ck_participant LOGIN, ckp.dispatch SECURITY DEFINER + granted to ck_participant)"
+
+echo "[ck-allinone] ②c pgCK CI-B affordance registry is populated (not a stub)"
+# CI-B asserts the registry table is seeded with verbs by the extension's
+# bootstrap migrations. A drift to zero rows means CI-B regressed silently.
+REGISTRY_COUNT=$($PSQL -c "SELECT count(*) FROM ckp.affordance_registry;" 2>&1 | tr -d ' ')
+if ! [[ "$REGISTRY_COUNT" =~ ^[0-9]+$ ]] || [[ "$REGISTRY_COUNT" -lt 10 ]]; then
+  echo "✗ CI-B regression: ckp.affordance_registry has $REGISTRY_COUNT entries (expect >= 10 — pgCK v0.4.x seeds ~20 verbs)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ CI-B registry seeded ($REGISTRY_COUNT verbs)"
 
 echo "[ck-allinone] ③ NATS core on :4222"
 for i in $(seq 1 15); do
@@ -220,52 +276,136 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip — input.kernel.pgCK.action.<verb> → result.kernel.pgCK.<verb> (via ckp.dispatch)"
-# Publishes to the input subject and asserts a typed jsonb MSG arrives on the
-# matching result subject within 5 s. v0.7.11+ : the relay now calls
-# ckp.dispatch(verb, kernel_urn, payload, identity) via a pg connection as
-# ck_participant and publishes the typed reply. Unknown verbs return the
-# pgCK registry's typed `{"ok":false,"error":"unknown_affordance"}` envelope —
-# which IS a successful round-trip (the bridge ran the dispatch and got a
-# typed reply); we accept any payload starting with `{` as proof of round-trip.
-DISP_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+echo "[ck-allinone] ②d pgCK 'demo' kernel bootstrap via vendored ontology fixtures"
+# v0.7.14+ : assert the vendored /ontology/<module>.ttl fixtures resolve via
+# ckp.import_module. pgCK 0.4.1's task.create resolver currently looks up the
+# 'demo' project regardless of the payload's target_kernel — so the smoke uses
+# 'demo' as the bootstrap project. When pgCK generalizes the lookup so any
+# target_kernel works, this smoke can switch to a unique per-run kernel name.
+# Without this step the per-verb seal handlers would fail with `could not open
+# file "/ontology/task.ttl"` — see bundles/bundle-ck-allinone/ontologies/
+# README.md for the upstream gap that motivates the vendoring.
+$PSQL -c "CALL ckp.import_module('task', 'demo', '/ontology');" >/dev/null 2>&1
+$PSQL -c "CALL ckp.import_module('goal', 'demo', '/ontology');" >/dev/null 2>&1
+DEMO_KERNEL_BOOTED=$($PSQL -c "SELECT (SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri LIKE 'urn:ckp:demo%') > 0;" 2>&1 | tr -d ' ')
+if [[ "$DEMO_KERNEL_BOOTED" != "t" ]]; then
+  echo "✗ pgCK kernel bootstrap failed: demo kernel graphs absent (import_module didn't fire; check /ontology/{task,goal}.ttl)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ demo kernel bootstrapped via ckp.import_module(task, demo) + (goal, demo)"
+
+echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + GOVERNED seal (semantic pass: ok=true + proof_digest)"
+# v0.7.14+ : the round-trip asserts not just envelope shape but envelope
+# SEMANTICS — the reply must be `ok:true` with a proof_digest, proving the
+# relay actually called the GOVERNED 2-arg `ckp.dispatch(verb, payload)`
+# that runs the per-verb seal handlers in pgCK 0.4.x. This is the gate
+# that would have caught the v0.7.11..v0.7.13 escape — those cuts called
+# the 4-arg CI-A-2 stub by mistake, which returns `{"ok":false,"error":
+# "verb not governed yet (CI-B): <verb>",…}` for EVERY verb. CK.Lib.Js's
+# verify-v150 trapped the regression on v0.7.13; this assertion makes the
+# trap automatic on every future release.
+#
+# Why this gate is necessary and not redundant with the shape check above
+# it (kept for the parse-error catch): the shape check passes any typed
+# envelope; only a semantic check that asserts `ok===true` distinguishes
+# "the relay reached pg + got a typed reply" from "the relay reached pg +
+# got a typed reply that proves the seal happened."
+#
+# Payload structure for the smoke fixture:
+#   {"task": {"target_kernel": "smoke", "title": "smoke check"}}
+# matches the per-verb seal handler in pgck--0.4.x.sql's `task.create` /
+# `instance.create` branches (kernel + title are the only required fields).
+DISP_OUT=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
   cat > /probe.mjs <<EOF
 import { WebSocket } from "ws";
 const url = "ws://'"$CONTAINER_NAME"':9222";
-const verb = "smoke.ping." + Math.random().toString(36).slice(2,8);
+const verb = "task.create";
 const inSubj = "input.kernel.pgCK.action." + verb;
 const outSubj = "result.kernel.pgCK." + verb;
 const ws = new WebSocket(url);
-let ok = false;
-const t = setTimeout(() => { if (!ok) { console.log("TIMEOUT"); process.exit(2); } }, 8000);
+const t = setTimeout(() => { console.log("FAIL timeout"); process.exit(2); }, 8000);
 ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
 ws.on("message", (data) => {
   const txt = data.toString();
   if (txt.startsWith("INFO ")) {
     ws.send("SUB " + outSubj + " 1\r\n");
     setTimeout(() => {
-      const payload = "{}";
+      const payload = JSON.stringify({task:{target_kernel:"demo",title:"smoke check"}});
       ws.send("PUB " + inSubj + " " + payload.length + "\r\n" + payload + "\r\n");
     }, 200);
-  } else if (txt.includes("MSG " + outSubj + " ")) {
-    ok = true;
+  } else if (txt.startsWith("MSG ")) {
     clearTimeout(t);
-    console.log("OK");
-    ws.close();
-    process.exit(0);
+    const parts = txt.split("\r\n");
+    const body = parts[1] || "";
+    let env;
+    try { env = JSON.parse(body); }
+    catch(e) { console.log("FAIL not-json:" + body.slice(0,160)); process.exit(3); }
+
+    var hasDelegate = Object.prototype.hasOwnProperty.call(env, "delegate");
+    var isStubError = /not governed yet/.test(String(env.error||""));
+    if (hasDelegate || isStubError) {
+      console.log("FAIL relay-called-4-arg-stub must-call-GOVERNED-2-arg body=" + body.slice(0,240));
+      process.exit(10);
+    }
+    if (/does not exist/.test(String(env.error||""))) {
+      console.log("FAIL relation-missing — init.sql bootstrap (CALL ckp.bootstrap_kernel + role-floor grants) did not run; this is the v0.7.14 escape class. body=" + body.slice(0,240));
+      process.exit(12);
+    }
+    if (env.ok === true && env.proof_digest && String(env.id||"").startsWith("task-")) {
+      console.log("OK ok=true id=" + env.id + " proof_digest=" + env.proof_digest.slice(0,12));
+      ws.close();
+      process.exit(0);
+    }
+    console.log("FAIL seal-did-not-complete body=" + body.slice(0,240));
+    process.exit(13);
   }
 });
-ws.on("error", (e) => { console.log("ERR " + e.message); process.exit(3); });
+ws.on("error", (e) => { console.log("FAIL ws-error:" + e.message); process.exit(7); });
 EOF
   cd /tmp && npm install --silent --no-save ws@8 >/dev/null 2>&1
   node --input-type=module < /probe.mjs
 ' 2>&1 | tail -1)
-if [[ "$DISP_OK" != "OK" ]]; then
-  echo "✗ §B4 dispatch bridge round-trip failed: $DISP_OK"
+if [[ "$DISP_OUT" != OK* ]]; then
+  echo "✗ §B4 dispatch bridge GOVERNED-seal round-trip failed: $DISP_OUT"
   docker logs "$CONTAINER_NAME" 2>&1 | grep -i 'pgck-relay' | tail -20
   exit 1
 fi
-echo "[ck-allinone] ✓ §B4 dispatch bridge round-trip OK (input → ckp.dispatch → result)"
+echo "[ck-allinone] ✓ §B4 dispatch bridge GOVERNED seal round-trip ($DISP_OUT)"
+
+echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advances the kernel epoch (CKP v3.9 §5)"
+# The adoption-critical path: a participant (not superuser) governs a type
+# change in through the sealed door. Asserts the FULL lifecycle: Proposal
+# sealed {pending} → Vote sealed, quorum met → apply flips state to
+# {applied} and bumps the kernel epoch. This is the regression trap for
+# the v3.9 governance plane end-to-end — if any of registry routing, the
+# ProposalShape gate, the quorum count, or the apply cascade regresses,
+# this fails before a release ships.
+PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:17-bookworm psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
+EPOCH_BEFORE=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
+GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"property\":\"smoke_prop\",\"datatype\":\"xsd:string\"}}'::jsonb)::text;" 2>&1)
+GOV_IRI=$(echo "$GOV_PROPOSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)
+if [[ -z "$GOV_IRI" ]]; then
+  echo "✗ governance propose failed: $GOV_PROPOSE"
+  exit 1
+fi
+GOV_VOTE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.vote', '{\"about\":\"$GOV_IRI\",\"value\":\"approve\"}'::jsonb)::text;" 2>&1)
+GOV_QUORUM=$(echo "$GOV_VOTE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('quorum_met',False))" 2>/dev/null)
+if [[ "$GOV_QUORUM" != "True" ]]; then
+  echo "✗ governance vote failed or quorum not met: $GOV_VOTE"
+  exit 1
+fi
+GOV_APPLY=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.apply', '{\"about\":\"$GOV_IRI\"}'::jsonb)::text;" 2>&1)
+GOV_STATE=$(echo "$GOV_APPLY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null)
+EPOCH_AFTER=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
+if [[ "$GOV_STATE" != "applied" ]]; then
+  echo "✗ governance apply failed: $GOV_APPLY"
+  exit 1
+fi
+if [[ "$EPOCH_AFTER" -le "$EPOCH_BEFORE" ]]; then
+  echo "✗ governance apply did not advance the kernel epoch (before=$EPOCH_BEFORE after=$EPOCH_AFTER)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
 
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \
