@@ -1,9 +1,9 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.10
+version: v0.7.11
 role: prod
 never_prod: false
-description: CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 17 + pgRDF 0.5.42 + pgCK 0.4.0 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.2 (Air-gapped cut, attested 2026-06-10), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
+description: CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.5.42 + pgCK 0.4.0 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.4.2 (Air-gapped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11 rewrites ociger-pgck-relay from a bus-level echo into a real dispatch bridge: subscribe input.kernel.<K>.action.<verb> → CALL ckp.dispatch(verb, kernel_urn, payload::jsonb, identity) via Unix-socket pg connection as ck_participant → publish typed reply on result.kernel.<K>.<verb> preserving Trace-Id. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env).
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
@@ -62,14 +62,14 @@ components:
     source: ./cmd/ociger-pg-launcher
     description: PID-stable postgres launcher; handles initdb on first boot, appends OCIGER_POSTGRES_CONF_EXTRA, and pipes OCIGER_INITDB_SQL_FILE through `postgres --single` so the image needs no postgres client.
   ociger-pgck-relay:
-    version: in-tree
-    role: shim
+    version: in-tree (v0.7.11 generation — dispatch bridge)
+    role: bridge
     source: ./cmd/ociger-pgck-relay
-    shims_for: pgck@0.3.x (nats-client Cargo feature OFF through Track D; not a v0.4.0 gate)
+    shims_for: pgck@0.4.x (nats-client Cargo feature OFF through Track D; not a v0.4.0 gate)
     notify_ref: pgck/publish-nats-client-feature-build
     retire_probe: pgck.so contains BOTH 'RELAY_OUT_PREFIX' AND 'async_nats::' (multi-marker conjunction; ratified with pgCK upstream 2026-06-10)
     opt_out_env: OCIGER_DISABLE_PGCK_RELAY=1
-    description: Bus-level relay (input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>) covering the compiled-out nats-client path in pgCK 0.3.x.
+    description: NATS → pgCK dispatch bridge. Subscribes input.kernel.<K>.action.<verb>; connects to postgres as ck_participant over Unix socket; calls ckp.dispatch(verb, kernel_urn, payload::jsonb, identity); publishes typed jsonb reply on result.kernel.<K>.<verb> preserving inbound headers (incl. Trace-Id, X-Identity-Key). Replaces the v0.7.5–v0.7.10 bus-level echo per CK.Lib.Js NOTIFY v0.7.9.integration-gaps-block-v150.
 
 supervisor:
   binary: s6-overlay v3.2.3.0

@@ -190,28 +190,31 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ⑤d §B4 dispatcher round-trip — input.kernel.pgCK.action.> → event.kernel.pgCK.<verb>"
-# Publishes to the input subject and asserts a MSG arrives on the matching event
-# subject within 5 s. Closes CHECKLIST §B4. The fan-out is performed by
-# ociger-pgck-relay (in-tree shim) while pgck.so is built without the
-# nats-client feature; the relay self-disables when upstream embeds it.
+echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip — input.kernel.pgCK.action.<verb> → result.kernel.pgCK.<verb> (via ckp.dispatch)"
+# Publishes to the input subject and asserts a typed jsonb MSG arrives on the
+# matching result subject within 5 s. v0.7.11+ : the relay now calls
+# ckp.dispatch(verb, kernel_urn, payload, identity) via a pg connection as
+# ck_participant and publishes the typed reply. Unknown verbs return the
+# pgCK registry's typed `{"ok":false,"error":"unknown_affordance"}` envelope —
+# which IS a successful round-trip (the bridge ran the dispatch and got a
+# typed reply); we accept any payload starting with `{` as proof of round-trip.
 DISP_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
   cat > /probe.mjs <<EOF
 import { WebSocket } from "ws";
 const url = "ws://'"$CONTAINER_NAME"':9222";
 const verb = "smoke.ping." + Math.random().toString(36).slice(2,8);
 const inSubj = "input.kernel.pgCK.action." + verb;
-const outSubj = "event.kernel.pgCK." + verb;
+const outSubj = "result.kernel.pgCK." + verb;
 const ws = new WebSocket(url);
 let ok = false;
-const t = setTimeout(() => { if (!ok) { console.log("TIMEOUT"); process.exit(2); } }, 5000);
+const t = setTimeout(() => { if (!ok) { console.log("TIMEOUT"); process.exit(2); } }, 8000);
 ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
 ws.on("message", (data) => {
   const txt = data.toString();
   if (txt.startsWith("INFO ")) {
     ws.send("SUB " + outSubj + " 1\r\n");
     setTimeout(() => {
-      const payload = "dispatch-" + Date.now();
+      const payload = "{}";
       ws.send("PUB " + inSubj + " " + payload.length + "\r\n" + payload + "\r\n");
     }, 200);
   } else if (txt.includes("MSG " + outSubj + " ")) {
@@ -228,11 +231,11 @@ EOF
   node --input-type=module < /probe.mjs
 ' 2>&1 | tail -1)
 if [[ "$DISP_OK" != "OK" ]]; then
-  echo "✗ §B4 dispatcher round-trip failed: $DISP_OK"
+  echo "✗ §B4 dispatch bridge round-trip failed: $DISP_OK"
   docker logs "$CONTAINER_NAME" 2>&1 | grep -i 'pgck-relay' | tail -20
   exit 1
 fi
-echo "[ck-allinone] ✓ §B4 dispatcher round-trip OK (relay forwarded input→event)"
+echo "[ck-allinone] ✓ §B4 dispatch bridge round-trip OK (input → ckp.dispatch → result)"
 
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \

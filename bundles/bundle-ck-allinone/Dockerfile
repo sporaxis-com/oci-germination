@@ -8,6 +8,11 @@
 ARG PG_BASE_VERSION=v0.1.10
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.4.2
+# v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
+# bridge calling ckp.dispatch over Unix-socket pg connection as
+# ck_participant). Pinning the version here so future ARG changes
+# are visible.
+ARG OCIGER_RELAY_GENERATION=v0.7.11
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
