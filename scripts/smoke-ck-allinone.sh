@@ -22,7 +22,6 @@ EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
 # the Dockerfile. v1.5.0 adds ck.js (the L2 dispatch facade / entry point)
 # and ck-store.js (the typed-instance cache); still no index.html/ck-page.
 EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE README.md ck.js ck-client.js ck-store.js vendor/msgpack.js vendor/nats.ws.js}"
-EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.11}"
 
 echo "════════════════════════════════════════════════════════════"
 echo "[ck-allinone] CKP v3.8 All-in-One (Delta) Smoke Test"

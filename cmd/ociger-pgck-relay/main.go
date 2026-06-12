@@ -9,23 +9,25 @@
 // History
 // -------
 // v0.7.5–v0.7.10 — bus-level fan-out only: forwarded the inbound MSG
-//   verbatim to `event.kernel.<K>.<verb>` without ever calling
-//   `ckp.dispatch`. CK.Lib.Js verify-v150 exercised this path and
-//   correctly reported that nothing reached `result.*` — the relay
-//   echoed but did not dispatch.
+//
+//	verbatim to `event.kernel.<K>.<verb>` without ever calling
+//	`ckp.dispatch`. CK.Lib.Js verify-v150 exercised this path and
+//	correctly reported that nothing reached `result.*` — the relay
+//	echoed but did not dispatch.
 //
 // v0.7.11 — replaces the echo with a real bridge per CK.Lib.Js NOTIFY
-//   `…v0.7.9.integration-gaps-block-v150.md` ask #2: subscribe input,
-//   CALL ckp.dispatch, publish typed result on `result.kernel.<K>.<verb>`.
+//
+//	`…v0.7.9.integration-gaps-block-v150.md` ask #2: subscribe input,
+//	CALL ckp.dispatch, publish typed result on `result.kernel.<K>.<verb>`.
 //
 // Self-disable conditions (unchanged from v0.7.10):
 //
-//   1. env OCIGER_DISABLE_PGCK_RELAY=1 → block forever, never connect.
-//   2. boot probe: if /usr/lib/postgresql/17/lib/pgck.so contains BOTH
-//      "RELAY_OUT_PREFIX" AND "async_nats::" — the discriminating
-//      conjunction of the relay-code constant and a symbol from the
-//      async_nats Rust crate — we assume the upstream `nats-client`
-//      Cargo feature is compiled in and stand down.
+//  1. env OCIGER_DISABLE_PGCK_RELAY=1 → block forever, never connect.
+//  2. boot probe: if /usr/lib/postgresql/17/lib/pgck.so contains BOTH
+//     "RELAY_OUT_PREFIX" AND "async_nats::" — the discriminating
+//     conjunction of the relay-code constant and a symbol from the
+//     async_nats Rust crate — we assume the upstream `nats-client`
+//     Cargo feature is compiled in and stand down.
 //
 // Standing down means "park as a no-op longrun" rather than exit so
 // s6 doesn't restart-loop us.
@@ -159,7 +161,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("NATS connect failed: %v", err)
 	}
-	defer nc.Drain()
+	defer func() { _ = nc.Drain() }()
 
 	sub, err := nc.Subscribe(relayInSubject, func(m *nats.Msg) {
 		handleMsg(ctx, pool, nc, m)
@@ -167,7 +169,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("subscribe %s failed: %v", relayInSubject, err)
 	}
-	defer sub.Unsubscribe()
+	defer func() { _ = sub.Unsubscribe() }()
 
 	log.Printf("dispatching %s → %s<K>.<verb> via ckp.dispatch", relayInSubject, relayOutPrefix)
 
@@ -280,8 +282,8 @@ func drainBatch(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn) {
 //
 // pgCK 0.3.x..0.4.x ships TWO `ckp.dispatch` overloads:
 //
-//   ckp.dispatch(verb text, payload jsonb)                                 — the GOVERNED 2-arg
-//   ckp.dispatch(verb text, kernel_urn text, payload jsonb, identity text) — the CI-A-2 STUB
+//	ckp.dispatch(verb text, payload jsonb)                                 — the GOVERNED 2-arg
+//	ckp.dispatch(verb text, kernel_urn text, payload jsonb, identity text) — the CI-A-2 STUB
 //
 // The 2-arg form runs the per-verb seal handlers and returns a sealed
 // instance + proof_digest on success. The 4-arg form is a CI-A-2 stub

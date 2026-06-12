@@ -1,11 +1,11 @@
 package bundle
 
 type Spec struct {
-	Name        string        `yaml:"name"`
-	SpecVersion string        `yaml:"spec_version,omitempty"`
-	Description string        `yaml:"description"`
-	BundleDir   string        `yaml:"-"`
-	SkipRender  bool          `yaml:"skip_render,omitempty"`
+	Name        string `yaml:"name"`
+	SpecVersion string `yaml:"spec_version,omitempty"`
+	Description string `yaml:"description"`
+	BundleDir   string `yaml:"-"`
+	SkipRender  bool   `yaml:"skip_render,omitempty"`
 	// Role + NeverProd surface the ck.bundle.role + ck.bundle.never-prod
 	// manifest labels emitted in the bundle's Dockerfile final stage.
 	// Valid Role values: "prod" | "devel" | "bench".

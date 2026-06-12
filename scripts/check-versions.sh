@@ -9,7 +9,7 @@
 # Usage:  scripts/check-versions.sh            # report + gate
 #         scripts/check-versions.sh --report   # report only, always exit 0
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 REPORT_ONLY=0
 [ "${1:-}" = "--report" ] && REPORT_ONLY=1
