@@ -26,3 +26,21 @@ CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
 -- board arming; /ontology is the documented default root).
 CALL ckp.import_module('task', 'demo', '/ontology');
 CALL ckp.import_module('goal', 'demo', '/ontology');
+
+-- Native outbox drain role (v0.7.18+). Every seal enqueues an event into
+-- ckp.outbox; pgCK's in-kernel nats-client bgworker that drains it onto NATS
+-- is not in the shipped .so, so ociger-pgck-relay drains it (the same shim
+-- posture as the dispatch bridge — it retires when pgCK ships the bgworker).
+-- The drain runs as this dedicated LEAST-PRIVILEGE role: SELECT + DELETE on
+-- ckp.outbox only. It is deliberately NOT ck_participant (the v3.9 floor keeps
+-- the participant role to ckp.dispatch alone) and NOT a superuser. ck_drainer
+-- connects from inside the container over 127.0.0.1 (the launcher's pg_hba
+-- catch-all trusts local connections); it needs no password and is not
+-- exposed — only ck_participant is the externally-scram'd role.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ck_drainer') THEN
+    CREATE ROLE ck_drainer LOGIN;
+  END IF;
+END $$;
+GRANT USAGE ON SCHEMA ckp TO ck_drainer;
+GRANT SELECT, DELETE ON ckp.outbox TO ck_drainer;

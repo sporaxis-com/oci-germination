@@ -16,11 +16,12 @@ DATA_DIR=".artifacts/ociger-ck-allinone-smoke/pgdata"
 EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
 EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.2}"
 EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
-# cklib 1.4.3+ byte-set contract (adopted by both sides of the cklib-stale
-# thread): /app/cklib MUST contain EXACTLY this file set — the attested
-# stripped bundle, nothing more, nothing less. Bump together with
-# CKLIB_VERSION in the Dockerfile.
-EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE README.md ck-client.js vendor/msgpack.js vendor/nats.ws.js}"
+# cklib byte-set contract (adopted by both sides of the cklib-stale thread):
+# /app/cklib MUST contain EXACTLY this file set — the attested stripped
+# bundle, nothing more, nothing less. Bump together with CKLIB_VERSION in
+# the Dockerfile. v1.5.0 adds ck.js (the L2 dispatch facade / entry point)
+# and ck-store.js (the typed-instance cache); still no index.html/ck-page.
+EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE README.md ck.js ck-client.js ck-store.js vendor/msgpack.js vendor/nats.ws.js}"
 EXPECTED_CKLIB_VERSION="${CKLIB_EXPECTED_VERSION:-1.3.11}"
 
 echo "════════════════════════════════════════════════════════════"
@@ -185,16 +186,16 @@ else
 fi
 
 echo "[ck-allinone] ⑤ busybox httpd serves the cklib client on :8000"
-# cklib 1.4.3+ ships NO index.html (the stripped set), so the gate is the
-# client entrypoint + the vendored transport deps, each 200.
-for asset in ck-client.js vendor/nats.ws.js vendor/msgpack.js; do
+# cklib 1.5.0 ships NO index.html (the stripped set), so the gate is the
+# L2 facade entry point (ck.js) + the client + the vendored transport deps.
+for asset in ck.js ck-client.js ck-store.js vendor/nats.ws.js vendor/msgpack.js; do
   STATUS=$(curl -sI -o /dev/null -w '%{http_code}' "http://127.0.0.1:38000/cklib/${asset}")
   if [[ "$STATUS" != "200" ]]; then
     echo "✗ httpd /cklib/${asset} returned $STATUS"
     exit 1
   fi
 done
-echo "[ck-allinone] ✓ /cklib/ck-client.js + vendor/{nats.ws,msgpack}.js all 200"
+echo "[ck-allinone] ✓ /cklib/{ck.js,ck-client.js,ck-store.js} + vendor/{nats.ws,msgpack}.js all 200"
 
 echo "[ck-allinone] ⑤± cklib byte-set gate — /app/cklib is EXACTLY the attested stripped bundle"
 # The packaging contract from the cklib-stale thread: every file under
@@ -435,6 +436,53 @@ if [[ "$EPOCH_AFTER" -le "$EPOCH_BEFORE" ]]; then
   exit 1
 fi
 echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
+
+echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.pgCK.<class>.sealed (NO host bridge)"
+# v0.7.18+ : every seal enqueues a ckp.outbox row; the relay's native drain
+# (as ck_drainer) publishes it onto event.kernel.pgCK.<class>.sealed. This
+# gate proves the bundle moves sealed events onto NATS BY ITSELF — the
+# regression class CK.Lib.Js's no-native-outbox-drain NOTIFY surfaced (their
+# verify only passed with a stray host-side dev drain). The probe subscribes
+# to event.kernel.pgCK.> first, triggers a seal via the relay, and asserts an
+# event lands — with no drain process anywhere but inside the container.
+DRAIN_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+  cat > /probe.mjs <<EOF
+import { WebSocket } from "ws";
+const ws = new WebSocket("ws://'"$CONTAINER_NAME"':9222");
+const evtSubj = "event.kernel.pgCK.>";
+const inSubj  = "input.kernel.pgCK.action.task.create";
+let subscribed = false;
+const t = setTimeout(() => { console.log("FAIL no-event-in-8s"); process.exit(2); }, 8000);
+ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
+ws.on("message", (data) => {
+  const txt = data.toString();
+  if (txt.startsWith("INFO ")) {
+    ws.send("SUB " + evtSubj + " 1\r\n");
+    subscribed = true;
+    setTimeout(() => {
+      const payload = JSON.stringify({task:{target_kernel:"demo",title:"drain-probe"}});
+      ws.send("PUB " + inSubj + " " + payload.length + "\r\n" + payload + "\r\n");
+    }, 300);
+  } else if (subscribed && txt.includes("MSG event.kernel.pgCK.")) {
+    clearTimeout(t);
+    const subj = txt.split("\r\n")[0].split(" ")[1];
+    console.log("OK " + subj);
+    ws.close();
+    process.exit(0);
+  }
+});
+ws.on("error", (e) => { console.log("FAIL ws-error:" + e.message); process.exit(3); });
+EOF
+  cd /tmp && npm install --silent --no-save ws@8 >/dev/null 2>&1
+  node --input-type=module < /probe.mjs
+' 2>&1 | tail -1)
+if [[ "$DRAIN_OK" != OK* ]]; then
+  echo "✗ native outbox drain failed: $DRAIN_OK"
+  echo "   (a seal did not emit an event on event.kernel.pgCK.* — the relay drain isn't running)"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck-relay|drain' | tail -15
+  exit 1
+fi
+echo "[ck-allinone] ✓ native drain OK — seal → $DRAIN_OK (no host bridge)"
 
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \

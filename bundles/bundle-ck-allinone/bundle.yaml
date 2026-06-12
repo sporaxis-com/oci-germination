@@ -46,10 +46,10 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.4.3
+    version: 1.5.0
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
-    description: Browser JavaScript client library for CKP v3.8 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.4.2 "Air-gapped" — requested explicitly by CK.Lib.Js for the bundled all-in-one (SLSA-attested 2026-06-10 22:27 UTC). OCI bundle file set is byte-identical to 1.4.1 and 1.4.0 (verified empirically); the vendoring claim applies to the npm package, not the OCI bundle. File-level RDF surface excise + L2 facade remain forward work on the v1.5.0 line.
+    description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.0 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
   nats-server:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server

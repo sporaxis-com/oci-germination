@@ -49,6 +49,32 @@
 // For now it reads from the inbound NATS header `X-Identity-Key`; the
 // Envoy/Keycloak edge sets that header when present. If absent we pass
 // the empty string and pgCK's TR-02 transitional GUC handles fallback.
+//
+// Outbox drain (v0.7.18+)
+// -----------------------
+// Every pgCK seal enqueues one row into `ckp.outbox` (subject, payload,
+// headers) via the ckp.ledger_to_outbox trigger. pgCK's design drains
+// that queue with an in-kernel nats-client bgworker — which is NOT in the
+// shipped .so (the same nats-client Cargo feature the dispatch relay
+// stands in for). Without a drain, sealed events never leave the database:
+// `event.kernel.<K>.*` stays silent and every consumer (web2, cklib ckOn
+// binds) sees nothing. So this binary also drains the outbox.
+//
+// The drain runs as the dedicated least-privilege `ck_drainer` role
+// (SELECT + DELETE on ckp.outbox only — created in the bundle's init.sql),
+// NOT as ck_participant (the v3.9 floor keeps the participant role to
+// ckp.dispatch alone) and NOT as a superuser. The loop polls every
+// ~250ms, publishes each row to its stored subject in seq order with the
+// row's headers, flushes to confirm server receipt, then deletes the
+// confirmed rows. At-least-once: a crash between flush and delete
+// re-publishes; consumers dedupe on the `Ck-Seq` header. There is no
+// pg_notify on outbox insert, so polling is the mechanism (matches pgCK's
+// documented bgworker tick loop).
+//
+// The drain shares the relay's retire posture: when pgCK ships the
+// nats-client bgworker (multi-marker probe trips), the whole binary stands
+// down and the native drain takes over. OCIGER_DISABLE_OUTBOX_DRAIN=1
+// disables just the drain (for operators running their own).
 package main
 
 import (
@@ -77,6 +103,11 @@ const (
 	// case is the upstream nats-client feature build.
 	probeMarkerRelay = "RELAY_OUT_PREFIX"
 	probeMarkerAsync = "async_nats::"
+
+	// Outbox drain tuning. Poll interval well under a second so the
+	// seal→event path is sub-second end to end; batch bounds each tick.
+	outboxDrainBatch    = 100
+	outboxDrainInterval = 250 * time.Millisecond
 )
 
 func main() {
@@ -139,8 +170,109 @@ func main() {
 	defer sub.Unsubscribe()
 
 	log.Printf("dispatching %s → %s<K>.<verb> via ckp.dispatch", relayInSubject, relayOutPrefix)
+
+	// Outbox drain — best-effort: a fresh v0.7.18+ volume has the ck_drainer
+	// role; an older volume does not, in which case the drain stays off and
+	// the dispatch path is unaffected (operators run their own drain there).
+	if os.Getenv("OCIGER_DISABLE_OUTBOX_DRAIN") == "1" {
+		log.Println("OCIGER_DISABLE_OUTBOX_DRAIN=1 — outbox drain off")
+	} else {
+		drainURL := getenv("OCIGER_PGCK_DRAIN_PG_URL",
+			"postgres://ck_drainer@127.0.0.1:5432/postgres?sslmode=disable")
+		if dpool := tryOpenPg(ctx, drainURL, "ociger-outbox-drain", 30*time.Second); dpool != nil {
+			defer dpool.Close()
+			go drainOutbox(ctx, dpool, nc)
+		} else {
+			log.Println("outbox drain disabled: could not connect as ck_drainer (pre-v0.7.18 volume?); dispatch unaffected")
+		}
+	}
+
 	<-ctx.Done()
 	log.Println("shutting down")
+}
+
+// drainOutbox polls ckp.outbox and republishes sealed events onto NATS,
+// in seq order, until ctx is cancelled. See the package doc for the
+// at-least-once contract.
+func drainOutbox(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn) {
+	log.Printf("draining ckp.outbox → event.kernel.<K>.* every %s (as ck_drainer)", outboxDrainInterval)
+	ticker := time.NewTicker(outboxDrainInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			drainBatch(ctx, pool, nc)
+		}
+	}
+}
+
+type outboxRow struct {
+	seq     int64
+	subject string
+	payload []byte
+	headers map[string]string
+}
+
+func drainBatch(ctx context.Context, pool *pgxpool.Pool, nc *nats.Conn) {
+	rows, err := pool.Query(ctx,
+		"SELECT seq, subject, payload, headers FROM ckp.outbox ORDER BY seq ASC LIMIT $1",
+		outboxDrainBatch)
+	if err != nil {
+		// ckp.outbox may not exist on the very first boot tick; stay quiet
+		// and let the next tick find it.
+		return
+	}
+	var batch []outboxRow
+	for rows.Next() {
+		var r outboxRow
+		var headersRaw []byte
+		if scanErr := rows.Scan(&r.seq, &r.subject, &r.payload, &headersRaw); scanErr != nil {
+			rows.Close()
+			return
+		}
+		if len(headersRaw) > 0 {
+			_ = json.Unmarshal(headersRaw, &r.headers)
+		}
+		batch = append(batch, r)
+	}
+	rows.Close()
+	if rows.Err() != nil || len(batch) == 0 {
+		return
+	}
+
+	// Publish in seq order; stop at the first publish error so ordering is
+	// preserved (the unpublished tail retries next tick). Then flush once to
+	// confirm the server received the batch BEFORE deleting — at-least-once.
+	var published []int64
+	for _, r := range batch {
+		hdr := nats.Header{}
+		for k, v := range r.headers {
+			hdr.Set(k, v)
+		}
+		if pubErr := nc.PublishMsg(&nats.Msg{Subject: r.subject, Data: r.payload, Header: hdr}); pubErr != nil {
+			log.Printf("outbox publish seq=%d subject=%s failed: %v", r.seq, r.subject, pubErr)
+			break
+		}
+		published = append(published, r.seq)
+	}
+	if len(published) == 0 {
+		return
+	}
+	if flushErr := nc.FlushTimeout(2 * time.Second); flushErr != nil {
+		// Not confirmed delivered — do NOT delete; next tick re-publishes
+		// (consumers dedupe on Ck-Seq).
+		log.Printf("outbox flush failed (%d events held): %v", len(published), flushErr)
+		return
+	}
+	for _, seq := range published {
+		if _, delErr := pool.Exec(ctx, "DELETE FROM ckp.outbox WHERE seq = $1", seq); delErr != nil {
+			// Delivered but not deleted — re-publish next tick (at-least-once).
+			log.Printf("outbox delete seq=%d failed: %v", seq, delErr)
+			return
+		}
+	}
 }
 
 // handleMsg parses the inbound subject, calls ckp.dispatch, and
@@ -243,6 +375,44 @@ func mustOpenPg(ctx context.Context, url string) *pgxpool.Pool {
 		select {
 		case <-ctx.Done():
 			log.Fatalf("pg connect aborted: %v", ctx.Err())
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// tryOpenPg is the non-fatal sibling of mustOpenPg: it returns a connected
+// pool, or nil if it cannot connect within deadline. Used for the outbox
+// drain, which must not take the dispatch path down if the ck_drainer role
+// is absent (an older volume).
+func tryOpenPg(ctx context.Context, rawURL, appName string, within time.Duration) *pgxpool.Pool {
+	cfg, err := pgxpool.ParseConfig(rawURL)
+	if err != nil {
+		log.Printf("drain pg url parse failed: %v", err)
+		return nil
+	}
+	cfg.MaxConns = 2
+	cfg.MinConns = 1
+	if cfg.ConnConfig.RuntimeParams == nil {
+		cfg.ConnConfig.RuntimeParams = map[string]string{}
+	}
+	cfg.ConnConfig.RuntimeParams["application_name"] = appName
+
+	deadline := time.Now().Add(within)
+	for {
+		pool, err := pgxpool.NewWithConfig(ctx, cfg)
+		if err == nil {
+			if pingErr := pool.Ping(ctx); pingErr == nil {
+				log.Printf("drain connected to %s", redactPassword(rawURL))
+				return pool
+			}
+			pool.Close()
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
 		case <-time.After(2 * time.Second):
 		}
 	}

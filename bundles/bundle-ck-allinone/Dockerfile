@@ -7,7 +7,7 @@
 
 ARG PG_BASE_VERSION=v0.1.12
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.4.3
+ARG CKLIB_VERSION=1.5.0
 # v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
 # bridge calling ckp.dispatch over TCP+scram as ck_participant); the
 # bridge itself is unchanged in v0.7.12+ — only the upstream pg_base
@@ -26,13 +26,15 @@ ARG BUNDLE_VERSION=dev
 FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.12 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.4.3 — the FIRST genuinely-stripped OCI bundle (CK.Lib.Js's publish
-# pipeline had been packaging stale `main` for 1.4.0..1.4.2; our byte audit
-# surfaced it; their corrective 1.4.3 is byte-verified). Ships EXACTLY:
-# LICENSE, README.md, ck-client.js, vendor/{msgpack,nats.ws}.js — no RDF
-# tier, no esm.sh runtime fetches. The smoke asserts this exact file set
-# (the byte-set gate adopted into the packaging contract by both sides).
-FROM ghcr.io/conceptkernel/ck-lib-js:1.4.3 AS cklib_source
+# 1.5.0 — the dispatch-only client, verified TYPED-SEALED live against the
+# v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop).
+# Ships EXACTLY: LICENSE, README.md, ck.js (the L2 dispatch facade —
+# CK/ConceptKernel/ckOn, the instance.*/kernel.* op→verb table, the
+# v1.5.0 entry point), ck-client.js (vendored transport, grammar-agnostic
+# result.kernel.<K>.> subscription), ck-store.js (the typed-instance cache),
+# vendor/{msgpack,nats.ws}.js. No index.html, no ck-page (the legacy
+# console is gone). The smoke ⑤± gate asserts this exact file set.
+FROM ghcr.io/conceptkernel/ck-lib-js:1.5.0 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
