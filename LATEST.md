@@ -13,20 +13,20 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — `v0.7.17`
+## ociger-ck-allinone — `v0.7.18`
 
 PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:480d218da998319754d0f4718b1642002deb4458f1cfc77a89fb142b9c600db8`  | 2026-06-11 18:47:12 |
-| arm64 | `sha256:1631ac78addb1bed46c4b2e43d776171792a5767566203d4d2478d6a77c09ace`  | 2026-06-11 18:47:12 |
+| amd64 | `sha256:5aaddcad39882a79d91ed401e31c27edff7d5bf37d96d43d45a9930b11e3b10e`  | 2026-06-12 01:12:31 |
+| arm64 | `sha256:e181a585693ce5d3b1bc2ec748ff65df733ab47a4643cef79c1515d3b9cb9761`  | 2026-06-12 01:12:31 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.17`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.18`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:be556f1d7b854408fc4d71a376f125fd116a8eb7dbc34a0f0da36a9aa44a59fc`                                                         |
+| Index digest       | `sha256:7daf75cf8437215490df7068921351691baf5f8df82090a679f6125869726854`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
