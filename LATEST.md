@@ -133,20 +133,20 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
 
-## ociger-pg17-pgrdf — `v0.1.7`
+## ociger-pg17-pgrdf — `v0.1.8`
 
 PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:94cbc39b9792ec328eea755e86f0184cab92a3b970870baa895e594e17720bf2`  | 2026-05-31 18:43:05 |
-| arm64 | `sha256:6adeea112db8273800e585a27cf1e7513ac16ccba3c6128af7c0ce56e94a3940`  | 2026-05-31 18:43:05 |
+| amd64 | `sha256:0d0a1968c0bbb2fe3beb7a3502795b6efdf91e101f54a1b02a2972f8b000bbdd`  | 2026-06-12 02:02:33 |
+| arm64 | `sha256:d07842a5460975266756de0f5e6e7a2d817676be36d8135351afc82b6d99e8ac`  | 2026-06-12 02:02:33 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.7`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.8`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:f33aa7ba385ea5d2466432aa04c09844378a811d1016eef8529dccd0121da418`                                                         |
+| Index digest       | `sha256:a869711b45bc915d3ba0ab9cff783eb6476eff76829b53058106eb55cfc78f50`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
