@@ -1,0 +1,132 @@
+name: pg17-bookworm-pgrdf-release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - pg17-bookworm-pgrdf-v*
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: pg17-bookworm-pgrdf-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Lint pgRDF preload contract
+        run: bash scripts/lint-pgrdf-preload.sh
+
+      - name: Version drift gate
+        run: bash scripts/check-versions.sh
+
+      - name: Build native image
+        run: bash scripts/build-pg17-bookworm-pgrdf.sh
+
+      - name: Smoke (docker exec psql; pgRDF ready with zero work)
+        run: bash scripts/smoke-pg17-bookworm-pgrdf.sh
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pg17-bookworm-pgrdf-v')
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tagged commit is on main history
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+            echo "refusing to publish tag outside origin/main history: $GITHUB_SHA" >&2
+            exit 1
+          fi
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve release coordinates
+        id: meta
+        run: |
+          set -euo pipefail
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-pg17-bookworm-pgrdf" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME#pg17-bookworm-pgrdf-}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish multi-arch image
+        id: publish
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file bundles/bundle-pg17-bookworm-pgrdf/Dockerfile \
+            --build-arg BUNDLE_VERSION=${{ steps.meta.outputs.tag }} \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.version=${{ steps.meta.outputs.tag }}" \
+            --tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" \
+            --tag "${{ steps.meta.outputs.image }}:latest" \
+            --provenance=false \
+            --metadata-file /tmp/build-meta.json \
+            --push \
+            .
+          DIGEST=$(jq -r '."containerimage.digest"' /tmp/build-meta.json)
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Published manifest digest: ${DIGEST}"
+
+      - name: Inspect published image
+        run: docker buildx imagetools inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
+
+      - name: Attest build provenance (SLSA v1)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attempt to make GHCR package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ensure-ghcr-public.sh ociger-pg17-bookworm-pgrdf
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Published `${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}` and `:latest`.
+
+            PostgreSQL 17 + pgRDF on stock bookworm — full client in-image,
+            pgRDF preloaded and **auto-created on first boot**. Zero work after start.
+
+            ```bash
+            docker run -d --name pgrdf-bench -e POSTGRES_PASSWORD=pw \
+              ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            docker exec pgrdf-bench psql -U postgres -c "SELECT pgrdf.version();"   # → 0.6.0, no setup
+            ```

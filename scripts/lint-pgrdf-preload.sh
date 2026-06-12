@@ -23,23 +23,39 @@ while IFS= read -r dockerfile; do
     continue
   fi
 
+  # A copied pgrdf.so MUST be preloaded by some baked-in mechanism. Two are
+  # accepted (both make the postmaster load pgrdf before any backend, so
+  # _PG_init runs in postmaster context and the PgAtomic shmem is set up):
+  #
+  #   (A) ENV OCIGER_SHARED_PRELOAD_LIBRARIES=…pgrdf…  — the ociger-launcher
+  #       bundles, whose launcher writes shared_preload_libraries from this env.
+  #   (B) a baked  shared_preload_libraries … 'pgrdf'  line — the stock-postgres
+  #       bundles (e.g. pg17-bookworm-pgrdf) that append it to the conf template
+  #       so initdb bakes it in.
+
   preload_line="$(grep -E '^ENV OCIGER_SHARED_PRELOAD_LIBRARIES=' "$dockerfile" || true)"
-  if [[ -z "$preload_line" ]]; then
-    echo "FAIL: $dockerfile copies pgrdf.so but has no OCIGER_SHARED_PRELOAD_LIBRARIES env" >&2
-    echo "      Add: ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf  (or 'pgrdf,pgck' if pgck also present)" >&2
-    violations=$((violations + 1))
+  if [[ -n "$preload_line" ]]; then
+    value="${preload_line#ENV OCIGER_SHARED_PRELOAD_LIBRARIES=}"
+    case ",${value}," in
+      *,pgrdf,*) continue ;;   # mechanism A satisfied
+      *)
+        echo "FAIL: $dockerfile sets OCIGER_SHARED_PRELOAD_LIBRARIES='$value' which does not include 'pgrdf'" >&2
+        echo "      Required: 'pgrdf' must appear in the comma-separated list (before 'pgck' if both present)" >&2
+        violations=$((violations + 1))
+        continue
+        ;;
+    esac
+  fi
+
+  # mechanism B: a baked shared_preload_libraries config line that includes pgrdf.
+  if grep -qE "shared_preload_libraries[^#]*pgrdf" "$dockerfile"; then
     continue
   fi
 
-  value="${preload_line#ENV OCIGER_SHARED_PRELOAD_LIBRARIES=}"
-  case ",${value}," in
-    *,pgrdf,*) : ;;
-    *)
-      echo "FAIL: $dockerfile copies pgrdf.so but OCIGER_SHARED_PRELOAD_LIBRARIES='$value' does not include 'pgrdf'" >&2
-      echo "      Required: 'pgrdf' must appear in the comma-separated list (before 'pgck' if both present)" >&2
-      violations=$((violations + 1))
-      ;;
-  esac
+  echo "FAIL: $dockerfile copies pgrdf.so but preloads it by neither mechanism" >&2
+  echo "      Add  ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf  (launcher bundles)" >&2
+  echo "      or   a baked  shared_preload_libraries = 'pgrdf'  line (stock-postgres bundles)." >&2
+  violations=$((violations + 1))
 done < <(find bundles -mindepth 2 -maxdepth 2 -name Dockerfile | sort)
 
 if (( violations > 0 )); then

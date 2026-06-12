@@ -1,0 +1,28 @@
+spec_version: 0.4
+name: bundle-pg17-bookworm-pgrdf
+role: prod
+never_prod: false
+description: PostgreSQL 17 + pgRDF on stock postgres:17-bookworm — full client (psql/pg_isready on PATH) with pgRDF preloaded and AUTO-CREATED on first boot. Zero maintenance after docker run; drivable directly via docker exec psql. The clean pgRDF-only benchmark image (no pgck preload to skew numbers).
+
+# Hand-crafted Dockerfile: pgRDF consumed as an ORAS-pulled artifact, layered
+# onto stock postgres:17-bookworm with shared_preload_libraries baked into the
+# conf template + a /docker-entrypoint-initdb.d auto-create. The generator does
+# not model the stock-postgres + initdb.d shape, so disable rendering.
+skip_render: true
+
+image:
+  registry: ghcr.io/sporaxis-com/ociger-pg17-bookworm-pgrdf
+  pg_major: 17
+  base_image: postgres:17-bookworm
+  final_image: postgres:17-bookworm
+extensions:
+  pgrdf:
+    version: 0.6.0
+platforms:
+  - linux/amd64
+  - linux/arm64
+local:
+  prefix: ociger-
+  data_dir: .artifacts/ociger-pg17-bookworm-pgrdf-smoke/pgdata
+  network: ociger-pg17-bookworm-pgrdf-net
+  container: ociger-pg17-bookworm-pgrdf-smoke
