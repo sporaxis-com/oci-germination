@@ -1,0 +1,43 @@
+# versions.yaml — the SINGLE SOURCE OF TRUTH for component versions across
+# every bundle in this repo.
+#
+# The problem this solves: each bundle's Dockerfile / bundle.yaml / smoke
+# script used to hardcode its own pgRDF / pgCK / cklib pin independently, so
+# the matrix drifted — ck-allinone tracked the latest while sibling bundles
+# rotted months behind on the same component. There was no one place that
+# said "pgRDF is X.Y.Z", so a bump meant hunting N Dockerfiles and usually
+# only touching the flagship.
+#
+# Now: this file is authoritative. To bump a component:
+#   1. edit the version here,
+#   2. run  scripts/check-versions.sh   to see which bundles drift,
+#   3. update those bundles' Dockerfile + bundle.yaml + smoke pins to match,
+#   4. rebuild + re-tag each (per-bundle tags — see PROVENANCE.md).
+# CI runs check-versions.sh as a gate: a Dockerfile pin that disagrees with
+# this file fails the build (unless the bundle is listed under `frozen:`).
+#
+# "latest consumable" means: published + pullable + SLSA-attested on GHCR.
+# A version in an upstream CHANGELOG that has no tag/artifact yet is NOT
+# consumable and MUST NOT be pinned (PROVENANCE.md rule 7).
+
+components:
+  # Latest consumable upstream pins (verified pullable + attested 2026-06-12).
+  pgrdf:      "0.6.0"          # 0.6.1 is CHANGELOG-only upstream — no tag/artifact yet (404).
+  pgck:       "0.4.2"          # install-from-zero; CI-A..CI-E.
+  cklib:      "1.5.0"          # dispatch-only client (ck.js + ck-store.js).
+  nats:       "2.14.1"
+  postgres:   "17-bookworm"
+  s6_overlay: "3.2.3.0"
+  busybox:    "1.36.1-musl"
+
+bases:
+  # In-repo base images other bundles derive FROM. These move when their own
+  # components bump; keep them at the head their Dockerfiles consume.
+  pg17-pgrdf-pgck-nats-micro: "v0.1.12"   # the ck-allinone base
+
+# Bundles intentionally NOT held to the canonical component pins (and why).
+# check-versions.sh skips drift-failure for these; they still appear in the
+# report so the freeze stays visible, not forgotten.
+frozen:
+  pgck-bench: "Python/FastAPI benchmark sibling on its own pgck-web cadence; re-cut deliberately, not in the component wave."
+  pg17-pgrdf-pgck-static-cklib: "ck-allinone sibling (Go static server). Bringing it current needs the full v0.7.18-era scaffolding (base v0.1.12 + pgCK 0.4.2 install-from-zero init.sql + the outbox drain + cklib 1.5.0 byte-set), not a pin bump — a coordinated re-cut, tracked separately. Until then use ck-allinone."

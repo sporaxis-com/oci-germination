@@ -60,6 +60,14 @@ jobs:
         run: |
           shellcheck --source-path=scripts/lib --severity=warning scripts/*.sh scripts/lib/*.sh
 
+  version-drift:
+    name: version drift (vs versions.yaml SSOT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every bundle pin against versions.yaml
+        run: bash scripts/check-versions.sh
+
   hadolint:
     name: hadolint (Dockerfiles)
     runs-on: ubuntu-latest
