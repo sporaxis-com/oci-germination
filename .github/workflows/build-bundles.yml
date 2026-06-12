@@ -22,7 +22,7 @@ jobs:
     # Per PROVENANCE.md Rule 2, no entry lands in LATEST.md unless
     # gh attestation verify accepts the digest pushed here.
     permissions:
-      contents: read
+      contents: write        # create the GitHub Release object (Releases tab)
       packages: write
       id-token: write
       attestations: write
@@ -210,3 +210,37 @@ jobs:
           echo "Verify:"
           echo "  gh attestation verify oci://${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}:${{ steps.semver.outputs.semantic_version }} \\"
           echo "    --repo sporaxis-com/oci-germination"
+
+      # Publish a GitHub Release for the tag so the repo's Releases tab + the
+      # "Latest release" badge reflect the flagship cut. Previously this
+      # workflow pushed only the git tag + GHCR package, so ck-allinone
+      # releases never appeared on the Releases UI — the badge pointed at an
+      # internal pg_base image. Idempotent: edit if the release already exists.
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BUNDLE="${{ steps.extract.outputs.bundle }}"
+          VER="${{ steps.semver.outputs.semantic_version }}"
+          IMG="${{ env.REGISTRY }}/sporaxis-com/ociger-${BUNDLE}:${VER}"
+          DIGEST="${{ steps.push.outputs.digest }}"
+          NOTES="$(cat <<EOF
+          **Image:** \`${IMG}\`
+          **Digest:** \`${DIGEST}\`
+          **Attestation:** SLSA Build Provenance v1 — \`gh attestation verify oci://${IMG} --repo ${{ github.repository }}\`
+
+          \`\`\`sh
+          docker pull ${IMG}
+          \`\`\`
+
+          Full entry: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          EOF
+          )"
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+              --title "ociger-${BUNDLE} ${VER}" --notes "${NOTES}" --latest
+          else
+            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+              --title "ociger-${BUNDLE} ${VER}" --notes "${NOTES}" --latest
+          fi
