@@ -2,7 +2,7 @@
 
 This is the on-ramp for using `ociger-ck-allinone` as the base for a new project — a game, a science experiment, a software system, anything that wants **governed, sealed, provable state** without writing a backend.
 
-Everything below is verified against the published `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.17` image. Commands you can paste are real; capability claims are drawn against what the image actually does, not what a spec promises.
+Everything below is verified against the published `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19` image. Commands you can paste are real; capability claims are drawn against what the image actually does, not what a spec promises.
 
 ---
 
@@ -12,7 +12,7 @@ Everything below is verified against the published `ghcr.io/sporaxis-com/ociger-
 docker run --rm -d --name ckp \
   -e OCIGER_CK_PARTICIPANT_PASSWORD='choose-a-password' \
   -p 5432:5432 -p 8000:8000 -p 4222:4222 -p 9222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.17
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19
 ```
 
 That single command stands up a complete **CKP v3.9 Critical Isolation** substrate:
@@ -40,7 +40,7 @@ A connection — even one holding database credentials — can execute exactly *
 
 ## 2. The capability boundary — read this before you design
 
-What the published image does **today** (v0.7.17 / pgCK 0.4.2), and what is on the upstream roadmap, stated plainly so you design against reality:
+What the published image does **today** (v0.7.19 / pgCK 0.4.13), and what is on the upstream roadmap, stated plainly so you design against reality:
 
 ```
 ┌─────────────────────────────────────────────┬──────────────────────────────────────┐
@@ -123,11 +123,14 @@ The landing page at `http://localhost:8000/` runs exactly this round-trip in you
 When you need to change what a kernel's instances *are* — add a property, tighten a constraint, change the quorum — you do not run a migration. You propose a change; it is sealed as data; it applies only after the votes it requires; and applying it advances the kernel's epoch. All over the same door:
 
 ```sh
-# 1. propose: add a `crew_size` integer property to the mygame kernel type
+# 1. propose: add a `crew_size` integer property to the mygame kernel type.
+#    add_property carries detail.targetClass (the class the property attaches
+#    to) + detail.path (the property IRI) — both IRIs, required since pgCK 0.4.5.
 psql -h localhost -U ck_participant -d postgres -tA -c \
   "SELECT ckp.dispatch('kernel.propose_change',
-     '{\"op\":\"add_property\",\"about\":\"ckp://Kernel#mygame\",\"requires_quorum\":1,
-       \"detail\":{\"property\":\"crew_size\",\"datatype\":\"xsd:integer\"}}'::jsonb);"
+     '{\"op\":\"add_property\",\"requires_quorum\":1,
+       \"detail\":{\"targetClass\":\"ckp://Kernel#mygame\",\"path\":\"ckp://Kernel#crew_size\",
+                  \"datatype\":\"xsd:integer\",\"minCount\":1}}'::jsonb);"
 # → {"ok":true,"proposal_iri":"ckp://Proposal#proposal-…","state":"pending"}
 
 # 2. vote (the proposal IRI from step 1)
@@ -202,14 +205,14 @@ Any NATS client works. Publish to `input.kernel.<K>.action.<verb>`, subscribe to
 ### The deploy contract (do not skip)
 
 - **Set `OCIGER_CK_PARTICIPANT_PASSWORD`.** Without it, `ck_participant` exists but cannot log in — by design, so the role floor is never cosmetic.
-- **Identity today is the scram password.** Verified-JWT identity with seal-time claim checking is an inherited upstream prerequisite (CKP v3.9 §10, owned by SPORE-GENESIS) and is not yet in this image. Treat a v0.7.17 deployment as **alpha-trust**: the isolation floor is real, but participant identity is a shared secret, not a per-user verified claim. Do not expose it to untrusted users as-is.
+- **Identity today is the scram password.** Verified-JWT identity with seal-time claim checking is an inherited upstream prerequisite (CKP v3.9 §10, owned by SPORE-GENESIS) and is not yet in this image. Treat a v0.7.19 deployment as **alpha-trust**: the isolation floor is real, but participant identity is a shared secret, not a per-user verified claim. Do not expose it to untrusted users as-is.
 - **Persist `/var/lib/postgresql/data`.** The init runs once on first boot; your sealed data lives there.
 
 ---
 
 ## 7. Where this is going
 
-The substrate is finalized at CKP v3.9; the bundle tracks the three upstreams (`pgRDF`, `pgCK`, `CK.Lib.Js`) and re-cuts as they ship. The single capability that turns this from a workflow substrate into a model-anything substrate is the **generic typed create** (CKP v3.9 §4) — a `ckp.dispatch('instance.create', …)` whose payload is typed by *your kernel's own sealed shape*, so a game's `Ship` and a lab's `Sample` are first-class sealed instances. That is on pgCK's side; a NOTIFY is filed. When it lands, this guide gains a "model your own type" section and `examples/` gains a real domain-entity walkthrough.
+The substrate is finalized at CKP v3.9; the bundle tracks the three upstreams (`pgRDF`, `pgCK`, `CK.Lib.Js`) and re-cuts as they ship — the current cut rides **pgRDF 0.6** (a parallel bulk loader, LUBM-benchmarked ingest at tens-of-millions-of-triples scale) and **pgCK 0.4.13**. The single capability that turns this from a workflow substrate into a model-anything substrate is the **generic typed create** (CKP v3.9 §4) — a `ckp.dispatch('instance.create', …)` whose payload is typed by *your kernel's own sealed shape*, so a game's `Ship` and a lab's `Sample` are first-class sealed instances. That is on pgCK's side; a NOTIFY is filed. When it lands, this guide gains a "model your own type" section and `examples/` gains a real domain-entity walkthrough.
 
 Until then: everything in §3 works today, on the published image, with one `docker run`.
 

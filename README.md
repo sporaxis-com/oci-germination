@@ -1,6 +1,6 @@
 # oci-germination — Sporaxis-Com's Concept Kernel v3.9 container distribution
 
-This repo ships the OCI container artifacts that make a **CKP v3.9 ([Critical Isolation](https://github.com/styk-tv/pgCK)) runtime** trivial to stand up: PostgreSQL 17 with `pgRDF` (graph storage) and `pgCK` (governed-write + concept-kernel runtime) preloaded, NATS for the WebSocket transport browsers talk to, and CK.Lib.Js mounted at `/cklib/` so a page can become a concept-kernel client in one line.
+This repo ships the OCI container artifacts that make a **CKP v3.9 ([Critical Isolation](https://github.com/styk-tv/pgCK)) runtime** trivial to stand up: PostgreSQL 17 with `pgRDF` (the parallel-ingest RDF graph engine) and `pgCK` (governed-write + concept-kernel runtime) preloaded, NATS for the WebSocket transport browsers talk to, and CK.Lib.Js mounted at `/cklib/` so a page can become a concept-kernel client in one line.
 
 The repo is a **layer-addition shop, not a compile shop**: pg base + extensions come pre-composed from upstream, this side just stacks `s6-overlay`, `busybox httpd`, and CK.Lib.Js on top to produce a marketplace-shaped image.
 
@@ -26,8 +26,8 @@ Three production bundles + one benchmark sibling + four core bundles (pg-only). 
 
 | Bundle | Current tag | Last release | Role |
 |---|---|---|---|
-| **`ociger-ck-allinone`** | `v0.7.12` | 2026-06-11 | Marketplace-minimal CKP v3.9 Critical Isolation Alpha runtime — pg17 + pgRDF + pgCK + NATS + cklib, supervised by `s6-overlay`, web by `busybox httpd`, with the in-tree `ociger-pgck-relay` dispatch bridge wired to `ckp.dispatch`. **No Python, no FastAPI, scratch base.** Default for prod. |
-| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.11` | 2026-06-11 | The shared base for `ck-allinone` — pg17 + pgRDF + pgCK + NATS in a scratch + selectively-copied bookworm layout. Tracks the upstream pgRDF / pgCK release cadence directly. |
+| **`ociger-ck-allinone`** | `v0.7.19` | 2026-06-13 | Marketplace-minimal CKP v3.9 Critical Isolation Alpha runtime — pg17 + pgRDF + pgCK + NATS + cklib, supervised by `s6-overlay`, web by `busybox httpd`, with the in-tree `ociger-pgck-relay` dispatch bridge wired to `ckp.dispatch`. **No Python, no FastAPI, scratch base.** Default for prod. |
+| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.13` | 2026-06-13 | The shared base for `ck-allinone` — pg17 + pgRDF + pgCK + NATS in a scratch + selectively-copied bookworm layout. Tracks the upstream pgRDF / pgCK release cadence directly. |
 | `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.7` | 2026-05-31 | Same composition family but with the in-tree `ociger-static-server` Go binary instead of busybox httpd — kept for downstreams that already pin to it. **Frozen at the 2026-05-31 component pins**; next cut will roll forward when the static-cklib track is needed. |
 | `ociger-pg17-pgrdf-pgck-nats` | `v0.1.7` | 2026-05-31 | Same as `-nats-micro` with distroless final (instead of scratch). |
 | `ociger-pg17-pgrdf-pgck` | `v0.1.7` | 2026-05-31 | pg17 + pgRDF + pgCK, no NATS. |
@@ -36,29 +36,29 @@ Three production bundles + one benchmark sibling + four core bundles (pg-only). 
 | `ociger-pgck-bench` | `v0.1.1` | 2026-05-31 | **Sibling devel / benchmark image** (Python + FastAPI + pgck-web). Runs **outside** ck-allinone on the same NATS network; never used in prod. The only sanctioned home for Python in this group. |
 | `ociger-pg17-pgrdf-pgck-web-cklib` | `v0.6.5` | 2026-05-29 | **Retired surface**. Superseded by `ck-allinone`; the `static-cklib` variant continues for downstreams that need the in-tree static server. Not advertised in `LATEST.md`. |
 
-Component versions baked into the `v0.7.12` / `v0.1.11` heads (the actively maintained pair):
+Component versions baked into the `v0.7.19` / `v0.1.13` heads (the actively maintained pair):
 
 | Component | Version | Source |
 |---|---|---|
 | PostgreSQL | 17.10 (Debian bookworm build) | upstream |
-| pgRDF | `0.5.43` | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF), SLSA-attested |
-| pgCK | `0.4.1` (CKP v3.9 Critical Isolation enforced — CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance + CI-E typed reads) | [styk-tv/pgCK](https://github.com/styk-tv/pgCK), SLSA-attested |
+| pgRDF | `0.6.3` — parallel bulk loader (`load_turtle(…, bulk_load => true)`, shipped 0.6.2); LUBM-benchmarked ingest at tens-of-millions-of-triples scale | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF), SLSA-attested |
+| pgCK | `0.4.13` (CKP v3.9 Critical Isolation enforced — CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance + CI-E typed reads) | [styk-tv/pgCK](https://github.com/styk-tv/pgCK), SLSA-attested |
 | NATS server | `2.14.1` (core on `:4222` + WSS bridge on `:9222`) | upstream |
-| CK.Lib.Js | `1.4.2` ("Air-gapped" cut) | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js), SLSA-attested |
+| CK.Lib.Js | `1.5.0` (dispatch-only client) | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js), SLSA-attested |
 | s6-overlay | `3.2.3.0` | upstream |
 | busybox | `1.36.1-musl` | upstream |
 | `ociger-pg-launcher` (in-tree) | rolls with bundle | this repo |
 | `ociger-pgck-relay` (in-tree dispatch bridge) | rolls with bundle (v0.7.11 generation) | this repo |
 
-Older bundles in the matrix carry their 2026-05-31-era component pins (pgRDF 0.5.28, pgCK 0.2.2, cklib 1.3.11). They have not been re-cut on the v3.9 alpha components — they are not part of the integration critical path. The next time any of them needs to move, the wave will fold in the current heads.
+All non-frozen bundles now share **one** set of component pins via [`versions.yaml`](./versions.yaml) (the single source of truth — pgRDF 0.6.3, pgCK 0.4.13, cklib 1.5.0); the `scripts/check-versions.sh` drift gate fails CI if any Dockerfile disagrees. The pure-extension siblings (`pg17-pgrdf`, `-pgck`, `-pgck-nats`, `pg17-bookworm-pgrdf`) carry those pins in source and roll their *published* images forward when their per-bundle tags are next cut. `pg17-pgrdf-pgck-static-cklib` stays frozen on its older pins (reason recorded in `versions.yaml`).
 
 See [`LATEST.md`](./LATEST.md) for the auto-rendered attestation-verified head of each bundle.
 
 ---
 
-## Inside `ck-allinone:v0.7.12` — layer composition
+## Inside `ck-allinone:v0.7.19` — layer composition
 
-The numbers below are illustrative — they were last measured against `v0.7.0` (the size profile is close enough to the current cut that the relative shape still holds; v0.7.11+ added the `pgx`-equipped relay binary, which moves the bundle from ~125 MiB to ~128 MiB). For exact byte counts on a specific tag, run `docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12`.
+The numbers below are illustrative — they were last measured against `v0.7.0` (the size profile is close enough to the current cut that the relative shape still holds; v0.7.11+ added the `pgx`-equipped relay binary, which moves the bundle from ~125 MiB to ~128 MiB). For exact byte counts on a specific tag, run `docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19`.
 
 Layer composition (compressed, amd64; 9 layers total, 5 inherited from `pg_base`, 4 added in this repo):
 
@@ -102,7 +102,7 @@ docker run --rm -d \
   -e PGDATA=/var/lib/postgresql/data \
   -v "$PWD/ck-allinone-data:/var/lib/postgresql/data" \
   -p 15432:5432 -p 18000:8000 -p 14222:4222 -p 19222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.0
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19
 ```
 
 Verify the runtime:
@@ -127,7 +127,7 @@ nc -zv 127.0.0.1 19222                               # WSS listening
 Verify the attestation chain (Sigstore Rekor + GitHub Fulcio OIDC):
 
 ```bash
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.0 \
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19 \
   --repo sporaxis-com/oci-germination
 ```
 
@@ -142,7 +142,7 @@ Python + FastAPI + pgck-web — runs **alongside** ck-allinone on the same docke
 ```bash
 docker network create ckp-net
 docker run --rm -d --name ck-allinone --network ckp-net \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.0
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19
 docker run --rm -d --name pgck-bench --network ckp-net -p 18001:8000 \
   ghcr.io/sporaxis-com/ociger-pgck-bench:v0.1.0
 ```
