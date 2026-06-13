@@ -9,7 +9,9 @@ NETWORK="ociger-pg17-pgrdf-net"
 CONTAINER="ociger-pg17-pgrdf-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf:local}"
-EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
+# pgRDF version from versions.yaml (single source of truth) via lib/versions.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/versions.sh"
+EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
 
 ensure_repo_data_path() {
   case "$DATA_DIR" in

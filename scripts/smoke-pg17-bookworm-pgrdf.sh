@@ -10,7 +10,9 @@ set -euo pipefail
 IMAGE="${1:-ociger-pg17-bookworm-pgrdf:local}"
 NAME="ociger-pg17-bookworm-pgrdf-smoke"
 PW="smoke-bw"
-EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
+# pgRDF version from versions.yaml (single source of truth) via lib/versions.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/versions.sh"
+EXPECTED_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
 
 say() { printf '[pg17-bookworm-pgrdf] %s\n' "$*"; }
 cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; }

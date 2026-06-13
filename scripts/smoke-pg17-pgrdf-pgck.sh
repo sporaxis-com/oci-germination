@@ -9,9 +9,11 @@ NETWORK="ociger-pg17-pgrdf-pgck-net"
 CONTAINER="ociger-pg17-pgrdf-pgck-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-pgck-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf-pgck:local}"
-EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
-EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.2}"
-EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
+# Versions come from versions.yaml (single source of truth) via lib/versions.sh.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/versions.sh"
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
+EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-$OCIGER_PGCK_VERSION}"
+EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-$OCIGER_PGCK_NATIVE}"
 
 ensure_repo_data_path() {
   case "$DATA_DIR" in

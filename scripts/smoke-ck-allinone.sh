@@ -13,9 +13,14 @@ CONTAINER_NAME="ociger-ck-allinone-smoke"
 NETWORK_NAME="ociger-ck-allinone-net"
 DATA_DIR=".artifacts/ociger-ck-allinone-smoke/pgdata"
 
-EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
-EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.2}"
-EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
+# Component versions come from versions.yaml (single source of truth) via
+# lib/versions.sh — bump versions.yaml, not this file. pgck_native is carried
+# there because pgCK 0.4.13 reports a stale "0.4.3 (rc3)" natively (the
+# extension is correctly 0.4.13 — pgCK NOTIFY filed). Env still overrides.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/versions.sh"
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
+EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-$OCIGER_PGCK_VERSION}"
+EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-$OCIGER_PGCK_NATIVE}"
 # cklib byte-set contract (adopted by both sides of the cklib-stale thread):
 # /app/cklib MUST contain EXACTLY this file set — the attested stripped
 # bundle, nothing more, nothing less. Bump together with CKLIB_VERSION in
@@ -409,9 +414,13 @@ echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advance
 # the v3.9 governance plane end-to-end — if any of registry routing, the
 # ProposalShape gate, the quorum count, or the apply cascade regresses,
 # this fails before a release ships.
+# Payload contract (pgCK 0.4.5+, verified live on 0.4.13): add_property
+# requires detail.targetClass + detail.path as IRIs. The 0.4.2-era
+# detail.property (no targetClass) no longer translates — apply raises
+# op_translate_failed "add_property: targetClass must be an IRI, got <NULL>".
 PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:17-bookworm psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
 EPOCH_BEFORE=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
-GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"property\":\"smoke_prop\",\"datatype\":\"xsd:string\"}}'::jsonb)::text;" 2>&1)
+GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.8/core#Task\",\"path\":\"https://conceptkernel.org/ontology/v3.8/core#smokeProp\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text;" 2>&1)
 GOV_IRI=$(echo "$GOV_PROPOSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)
 if [[ -z "$GOV_IRI" ]]; then
   echo "✗ governance propose failed: $GOV_PROPOSE"

@@ -21,10 +21,11 @@
 # consumable and MUST NOT be pinned (PROVENANCE.md rule 7).
 
 components:
-  # Latest consumable upstream pins (verified pullable + attested 2026-06-12).
-  pgrdf:      "0.6.0"          # 0.6.1 is CHANGELOG-only upstream — no tag/artifact yet (404).
-  pgck:       "0.4.2"          # install-from-zero; CI-A..CI-E.
-  cklib:      "1.5.0"          # dispatch-only client (ck.js + ck-store.js).
+  # Latest consumable upstream pins (verified pullable + attested 2026-06-13).
+  pgrdf:      "0.6.3"          # attested head; 0.6.2 shipped the parallel bulk loader. 0.6.4 is a tag with no published artifact yet (404).
+  pgck:       "0.4.13"         # latest published release (styk-tv/pgck); install-from-zero. 0.4.14/0.4.15 not released (404).
+  pgck_native: "pgck 0.4.3 (rc3)"  # ACTUAL string pgck_version() reports at 0.4.13 — STALE upstream (should report 0.4.13; the extension default_version/extversion/SQL are correctly 0.4.13). pgCK NOTIFY filed. Smokes pin to this; bump the moment pgCK fixes pgck_version().
+  cklib:      "1.5.0"          # dispatch-only client (ck.js + ck-store.js); latest published release.
   nats:       "2.14.1"
   postgres:   "17-bookworm"
   s6_overlay: "3.2.3.0"
@@ -33,7 +34,7 @@ components:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg17-pgrdf-pgck-nats-micro: "v0.1.12"   # the ck-allinone base
+  pg17-pgrdf-pgck-nats-micro: "v0.1.13"   # the ck-allinone base (pgRDF 0.6.3 + pgCK 0.4.13)
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

@@ -10,9 +10,13 @@ NETWORK="ociger-pg17-pgrdf-pgck-nats-micro-net"
 CONTAINER="ociger-pg17-pgrdf-pgck-nats-micro-smoke"
 OWNERSHIP_LABEL="pg17-pgrdf-pgck-nats-micro-smoke"
 IMAGE="${1:-ociger-pg17-pgrdf-pgck-nats-micro:local}"
-EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-0.6.0}"
-EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-0.4.2}"
-EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-pgck 0.4.2 (rc3)}"
+# Versions come from versions.yaml (single source of truth) via lib/versions.sh;
+# env still overrides. pgck_native is carried there because pgCK 0.4.13 reports a
+# stale "0.4.3 (rc3)" natively (extension is correctly 0.4.13 — pgCK NOTIFY filed).
+source "$(dirname "${BASH_SOURCE[0]}")/lib/versions.sh"
+EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
+EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-$OCIGER_PGCK_VERSION}"
+EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-$OCIGER_PGCK_NATIVE}"
 EXPECTED_NATS_VERSION="${NATS_EXPECTED_VERSION:-2.14.1}"
 RELATIVE_PATH=""
 RELATION_PROOF_METHOD=""
