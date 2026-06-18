@@ -301,14 +301,15 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ②d 'demo' board armed at FIRST BOOT (init.sql import_module from artifact-shipped /ontology)"
-# v0.7.17+ : init.sql arms the demo project board itself (CALL ckp.import_module
-# × 2 from the /ontology the pgCK 0.4.2 artifact ships). The smoke asserts the
-# arming HAPPENED at boot — no smoke-side CALL — so the gate proves the bundle
-# dispatches out of the box with zero manual steps, the pgCK s34 posture.
+echo "[ck-allinone] ②d 'demo' CK loop armed at FIRST BOOT (init.sql adopt_kernel_ttl from artifact-shipped /ontology)"
+# v0.7.20+ : init.sql seals the demo's Task/Goal type shapes into urn:ckp:demo/kernel/ck via
+# pgCK 0.4.14's ckp.adopt_kernel_ttl (× 2, task.ttl + goal.ttl from the /ontology the pgCK
+# artifact ships). The smoke asserts the arming HAPPENED at boot — no smoke-side CALL — so the
+# gate proves the bundle dispatches out of the box with zero manual steps, the pgCK s34 posture.
+# (Pre-0.7.20 used import_module → …/kernel/board, which left /ck empty — see ⑤g for the gate.)
 DEMO_KERNEL_BOOTED=$($PSQL -c "SELECT (SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri LIKE 'urn:ckp:demo%') > 0;" 2>&1 | tr -d ' ')
 if [[ "$DEMO_KERNEL_BOOTED" != "t" ]]; then
-  echo "✗ demo board not armed at first boot — init.sql import_module didn't run or /ontology fixtures missing from pg_base"
+  echo "✗ demo CK loop not armed at first boot — init.sql adopt_kernel_ttl didn't run or /ontology TTLs missing from pg_base"
   docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'import_module|ontology|ERROR' | head -5
   exit 1
 fi
@@ -491,6 +492,26 @@ if [[ "$DRAIN_OK" != OK* ]]; then
   exit 1
 fi
 echo "[ck-allinone] ✓ native drain OK — seal → $DRAIN_OK (no host bridge)"
+
+echo "[ck-allinone] ⑤g typed-edge enforcement is NON-VACUOUS (#18 — type shapes in /ck; gate rejects incomplete)"
+# Pre-v0.7.20 the demo's Task/Goal shapes were sealed into urn:ckp:demo/kernel/board, but pgCK's
+# typed-edge ops + ckp.seal READ urn:ckp:demo/kernel/ck — so /ck was empty and every T1–T5 gate
+# no-opped (ok:true enforcing nothing; the silent-pass CK.Lib.Js verify-v160 + CSVC SPIKE caught).
+# v0.7.20 wires init.sql to pgCK 0.4.14's ckp.adopt_kernel_ttl, sealing task.ttl + goal.ttl into /ck.
+# Assert (a) the type shapes ARE in /ck (the gate graph), and (b) a typed instance.create missing a
+# required prop is REJECTED through the dispatch door as ck_participant (the s49 contract — silently
+# ACCEPTED when vacuous). This is the gate that would have caught #18 before it shipped.
+SH_CK=$($PSQL -c "SELECT count(*) FROM pgrdf.sparql('PREFIX sh: <http://www.w3.org/ns/shacl#> SELECT ?c WHERE { GRAPH <urn:ckp:demo/kernel/ck> { ?s sh:targetClass ?c } }') j;" 2>&1 | tr -d ' ')
+if ! [[ "$SH_CK" =~ ^[0-9]+$ ]] || [[ "$SH_CK" -lt 2 ]]; then
+  echo "✗ typed-edge VACUOUS: $SH_CK sh:targetClass in urn:ckp:demo/kernel/ck (expect ≥2: Task+Goal) — init.sql adopt_kernel_ttl didn't populate the gate graph (the #18 regression)"
+  exit 1
+fi
+TE_OK=$($PSQL_PART -c "SELECT ckp.dispatch('instance.create','{\"type\":\"https://conceptkernel.org/ontology/v3.8/core#Task\"}'::jsonb)->>'ok';" 2>&1 | tr -d ' ')
+if [[ "$TE_OK" != "false" ]]; then
+  echo "✗ typed-edge gate VACUOUS: a Task instance.create missing required props returned ok=$TE_OK (expect false/rejected) — the /ck shape gate is no-opping (the #18 silent-pass)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ typed-edge non-vacuous ($SH_CK type shapes in /ck; incomplete Task create REJECTED at the door)"
 
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \

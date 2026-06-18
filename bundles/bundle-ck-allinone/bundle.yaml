@@ -1,9 +1,9 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.19
+version: v0.7.20
 role: prod
 never_prod: false
-description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.6.3 + pgCK 0.4.13 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.5.0 (byte-verified stripped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL the GOVERNED 2-arg ckp.dispatch(verb, payload) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."
+description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.6.6 + pgCK 0.4.14 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.1 (core+WSS) + cklib 1.5.1 (byte-verified stripped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL the GOVERNED 2-arg ckp.dispatch(verb, payload) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
@@ -15,7 +15,7 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 17
   base_image: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
-  base_image_version: v0.1.13
+  base_image_version: v0.1.14
   final_image: scratch
   runtime_profile: micro
 
@@ -25,11 +25,11 @@ extensions:
     source: https://www.postgresql.org/docs/17/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.6.3
+    version: 0.6.6
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.4.13
+    version: 0.4.14
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,10 +46,10 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.5.0
+    version: 1.5.1
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
-    description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.0 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
+    description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.1 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
   nats-server:
     version: 2.14.1
     source: https://github.com/nats-io/nats-server

@@ -21,11 +21,21 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pgrdf;
 CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
 
--- Arm the default 'demo' project board from the artifact-shipped ontology
--- modules so the bundle dispatches out of the box (pgCK 0.4.2 §4: optional
--- board arming; /ontology is the documented default root).
-CALL ckp.import_module('task', 'demo', '/ontology');
-CALL ckp.import_module('goal', 'demo', '/ontology');
+-- Arm the 'demo' project's CK loop: seal the Task + Goal type shapes into
+-- urn:ckp:demo/kernel/ck — the graph pgCK's typed-edge ops + seal gate READ —
+-- via pgCK 0.4.14's authorized, file-mount-free writer ckp.adopt_kernel_ttl.
+-- Replaces the pre-0.4.14 ckp.import_module, which sealed shapes into
+-- …/kernel/board — a DIFFERENT graph the typed ops never read — leaving every
+-- T1–T5 gate vacuous (ok:true enforcing nothing). pgCK NOTIFY
+-- import-module-typed-op-graph-split: RESOLVED in 0.4.14. adopt_kernel_ttl is
+-- operator-level (first boot), NOT a ckp.dispatch verb, so ck_participant still
+-- cannot write /ck (the v3.9 Critical Isolation floor holds). init.sql runs via
+-- `postgres --single`, so we read the artifact-shipped TTL with pg_read_file
+-- (pgCK's documented psql `\set … cat` form is psql-only; pg_read_file is the
+-- postgres --single equivalent).
+CALL ckp.bootstrap_kernel();
+SELECT ckp.adopt_kernel_ttl(pg_read_file('/ontology/task.ttl'), 'demo');
+SELECT ckp.adopt_kernel_ttl(pg_read_file('/ontology/goal.ttl'), 'demo');
 
 -- Native outbox drain role (v0.7.18+). Every seal enqueues an event into
 -- ckp.outbox; pgCK's in-kernel nats-client bgworker that drains it onto NATS
