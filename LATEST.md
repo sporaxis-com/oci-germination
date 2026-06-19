@@ -33,6 +33,26 @@ PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS co
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
+**Version composition** — **test-confirmed** against this digest at `2026-06-19T12:06:38Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `ociger-pg17-pgrdf-pgck-nats-micro:v0.1.14` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `17.10 (Debian 17.10-1.pgdg12+1)` | ✓ |
+| `pgcrypto` | extension | `builtin` | `CREATE EXTENSION` | gate-before-push | ✓ gated |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `0.6.6` | ✓ |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `0.6.6` | ✓ |
+| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `0.4.14` | ✓ |
+| `pgck.version()` | native | `0.4.14` | `self-report` | `pgck 0.4.3 (rc3)` | ⚠ stale¹ |
+| `s6-overlay` | component | `3.2.3.0` | `—` | gate-before-push | ✓ gated |
+| `busybox` | component | `1.36.1` | `httpd :8000` | gate-before-push | ✓ gated |
+| `cklib` | component | `1.5.2` | `/app/cklib` | gate-before-push | ✓ gated |
+| `nats-server` | component | `2.14.1` | `—` | gate-before-push | ✓ gated |
+| `ociger-pg-launcher` | component | `in-tree` | `—` | gate-before-push | ✓ gated |
+| `ociger-pgck-relay` | component | `in-tree (v0.7.11 generation — dispatch bridge)` | `bridge` | gate-before-push | ✓ gated |
+
+¹ native self-report frozen upstream (the extension build is the correct version — see `extversion`); tracked in the open pgCK `pgck_version()`-stale NOTIFY, not release-blocking.
+
 ## ociger-pg17-pgrdf-pgck-static-cklib — `v0.6.7`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at `/cklib/`. No Python, no FastAPI. Browser ↔ kernel via NATS WSS; HTTP serves only static assets.
@@ -52,6 +72,20 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-static-cklib |
+
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.5.28` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.5.28` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.2.2` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.2.2` | `self-report` | `—` | ? unprobed |
+| `static_server` | component | `0.1.0` | `httpd :8000` | gate-before-push | ✓ gated |
+| `cklib` | component | `1.3.11` | `/cklib` | gate-before-push | ✓ gated |
+| `nats` | component | `2.14.1` | `—` | gate-before-push | ✓ gated |
 
 ## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.5`
 
@@ -73,14 +107,15 @@ Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
+
 ## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.14`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `_unknown_`  | 2026-06-18 21:57:40 |
-| arm64 | `_unknown_`  | 2026-06-18 21:57:40 |
+| amd64 | `sha256:5cb812351127c6e7fa675a41302df2181cd9ed47b42e2d097521a91b22569607`  | 2026-06-18 21:57:40 |
+| arm64 | `sha256:ee10d8b0809f4a7533382c905c5b23f86274fbcdfb38f5afe5a943e4ba5c2e74`  | 2026-06-18 21:57:40 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
@@ -92,6 +127,17 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
+
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck-nats — `v0.1.11`
 
@@ -113,6 +159,17 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats/`](./bundles/bundle-pg17-pgrdf-pgck-nats/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats |
 
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
+
 ## ociger-pg17-pgrdf-pgck — `v0.1.11`
 
 PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgrdf,pgck`). No NATS. Distroless base.
@@ -132,6 +189,17 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
+
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf — `v0.1.11`
 
@@ -153,6 +221,15 @@ PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 | Source bundle      | [`bundles/bundle-pg17-pgrdf/`](./bundles/bundle-pg17-pgrdf/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf |
 
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
+
 ## ociger-core-pg17-nats-micro — `v0.1.2`
 
 PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
@@ -172,6 +249,13 @@ PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17-nats-micro/`](./bundles/core-pg17-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats-micro |
+
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 
 ## ociger-core-pg17-nats — `v0.1.2`
 
@@ -193,6 +277,13 @@ PostgreSQL 17 + NATS + NATS WSS. No extensions. Distroless base.
 | Source bundle      | [`bundles/core-pg17-nats/`](./bundles/core-pg17-nats/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats |
 
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+
 ## ociger-core-pg17-micro — `v0.1.2`
 
 PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bundle.
@@ -213,6 +304,13 @@ PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bund
 | Source bundle      | [`bundles/core-pg17-micro/`](./bundles/core-pg17-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-micro |
 
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+
 ## ociger-core-pg17-min — `core-pg17-v0.1.3`
 
 PostgreSQL 17 only. Distroless base (shell + libc available).
@@ -232,6 +330,13 @@ PostgreSQL 17 only. Distroless base (shell + libc available).
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/core-pg17/`](./bundles/core-pg17/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-min |
+
+**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 
 ## Pin policy
 
