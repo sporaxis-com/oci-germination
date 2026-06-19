@@ -53,3 +53,6 @@ _WIP/
 
 # hello-kernel example: per-run scratch (bundle's cklib staged for node:22)
 examples/hello-kernel/.run-*
+
+# Playwright MCP snapshot scratch (local browser-tool artifact)
+.playwright-mcp/
