@@ -496,7 +496,7 @@ echo "[ck-allinone] ✓ native drain OK — seal → $DRAIN_OK (no host bridge)"
 echo "[ck-allinone] ⑤g typed-edge enforcement is NON-VACUOUS (#18 — type shapes in /ck; gate rejects incomplete)"
 # Pre-v0.7.20 the demo's Task/Goal shapes were sealed into urn:ckp:demo/kernel/board, but pgCK's
 # typed-edge ops + ckp.seal READ urn:ckp:demo/kernel/ck — so /ck was empty and every T1–T5 gate
-# no-opped (ok:true enforcing nothing; the silent-pass CK.Lib.Js verify-v160 + CSVC SPIKE caught).
+# no-opped (ok:true enforcing nothing; the silent-pass CK.Lib.Js verify-v160 + a downstream spike caught).
 # v0.7.20 wires init.sql to pgCK 0.4.14's ckp.adopt_kernel_ttl, sealing task.ttl + goal.ttl into /ck.
 # Assert (a) the type shapes ARE in /ck (the gate graph), and (b) a typed instance.create missing a
 # required prop is REJECTED through the dispatch door as ck_participant (the s49 contract — silently
