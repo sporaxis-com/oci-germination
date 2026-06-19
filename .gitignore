@@ -50,3 +50,6 @@ coverage.out
 
 # WIP scratch (NOTIFIES, drafts, transient docs — local exchange only)
 _WIP/
+
+# hello-kernel example: per-run scratch (bundle's cklib staged for node:22)
+examples/hello-kernel/.run-*
