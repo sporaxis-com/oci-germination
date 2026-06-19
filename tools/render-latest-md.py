@@ -26,6 +26,12 @@ import sys
 from datetime import datetime, timezone
 from typing import Iterable
 
+# The composition engine lives alongside this file (tools/). It reads each
+# bundle's bundle.yaml for the expected layer map and, when a digest-matched
+# composition.confirmed.json is present, the test-confirmed real versions.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import version_composition as vc  # noqa: E402
+
 # ----------------------------------------------------------------------
 # Bundle registry — single source of truth for what we publish + display.
 # ----------------------------------------------------------------------
@@ -248,6 +254,61 @@ def fmt_ts(iso: str) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _maybe_reprobe(bundle_dir: str, conf_path: str, index_digest: str, image_ref: str) -> dict | None:
+    """Opt-in, best-effort: re-probe the live image and re-stamp the JSON to the
+    advertised digest. Gated on env PROBE_COMPOSITION and on the bundle already
+    opting in (a composition.confirmed.json present). Returns the fresh record on
+    success, else None (caller falls back to the expected map). Never raises."""
+    if not os.environ.get("PROBE_COMPOSITION") or not os.path.exists(conf_path):
+        return None
+    try:
+        pdata = vc.probe(image_ref)
+        comp = vc.compose(bundle_dir, pdata)
+        comp["index_digest"] = pdata.get("_index_digest", "") or index_digest
+        comp["image"] = image_ref
+        comp["confirmed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(conf_path, "w") as f:
+            json.dump(comp, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        return comp if comp.get("index_digest") == index_digest else None
+    except Exception:
+        return None
+
+
+def render_composition_section(bundle_dir: str, index_digest: str, image_ref: str) -> str:
+    """Composition table for a bundle: EXPECTED (bundle.yaml) + test-CONFIRMED.
+
+    Uses bundles/<dir>/composition.confirmed.json ONLY when its recorded
+    index_digest matches the digest we're advertising — so a stale confirmation
+    from a prior cut never decorates a new digest. Without a digest-match it
+    falls back to the expected layer map from bundle.yaml. See PROVENANCE.md.
+    """
+    if not os.path.exists(os.path.join(bundle_dir, "bundle.yaml")):
+        return ""  # retired/placeholder bundle — no layer map to compose
+    conf_path = os.path.join(bundle_dir, "composition.confirmed.json")
+    confirmed = None
+    if os.path.exists(conf_path):
+        try:
+            c = json.load(open(conf_path))
+            if c.get("index_digest") == index_digest:
+                confirmed = c
+        except Exception:
+            confirmed = None
+    if confirmed is None:
+        confirmed = _maybe_reprobe(bundle_dir, conf_path, index_digest, image_ref)
+    if confirmed:
+        table = vc.render_md(confirmed)
+        stamp = (f"**test-confirmed** against this digest at "
+                 f"`{confirmed.get('confirmed_at', '?')}` — every probed native version was "
+                 f"read back from the running image; the rest are gated by the bundle's "
+                 f"gate-before-push smoke.")
+    else:
+        table = vc.render_md(vc.compose(bundle_dir, None))
+        stamp = ("expected layer map (bundle.yaml); live confirmation re-attaches on the "
+                 "next gated build for this digest.")
+    return f"**Version composition** — {stamp}\n\n{table}\n"
+
+
 def render_bundle_section(
     pkg: str,
     heading: str,
@@ -328,6 +389,7 @@ def render_bundle_section(
     lines.append(f"| Source bundle      | [`{bundle_dir}/`](./{bundle_dir}/)                                          |")
     lines.append(f"| Repo packages view | https://github.com/orgs/{owner}/packages/container/package/{pkg} |")
     lines.append("")
+    lines.append(render_composition_section(bundle_dir, index_digest, image_ref))
     return "\n".join(lines)
 
 

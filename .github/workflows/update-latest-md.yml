@@ -48,21 +48,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.repository }}
+          # Opt the renderer into test-confirming composition: for any bundle that
+          # opts in (a composition.confirmed.json present) whose committed digest no
+          # longer matches the advertised one, stand the freshly-pushed image up,
+          # re-probe its native .version() surfaces, and re-stamp the JSON. Best-
+          # effort — a flaky probe leaves the committed JSON and falls back to the
+          # expected layer map; it never fails the render. See PROVENANCE.md.
+          PROBE_COMPOSITION: "1"
         run: |
           set -euo pipefail
+          pip install --quiet pyyaml || pip3 install --quiet pyyaml || true
           python3 tools/render-latest-md.py > LATEST.md.new
           mv LATEST.md.new LATEST.md
 
       - name: Commit refresh if changed
         run: |
           set -euo pipefail
-          if git diff --quiet LATEST.md; then
-            echo "LATEST.md already current — nothing to do"
+          if git diff --quiet LATEST.md bundles/*/composition.confirmed.json; then
+            echo "LATEST.md + composition records already current — nothing to do"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add LATEST.md
+          git add LATEST.md bundles/*/composition.confirmed.json
           git commit -m "$(cat <<'EOF'
           docs(auto): refresh LATEST.md from GHCR (attestation-gated)
 

@@ -15,8 +15,31 @@
 8. **Voice inconsistencies between upstream `LATEST.md` and actual attestation state immediately, do not accept them.** If an upstream repo's `LATEST.md` advertises a version (e.g. pgRDF's `LATEST.md` listing `0.5.9-pg17-*` as the head) but `gh attestation verify` returns 404 or rejects that digest, that is a verifiable inconsistency. The agent surfaces it in the same turn the discrepancy is found, refuses to consume that version, and recommends one of: bug-report NOTIFY to the upstream, hold-back to the last attested version of theirs, or user-driven explicit override. Silent acceptance of an unattested upstream artifact is prohibited.
 9. **Version numbers are monotonic and never reused.** A failed CI run at `vN.M.K` retires that number permanently. The next attempt is `vN.M.(K+1)`, never a re-push of `vN.M.K`. Do not `git push origin :refs/tags/<name>` to delete a failed tag; do not `git tag -f` to move one. The tag stays where the failure happened; the fix is a new commit with a new tag. Gaps in the version sequence are expected — they are explained by the corresponding FAILED entries in `CHANGELOG.md`.
 10. **`CHANGELOG.md` records every release attempt, successful or failed; git tags exist only for successful attempts.** Failed attempts (CI failure, attestation failure, smoke failure, etc.) get a FAILED entry in `CHANGELOG.md` describing what was tried and why it failed. They do **not** get a git tag. The version number is permanently spent. `CHANGELOG.md` is the audit trail for gaps in the tag sequence; `LATEST.md` is the audit trail for what's live in production.
+11. **`LATEST.md` carries a TEST-CONFIRMED version composition per bundle, not just intended pins.** Each advertised bundle block ends with a *Version composition* table whose **Expected** column is the layer map read from that bundle's `bundle.yaml` (base image, postgres, every extension incl. its native `.version()`, and every runtime/web component with its mapping — `cklib`→`/app/cklib`, busybox httpd→`:8000`, the dispatch relay, …) and whose **Confirmed (real)** column is read back from the *running, attested* image. A native self-report that disagrees with its installed `extversion` is shown as `⚠ stale` with a footnote to its open NOTIFY — surfaced, never silently reconciled. Expected and confirmed must agree (or be a tracked, footnoted upstream deviation) for the entry to stand.
 
 Everything else in this document explains how those rules are enforced.
+
+### Test-confirmed composition (Rule 11 — how it's produced)
+
+The goal: `LATEST.md` should answer "what is *actually inside* the attested digest", not merely "what we asked the Dockerfile for". Mechanism:
+
+- **Single source for the layer map: `bundle.yaml`.** `tools/version_composition.py` reads `extensions:` + `components:` + `image:` and renders every layer with its version and mapping. No second list to drift.
+- **Confirmed live, where the container already runs.** The renderer (`tools/render-latest-md.py`, the only allowed `LATEST.md` writer — Rule 3) probes the *pushed, attested* image and reads back each native surface (`SHOW server_version`, `pg_extension.extversion`, `pgrdf.version()`, `pgck_version()`). The result is written to `bundles/<dir>/composition.confirmed.json`, **stamped with the index digest it was confirmed against**.
+- **Digest-gated, never stale.** A `composition.confirmed.json` decorates a `LATEST.md` block **only if its recorded `index_digest` equals the digest being advertised**. A confirmation from a prior cut is ignored; the block falls back to the expected layer map until the next gated build re-confirms. Re-probe is best-effort (`PROBE_COMPOSITION=1`): a flaky probe never breaks the render.
+- **Non-probeable layers are gate-confirmed.** Layers without a queryable self-report (busybox, s6, NATS, cklib, the in-tree Go binaries) show `✓ gated` — their presence/behaviour is asserted by the bundle's gate-before-push smoke (busybox serves `/cklib`, NATS answers core+WSS, the relay round-trips), which is a precondition of the digest existing at all.
+
+Example (`ociger-ck-allinone` @ `v0.7.21`):
+
+| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
+|-------|------|----------|---------|------------------|---------|
+| `postgresql` | engine | `17` | `server` | `17.10 (Debian)` | ✓ |
+| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `0.6.6` | ✓ |
+| `pgrdf.version()` | native | `0.6.6` | `self-report` | `0.6.6` | ✓ |
+| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `0.4.14` | ✓ |
+| `pgck.version()` | native | `0.4.14` | `self-report` | `pgck 0.4.3 (rc3)` | ⚠ stale¹ |
+| `cklib` | component | `1.5.2` | `/app/cklib` | gate-before-push | ✓ gated |
+
+¹ `pgck_version()` is a frozen literal in the pgCK `.so` (the extension build itself is the correct 0.4.14 — see `extversion`); tracked in the open pgCK `pgck_version()`-stale NOTIFY, not release-blocking. pgRDF derives its `.version()` correctly.
 
 ### Release attempt policy (Rules 9, 10 — the changelog ↔ tag separation)
 

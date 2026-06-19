@@ -1,0 +1,126 @@
+{
+  "bundle": "bundle-ck-allinone",
+  "index_digest": "sha256:3385a0a35647e40988bef6d7d08dd1fd83dd60c35ed0479db38409d79fd9ec96",
+  "all_match": true,
+  "layers": [
+    {
+      "layer": "base image",
+      "kind": "base",
+      "expected": "ociger-pg17-pgrdf-pgck-nats-micro:v0.1.14",
+      "mapping": "FROM",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "postgresql",
+      "kind": "engine",
+      "expected": "17",
+      "mapping": "server",
+      "probe": "postgres",
+      "confirmed": "17.10 (Debian 17.10-1.pgdg12+1)",
+      "verdict": "✓"
+    },
+    {
+      "layer": "pgcrypto",
+      "kind": "extension",
+      "expected": "builtin",
+      "mapping": "CREATE EXTENSION",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "pgrdf",
+      "kind": "extension",
+      "expected": "0.6.6",
+      "mapping": "CREATE EXTENSION",
+      "probe": "pgrdf_ext",
+      "confirmed": "0.6.6",
+      "verdict": "✓"
+    },
+    {
+      "layer": "pgrdf.version()",
+      "kind": "native",
+      "expected": "0.6.6",
+      "mapping": "self-report",
+      "probe": "pgrdf_fn",
+      "confirmed": "0.6.6",
+      "verdict": "✓"
+    },
+    {
+      "layer": "pgck",
+      "kind": "extension",
+      "expected": "0.4.14",
+      "mapping": "CREATE EXTENSION",
+      "probe": "pgck_ext",
+      "confirmed": "0.4.14",
+      "verdict": "✓"
+    },
+    {
+      "layer": "pgck.version()",
+      "kind": "native",
+      "expected": "0.4.14",
+      "mapping": "self-report",
+      "probe": "pgck_fn",
+      "confirmed": "pgck 0.4.3 (rc3)",
+      "verdict": "⚠ stale¹"
+    },
+    {
+      "layer": "s6-overlay",
+      "kind": "component",
+      "expected": "3.2.3.0",
+      "mapping": "—",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "busybox",
+      "kind": "component",
+      "expected": "1.36.1",
+      "mapping": "httpd :8000",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "cklib",
+      "kind": "component",
+      "expected": "1.5.2",
+      "mapping": "/app/cklib",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "nats-server",
+      "kind": "component",
+      "expected": "2.14.1",
+      "mapping": "—",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "ociger-pg-launcher",
+      "kind": "component",
+      "expected": "in-tree",
+      "mapping": "—",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    },
+    {
+      "layer": "ociger-pgck-relay",
+      "kind": "component",
+      "expected": "in-tree (v0.7.11 generation — dispatch bridge)",
+      "mapping": "bridge",
+      "probe": null,
+      "confirmed": "gate-before-push",
+      "verdict": "✓ gated"
+    }
+  ],
+  "confirmed_at": "2026-06-19T12:06:38Z",
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.21"
+}
