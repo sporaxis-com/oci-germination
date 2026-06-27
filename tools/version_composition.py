@@ -47,8 +47,9 @@ PSQL_PROBES = {
 # Listed here so the gate prints ⚠ instead of ✗ and does not block releases over
 # a cosmetic upstream bug. Remove an entry the moment upstream ships the fix.
 KNOWN_STALE = {
-    # extversion that is correct -> the stale literal pgck_version() returns
-    "pgck_fn": "pgck 0.4.3 (rc3)",
+    # (empty) — pgck_version() de-staled in pgCK 0.4.15 (now CARGO_PKG_VERSION-derived);
+    # no tracked native-version exceptions. Re-add an entry only if an upstream freezes
+    # its self-report again.
 }
 
 

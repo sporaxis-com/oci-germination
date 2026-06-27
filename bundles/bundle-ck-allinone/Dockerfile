@@ -5,7 +5,7 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.14
+ARG PG_BASE_VERSION=v0.1.15
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.5.2
 # v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
@@ -17,16 +17,17 @@ ARG OCIGER_RELAY_GENERATION=v0.7.11
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.6.6 + pgCK 0.4.14 + NATS + ociger-pg-launcher) ───
-# v0.1.14 carries pgCK v0.4.14 "install-from-zero" — durable tables are
+# ─── Stage 1: pg base (pg17 + pgRDF 0.6.17 + pgCK 0.4.15 + NATS + ociger-pg-launcher) ───
+# v0.1.15 carries pgCK v0.4.15 "install-from-zero" — durable tables are
 # top-level install DDL born owned by ck_substrate, ontology modules ship
 # WITH the artifact at /ontology, and the floor pass covers everything —
-# plus pgRDF v0.6.6 (parallel bulk loader shipped upstream 0.6.2; LUBM-scale
-# ingest). CREATE EXTENSION pgck CASCADE is genuinely sufficient.
-# NOTE: pgCK 0.4.14's native pgck_version() still self-reports "0.4.3 (rc3)"
-# (stale display string — extension/control/SQL are correctly 0.4.14). pgCK
-# NOTIFY filed; the smoke pins the native check to the actual reported value.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.14 AS pg_base
+# plus pgRDF v0.6.17 (out-of-the-box at-scale staged ingest, T1–T5 GUC levers;
+# carve_graph subgraph slicing). pgRDF 0.6.6→0.6.17 is .so/GUC-only — no schema
+# change, no base/SONAME move (still 17-bookworm). CREATE EXTENSION pgck CASCADE
+# is genuinely sufficient. pgCK 0.4.15 now reports pgck_version() correctly
+# (CARGO_PKG_VERSION-derived; the frozen "0.4.3 (rc3)" literal through 0.4.14 is
+# fixed) — the smoke asserts the true version.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.15 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.2 — the dispatch-only client, verified TYPED-SEALED live against the
