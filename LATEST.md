@@ -134,10 +134,10 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.17` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.15` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.15` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck-nats — `v0.1.11`
 
@@ -165,10 +165,10 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.17` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.15` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.15` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck — `v0.1.11`
 
@@ -196,10 +196,10 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.14` | `self-report` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.17` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.15` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.15` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf — `v0.1.11`
 
@@ -227,8 +227,8 @@ PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.6` | `self-report` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.17` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.17` | `self-report` | `—` | ? unprobed |
 
 ## ociger-core-pg17-nats-micro — `v0.1.2`
 
