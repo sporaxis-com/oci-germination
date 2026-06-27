@@ -17,9 +17,9 @@ image:
   runtime_profile: stable
 extensions:
   pgrdf:
-    version: 0.6.6
+    version: 0.6.17
   pgck:
-    version: 0.4.14
+    version: 0.4.15
 platforms:
   - linux/amd64
   - linux/arm64
@@ -32,7 +32,7 @@ ports:
     container_port: 9222
 services:
   nats:
-    source_image: nats:2.14.1-scratch
+    source_image: nats:2.14.2-scratch
     core_port: 4222
     websocket_port: 9222
     jetstream: false
