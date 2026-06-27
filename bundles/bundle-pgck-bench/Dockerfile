@@ -28,8 +28,9 @@ ARG PGCKWEB_VERSION=v0.2.7
 # Build-arg supplied by CI from the git tag; default `dev` keeps local
 # `docker build` invocations clearly distinguished from a release.
 ARG BUNDLE_VERSION=dev
+ARG TARGETARCH
 
-FROM ghcr.io/styk-tv/pgck-web:v0.2.7-${TARGETARCH:-amd64} AS upstream
+FROM ghcr.io/styk-tv/pgck-web:v0.2.7-${TARGETARCH} AS upstream
 
 FROM upstream
 ARG BUNDLE_VERSION
