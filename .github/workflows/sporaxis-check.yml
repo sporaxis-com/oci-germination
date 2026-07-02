@@ -1,0 +1,48 @@
+name: sporaxis check
+
+# Adopt the sporaxis assembler as the composition gate (sporaxis-com/oci-germination#3,
+# closes #5). The bundle's discipline (invariants I1–I9) is enforced against the
+# declared composition on every change — not left to reviewer memory. The tool
+# itself is verified (SLSA) before it is trusted to run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "bundles/**/*.composition/**"
+      - ".github/workflows/sporaxis-check.yml"
+
+# One run per ref; a new push cancels the in-flight one.
+concurrency:
+  group: sporaxis-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  attestations: read # gh attestation verify (the tool's own provenance)
+
+jobs:
+  compose-check:
+    name: validate ck-allinone composition
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sporaxis + verify its SLSA provenance
+        run: |
+          set -euo pipefail
+          curl -fsSL -o sporaxis.tar.gz \
+            https://github.com/sporaxis-com/sporaxis/releases/latest/download/sporaxis-x86_64-unknown-linux-gnu.tar.gz
+          # Do not run a tool we cannot attest.
+          gh attestation verify sporaxis.tar.gz --repo sporaxis-com/sporaxis
+          tar -xzf sporaxis.tar.gz
+          sudo install -m0755 sporaxis /usr/local/bin/sporaxis
+          sporaxis --version
+
+      - name: sporaxis check — the ck-allinone composition
+        run: sporaxis check bundles/bundle-ck-allinone/ck-allinone.composition
+        # Upgrade to `--attest` once sporaxis v0.0.6 (I9 + live attestation) is
+        # released — it also verifies every gh-slsa component's digest here.

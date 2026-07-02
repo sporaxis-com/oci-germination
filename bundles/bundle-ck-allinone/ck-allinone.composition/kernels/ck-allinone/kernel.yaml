@@ -1,0 +1,7 @@
+type: "oci:FleetImage"
+version: v0.7.22
+provenance:
+  origin: "sporaxis-com/oci-germination"
+  attestation: "gh-slsa"
+  last_commit: "065d87f"
+  committed_by: "Peter Styk <peter@neux.io>"
