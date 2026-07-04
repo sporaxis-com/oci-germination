@@ -1,12 +1,12 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:8cd0dbbfcafa062565e39569229ebf603a1b10f5489660282629b058d6e483cf",
+  "index_digest": "sha256:e6b41dd6dd4a63baefe49f14693035b92c123fdfe75908d08803d39e04f5de01",
   "all_match": true,
   "layers": [
     {
       "layer": "base image",
       "kind": "base",
-      "expected": "ociger-pg17-pgrdf-pgck-nats-micro:v0.1.16",
+      "expected": "ociger-pg17-pgrdf-pgck-nats-micro:v0.1.17",
       "mapping": "FROM",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -51,19 +51,19 @@
     {
       "layer": "pgck",
       "kind": "extension",
-      "expected": "0.4.17",
+      "expected": "0.4.19",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "0.4.17",
+      "confirmed": "0.4.19",
       "verdict": "✓"
     },
     {
       "layer": "pgck.version()",
       "kind": "native",
-      "expected": "0.4.17",
+      "expected": "0.4.19",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "pgck 0.4.17",
+      "confirmed": "pgck 0.4.19",
       "verdict": "✓"
     },
     {
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25",
-  "confirmed_at": "2026-07-04T13:46:15Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.26",
+  "confirmed_at": "2026-07-04T22:24:03Z"
 }
