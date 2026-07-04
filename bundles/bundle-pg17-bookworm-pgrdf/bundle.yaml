@@ -17,7 +17,7 @@ image:
   final_image: postgres:17-bookworm
 extensions:
   pgrdf:
-    version: 0.6.17
+    version: 0.6.19
 platforms:
   - linux/amd64
   - linux/arm64
