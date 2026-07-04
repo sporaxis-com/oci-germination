@@ -16,9 +16,9 @@ image:
   final_image: gcr.io/distroless/base-debian12:latest
 extensions:
   pgrdf:
-    version: 0.6.17
+    version: 0.6.19
   pgck:
-    version: 0.4.15
+    version: 0.4.17
 platforms:
   - linux/amd64
   - linux/arm64
