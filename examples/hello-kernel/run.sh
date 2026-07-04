@@ -22,11 +22,11 @@
 # integration an app builds against is cklib over WSS, which is what this runs.
 #
 # Usage:  bash examples/hello-kernel/run.sh   [IMAGE]   [KERNEL]
-#   IMAGE   default: ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.21
+#   IMAGE   default: ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25
 #   KERNEL  default: demo   (the bundle arms 'demo' with the Task/Goal shapes at boot)
 set -euo pipefail
 
-IMAGE="${1:-ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.21}"
+IMAGE="${1:-ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25}"
 KERNEL="${2:-demo}"
 RUNNER="node:22-slim"
 SUF="$$"

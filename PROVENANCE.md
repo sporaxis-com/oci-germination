@@ -41,13 +41,13 @@ Example (`ociger-ck-allinone` @ `v0.7.21`):
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
 | `postgresql` | engine | `17` | `server` | `17.10 (Debian)` | ✓ |
-| `pgrdf` | extension | `0.6.6` | `CREATE EXTENSION` | `0.6.6` | ✓ |
-| `pgrdf.version()` | native | `0.6.6` | `self-report` | `0.6.6` | ✓ |
-| `pgck` | extension | `0.4.14` | `CREATE EXTENSION` | `0.4.14` | ✓ |
-| `pgck.version()` | native | `0.4.14` | `self-report` | `pgck 0.4.3 (rc3)` | ⚠ stale¹ |
-| `cklib` | component | `1.5.2` | `/app/cklib` | gate-before-push | ✓ gated |
+| `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `0.6.19` | ✓ |
+| `pgrdf.version()` | native | `0.6.19` | `self-report` | `0.6.19` | ✓ |
+| `pgck` | extension | `0.4.17` | `CREATE EXTENSION` | `0.4.17` | ✓ |
+| `pgck.version()` | native | `0.4.17` | `self-report` | `0.4.17` | ✓¹ |
+| `cklib` | component | `1.5.3` | `/app/cklib` | gate-before-push | ✓ gated |
 
-¹ `pgck_version()` is a frozen literal in the pgCK `.so` (the extension build itself is the correct 0.4.14 — see `extversion`); tracked in the open pgCK `pgck_version()`-stale NOTIFY, not release-blocking. pgRDF derives its `.version()` correctly.
+¹ `pgck_version()` self-report was a frozen literal (`pgck 0.4.3 (rc3)`) through 0.4.14 — **fixed in pgCK 0.4.15** (derives from `CARGO_PKG_VERSION`), so native == `extversion` again. The former stale-native NOTIFY is closed.
 
 ### Release attempt policy (Rules 9, 10 — the changelog ↔ tag separation)
 

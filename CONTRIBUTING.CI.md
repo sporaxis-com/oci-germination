@@ -35,25 +35,25 @@ If any step fails, **no artifact reaches GHCR**. The version number is permanent
 
 # 2. Run the local smoke against the local build before tagging.
 docker build --platform linux/arm64 \
-    --build-arg BUNDLE_VERSION=v0.7.13 \
+    --build-arg BUNDLE_VERSION=v0.7.25 \
     -f bundles/bundle-ck-allinone/Dockerfile \
-    -t ociger-ck-allinone:v0.7.13-local .
-bash scripts/smoke-ck-allinone.sh ociger-ck-allinone:v0.7.13-local
+    -t ociger-ck-allinone:v0.7.25-local .
+bash scripts/smoke-ck-allinone.sh ociger-ck-allinone:v0.7.25-local
 # 10/10 green is the gate. If smoke fails, fix on the same commit, re-smoke.
 
 # 3. Commit. Push main first.
 git add bundles/bundle-ck-allinone/
-git commit -m "feat(ck-allinone v0.7.13): …"
+git commit -m "feat(ck-allinone v0.7.25): …"
 git push origin main
 
 # 4. Tag with the next monotonic version. Push the tag.
-git tag release-ck-allinone-v0.7.13
-git push origin release-ck-allinone-v0.7.13
+git tag release-ck-allinone-v0.7.25
+git push origin release-ck-allinone-v0.7.25
 
 # 5. The workflow fires. Watch the run; if it fails, see "When CI fails" below.
 
 # 6. On green, gh attestation verify confirms the digest:
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.13 \
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25 \
     --repo sporaxis-com/oci-germination
 # Then update-latest-md.yml fires on workflow_run and advances LATEST.md.
 ```
@@ -65,13 +65,13 @@ gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.13 \
 The fix is a new commit on `main` plus the **next** version number:
 
 ```bash
-# CI failed at v0.7.13. Do NOT touch the v0.7.13 tag — it stays where it is.
+# CI failed at v0.7.25. Do NOT touch the v0.7.25 tag — it stays where it is.
 
 # Author the fix.
 git add scripts/smoke-ck-allinone.sh
 git commit -m "fix(smoke): bump expected pgCK version default
 
-The v0.7.13 CI run failed because the smoke script's default
+The v0.7.25 CI run failed because the smoke script's default
 PGCK_EXPECTED_VERSION hadn't been bumped to track the new pin.
 This commit ships the fix; the next release is v0.7.14."
 git push origin main
@@ -84,7 +84,7 @@ git push origin release-ck-allinone-v0.7.14
 Then record the failure in `CHANGELOG.md`:
 
 ```markdown
-### v0.7.13 — 2026-06-XX — FAILED
+### v0.7.25 — 2026-06-XX — FAILED
 - **Tried:** intent of this cut
 - **Tested:** which CI step ran and which one failed
 - **Cause:** root cause
@@ -94,7 +94,7 @@ Then record the failure in `CHANGELOG.md`:
 
 And the SHIPPED v0.7.14 entry that follows it.
 
-This honors three things at once: the immutable container digest history on GHCR stays clean (no orphan digests under deleted tags), the CI run history reads unambiguously (`v0.7.13 FAILED` then `v0.7.14 SUCCESS`), and the audit trail in `CHANGELOG.md` makes the version-number gap self-explanatory.
+This honors three things at once: the immutable container digest history on GHCR stays clean (no orphan digests under deleted tags), the CI run history reads unambiguously (`v0.7.25 FAILED` then `v0.7.14 SUCCESS`), and the audit trail in `CHANGELOG.md` makes the version-number gap self-explanatory.
 
 ## Smoke tests
 
@@ -116,14 +116,14 @@ For pre-tag local validation, `docker build` + local smoke is fine. `docker buil
 
 ```bash
 # Manifest (multi-arch).
-docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12
+docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25
 
 # Attestation (the gate).
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12 \
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25 \
     --repo sporaxis-com/oci-germination
 
 # Smoke against the published image.
-bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.12
+bash scripts/smoke-ck-allinone.sh ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25
 ```
 
 ## Troubleshooting

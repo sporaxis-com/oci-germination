@@ -12,7 +12,7 @@ bash examples/hello-kernel/run.sh
 It will:
 
 ```
-① stand up ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.21
+① stand up ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25
 ② stage the bundle's OWN cklib + run the journey under node:22 (native WebSocket)
 ③ the journey, all over cklib + WSS:
    • activate the kernel                       CK.activate(kernel, {wssEndpoint})
