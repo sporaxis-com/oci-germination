@@ -106,20 +106,20 @@ Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
 
 
-## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.16`
+## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.17`
 
 PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:faa4837700da27c0840546f051d428748f80d395cf922e1f6433c37df07ef437`  | 2026-07-04 13:28:02 |
-| arm64 | `sha256:86a169d388a2e184ee8a1500c08c0793e30022fdd012adebd3957bf9ec2189bc`  | 2026-07-04 13:28:02 |
+| amd64 | `sha256:cc9133cc0c20b6c1f47164182c86132207a914256055a07904363c08ccd99c7f`  | 2026-07-04 22:16:30 |
+| arm64 | `sha256:093a577640059bce27f68884a44561d25a1795c3fac1493c49ebb03dd17bbe7f`  | 2026-07-04 22:16:30 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.16`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.17`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:ab840043ad4ed23ce7f3c25437bcd129d9dee4048fb45fadc239c3038cfc9ab7`                                                         |
+| Index digest       | `sha256:3e6b89c41a28fa1a81a5635c217885f7b271e6769d1420a46f9ed699e22b8269`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
