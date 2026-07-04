@@ -134,8 +134,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.17` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.19` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.19` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck-nats — `v0.1.11`
 
@@ -165,8 +165,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.17` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.19` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.19` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck — `v0.1.11`
 
@@ -196,8 +196,8 @@ PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgr
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.17` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.17` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.19` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.19` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf — `v0.1.11`
 
