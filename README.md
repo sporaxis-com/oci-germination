@@ -1,153 +1,211 @@
 # oci-germination — Sporaxis-Com's Concept Kernel v3.9 container distribution
 
+![attestation](https://img.shields.io/badge/attestation-SLSA%20Build%20Provenance%20v1-brightgreen)
+![arch](https://img.shields.io/badge/arch-linux%2Famd64%20%C2%B7%20linux%2Farm64-informational)
+![base](https://img.shields.io/badge/prod%20base-scratch%20%C2%B7%20no%20python-blue)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
 This repo ships the OCI container artifacts that make a **CKP v3.9 ([Critical Isolation](https://github.com/styk-tv/pgCK)) runtime** trivial to stand up: PostgreSQL 17 with `pgRDF` (the parallel-ingest RDF graph engine) and `pgCK` (governed-write + concept-kernel runtime) preloaded, NATS for the WebSocket transport browsers talk to, and CK.Lib.Js mounted at `/cklib/` so a page can become a concept-kernel client in one line.
 
 The repo is a **layer-addition shop, not a compile shop**: pg base + extensions come pre-composed from upstream, this side just stacks `s6-overlay`, `busybox httpd`, and CK.Lib.Js on top to produce a marketplace-shaped image.
 
 > **New here?** → **[GETTING-STARTED.md](./GETTING-STARTED.md)** is the adopter on-ramp: one `docker run`, the hello-kernel journey, and how a game / experiment / software project maps onto the substrate. The journey is runnable — [`examples/hello-kernel/`](./examples/hello-kernel/).
 
+> **Auditing the supply chain?** → jump to [**The fleet as a typed composition**](#the-fleet-as-a-typed-composition) and [**Attestation — what is proven, and how**](#attestation--what-is-proven-and-how). Every artifact in every image is classified, versioned, sourced, and its attestation method is named — including the one component we *cannot* attest yet, declared plainly.
+
 ---
 
 ## Why concept kernels (light read)
 
-A **Concept Kernel** is a small self-describing, self-governing being that owns a slice of meaning. It carries its own ontology (what types can exist here), its own affordances (what verbs can be invoked), its own instances (the data that lives under it), and — when it climbs the capability tiers — its own sealing and proof. In [BFO](https://basic-formal-ontology.org/) terms a kernel sits as a `BFO:0000040`-class material entity for the purposes of stable identity and part-of relations: it endures, it has parts (ontology / tool / data), and it can be addressed independently. In [PROV-O](https://www.w3.org/TR/prov-o/) terms a kernel is a `prov:Agent` whose affordances generate `prov:Activity` invocations that mutate `prov:Entity` instances under it, each activity producing a sealed, auditable record. The CKP v3.9 line makes this concrete: kernels live in the pgRDF graph, declare their shape in SHACL, expose verbs over NATS-WSS, and carry an append-only proof chain. The discipline lets you describe a real-world or game-world domain as a federation of sovereign-by-design beings rather than a sprawl of tables and endpoints. This repo ships the runtime container that hosts it.
+A **Concept Kernel** is a small self-describing, self-governing being that owns a slice of meaning. It carries its own ontology (what types can exist here), its own affordances (what verbs can be invoked), its own instances (the data that lives under it), and — when it climbs the capability tiers — its own sealing and proof. In [BFO](https://basic-formal-ontology.org/) terms a kernel sits as a `BFO:0000040`-class material entity for the purposes of stable identity and part-of relations: it endures, it has parts (ontology / tool / data), and it can be addressed independently. In [PROV-O](https://www.w3.org/TR/prov-o/) terms a kernel is a `prov:Agent` whose affordances generate `prov:Activity` invocations that mutate `prov:Entity` instances under it, each activity producing a sealed, auditable record. The CKP v3.9 line makes this concrete: kernels live in the pgRDF graph, declare their shape in SHACL, expose verbs over NATS-WSS, and carry an append-only proof chain. This repo ships the runtime container that hosts it.
 
 ### A gaming example (one sentence)
 
 The design target: a `Space.Ship` is a kernel that declares the `Ship` class, the SHACL shape that says a ship has a `name` and a `hull_integrity`, and an affordance `Space.Ship.dock`; players invoke `ckp://Action#Space.Ship.dock` over WSS, the runtime resolves the URN, validates the input against the shape, mutates the addressed instance, and broadcasts the event — no REST endpoint, no per-type table, no bespoke server code. A sibling `Match` kernel composes several `Space.Ship` instances + a `Session` kernel into a live multiplayer round, governed end-to-end.
 
-What the **published image does today** is the same machinery one capability short of that target: governed, sealed, proof-chained kernels with tasks + goals, and consensus-gated type evolution — first-class custom classes like `Ship` are the next pgCK milestone. [`GETTING-STARTED.md`](./GETTING-STARTED.md) §2 draws that boundary precisely, and [`examples/hello-kernel/`](./examples/hello-kernel/) runs the part that works today end to end.
+What the **published image does today** is the same machinery one capability short of that target: governed, sealed, proof-chained kernels with tasks + goals, and consensus-gated type evolution — first-class custom classes like `Ship` are the next pgCK milestone.
 
 ---
 
-## What ships from here
+## The fleet as a typed composition
 
-Three production bundles + one benchmark sibling + four core bundles (pg-only). All multi-arch (`linux/amd64`, `linux/arm64`), all SLSA Build Provenance v1 attested via GitHub Actions, all published to GHCR. Current heads:
+We don't describe these images as "a Dockerfile that COPYs some stuff." Every artifact in every bundle is one of **five ontology entity types** (the same closed set the [`sporaxis`](https://github.com/sporaxis-com/sporaxis) composer validates). Organising the fleet by *what kind of thing each artifact is* — and naming its source and attestation next to it — is the whole transparency posture. The classes:
 
-| Bundle | Current tag | Last release | Role |
-|---|---|---|---|
-| **`ociger-ck-allinone`** | `v0.7.19` | 2026-06-13 | Marketplace-minimal CKP v3.9 Critical Isolation Alpha runtime — pg17 + pgRDF + pgCK + NATS + cklib, supervised by `s6-overlay`, web by `busybox httpd`, with the in-tree `ociger-pgck-relay` dispatch bridge wired to `ckp.dispatch`. **No Python, no FastAPI, scratch base.** Default for prod. |
-| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.13` | 2026-06-13 | The shared base for `ck-allinone` — pg17 + pgRDF + pgCK + NATS in a scratch + selectively-copied bookworm layout. Tracks the upstream pgRDF / pgCK release cadence directly. |
-| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.7` | 2026-05-31 | Same composition family but with the in-tree `ociger-static-server` Go binary instead of busybox httpd — kept for downstreams that already pin to it. **Frozen at the 2026-05-31 component pins**; next cut will roll forward when the static-cklib track is needed. |
-| `ociger-pg17-pgrdf-pgck-nats` | `v0.1.7` | 2026-05-31 | Same as `-nats-micro` with distroless final (instead of scratch). |
-| `ociger-pg17-pgrdf-pgck` | `v0.1.7` | 2026-05-31 | pg17 + pgRDF + pgCK, no NATS. |
-| `ociger-pg17-pgrdf` | `v0.1.7` | 2026-05-31 | pg17 + pgRDF only. |
-| `ociger-core-pg17-{nats,nats-micro,micro,min}` | `v0.1.2` / `v0.1.3` | 2026-05-28 | pg17 cores without extensions. |
-| `ociger-pgck-bench` | `v0.1.1` | 2026-05-31 | **Sibling devel / benchmark image** (Python + FastAPI + pgck-web). Runs **outside** ck-allinone on the same NATS network; never used in prod. The only sanctioned home for Python in this group. |
-| `ociger-pg17-pgrdf-pgck-web-cklib` | `v0.6.5` | 2026-05-29 | **Retired surface**. Superseded by `ck-allinone`; the `static-cklib` variant continues for downstreams that need the in-tree static server. Not advertised in `LATEST.md`. |
-
-Component versions baked into the `v0.7.19` / `v0.1.13` heads (the actively maintained pair):
-
-| Component | Version | Source |
+| Ontology class | What it is | In this fleet |
 |---|---|---|
-| PostgreSQL | 17.10 (Debian bookworm build) | upstream |
-| pgRDF | `0.6.3` — parallel bulk loader (`load_turtle(…, bulk_load => true)`, shipped 0.6.2); LUBM-benchmarked ingest at tens-of-millions-of-triples scale | [styk-tv/pgRDF](https://github.com/styk-tv/pgRDF), SLSA-attested |
-| pgCK | `0.4.13` (CKP v3.9 Critical Isolation enforced — CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance + CI-E typed reads) | [styk-tv/pgCK](https://github.com/styk-tv/pgCK), SLSA-attested |
-| NATS server | `2.14.1` (core on `:4222` + WSS bridge on `:9222`) | upstream |
-| CK.Lib.Js | `1.5.0` (dispatch-only client) | [ConceptKernel/CK.Lib.Js](https://github.com/ConceptKernel/CK.Lib.Js), SLSA-attested |
-| s6-overlay | `3.2.3.0` | upstream |
-| busybox | `1.36.1-musl` | upstream |
-| `ociger-pg-launcher` (in-tree) | rolls with bundle | this repo |
-| `ociger-pgck-relay` (in-tree dispatch bridge) | rolls with bundle (v0.7.11 generation) | this repo |
+| `oci:FleetImage` | an image **we** publish (owns a version + GHCR tag + its own attestation) | 12 images |
+| `oci:UpstreamImage` | an image we **consume**, never publish | 3 |
+| `ext:DBExtension` | a Postgres extension (`.so` + `.control` + `.sql`) | 3 |
+| `bin:StaticArtifact` | a binary / library / static asset, built in-tree or copied from upstream | 4 |
+| `svc:Process` | a supervised runtime process | 4 |
 
-All non-frozen bundles now share **one** set of component pins via [`versions.yaml`](./versions.yaml) (the single source of truth — pgRDF 0.6.3, pgCK 0.4.13, cklib 1.5.0); the `scripts/check-versions.sh` drift gate fails CI if any Dockerfile disagrees. The pure-extension siblings (`pg17-pgrdf`, `-pgck`, `-pgck-nats`, `pg17-bookworm-pgrdf`) carry those pins in source and roll their *published* images forward when their per-bundle tags are next cut. `pg17-pgrdf-pgck-static-cklib` stays frozen on its older pins (reason recorded in `versions.yaml`).
+Everything below is the **currently-shipping wave** (`ck-allinone v0.7.25` on `pg-base v0.1.16`). `LATEST.md` is the auto-rendered, attestation-verified authority for exact live tags; this table is the human-readable map.
 
-See [`LATEST.md`](./LATEST.md) for the auto-rendered attestation-verified head of each bundle.
+### `ext:DBExtension` — the graph + governance surface (3)
+
+| Extension | Version | Source | Attestation |
+|---|---|---|---|
+| `pgrdf` | `0.6.19` — parallel bulk loader + SPARQL expression surface (IF→CASE, `math#`, aggregates over expressions) | [`styk-tv/pgRDF`](https://github.com/styk-tv/pgRDF) → `ghcr.io/styk-tv/pgrdf-bundle` | **gh-SLSA ✓** `sha256:e6088320…` |
+| `pgck` | `0.4.17` — CKP v3.9 Critical Isolation + the generic ε-materialize derived-value substrate | [`styk-tv/pgCK`](https://github.com/styk-tv/pgCK) → `ghcr.io/styk-tv/pgck` | **gh-SLSA ✓** `sha256:2aa8a068…` |
+| `pgcrypto` | builtin (pg17) | PostgreSQL `contrib` | inherited from the postgres image |
+
+### `bin:StaticArtifact` — libraries + in-tree tooling (4)
+
+| Artifact | Version | Source | Attestation |
+|---|---|---|---|
+| `cklib` (→ `/app/cklib/`) | `1.5.3` — dispatch-only browser client | [`ConceptKernel/CK.Lib.Js`](https://github.com/ConceptKernel/CK.Lib.Js) → `ghcr.io/conceptkernel/ck-lib-js` | **gh-SLSA ✓** `sha256:0ceeb30b…` |
+| `s6-overlay` (PID 1) | `3.2.3.0` | [`just-containers/s6-overlay`](https://github.com/just-containers/s6-overlay) release tarball, `curl`'d in the build | **⚠ NONE** — no upstream attestation, no checksum pin (see below) |
+| `ociger-pg-launcher` | rolls with bundle | this repo → `cmd/ociger-pg-launcher` (Go) | fleet-CI, transitive via the FleetImage attestation |
+| `ociger-pgck-relay` | rolls with bundle | this repo → `cmd/ociger-pgck-relay` (Go); `SHIMS_FOR pgck` (bus bridge, retires when pgCK ships the in-`.so` relay) | fleet-CI, transitive |
+
+### `oci:UpstreamImage` — consumed bases (3)
+
+| Image | Version | Attestation |
+|---|---|---|
+| `postgres` | `17-bookworm` `sha256:17b6c778…` | docker-official (registry provenance; not gh-attestable) |
+| `busybox` | `1.36.1-musl` `sha256:3c6ae800…` (httpd applet on `:8000`) | docker-official |
+| `nats` | `2.14.2-scratch` `sha256:3b7b5f68…` (core `:4222` + WSS `:9222`) | docker-official |
+
+### `svc:Process` — the supervised runtime (4)
+
+`postgres` · `nats` · `httpd` (busybox applet) · `pgck-relay`. PID 1 is `s6-svscan`; each is an s6 longrun under `/etc/s6-overlay/s6-rc.d/`. Each carries a `SMOKES_BY` assertion the CI gate runs against a fresh volume (see [Attestation](#attestation--what-is-proven-and-how)).
+
+### `oci:FleetImage` — what we publish (12)
+
+All multi-arch (`linux/amd64`, `linux/arm64`), all SLSA Build Provenance v1 attested by GitHub Actions, all on GHCR. `LATEST.md` carries the live tags.
+
+| Image | Head | Role |
+|---|---|---|
+| **`ociger-ck-allinone`** | `v0.7.25` | Marketplace-minimal CKP v3.9 runtime — the full stack. **Default for prod.** |
+| `ociger-pg17-pgrdf-pgck-nats-micro` | `v0.1.16` | The **`pg-base`** `ck-allinone` inherits — pg17 + pgRDF + pgCK + NATS, scratch. |
+| `ociger-pg17-pgrdf-pgck-nats` | `v0.1.11` | as `-nats-micro`, distroless final. |
+| `ociger-pg17-pgrdf-pgck` | `v0.1.11` | pg17 + pgRDF + pgCK, no NATS. |
+| `ociger-pg17-pgrdf` | `v0.1.11` | pg17 + pgRDF only. |
+| `ociger-pg17-bookworm-pgrdf` | `v0.1.3` | plain `postgres:17-bookworm` + pgRDF (runnable Debian base). |
+| `ociger-core-pg17-{nats,nats-micro,micro,min}` | `v0.1.2` / `v0.1.3` | pg17 cores, no extensions. |
+| `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.7` | as `ck-allinone` but in-tree static server. **Frozen** (older pins — see `versions.yaml`). |
+| `ociger-pgck-bench` | `v0.1.1` | **devel/benchmark sibling** (Python/FastAPI). `never-prod=true`; runs *beside* prod, never inside. |
+
+All non-frozen bundles share **one** set of component pins via [`versions.yaml`](./versions.yaml) (the single source of truth — pgRDF 0.6.19 · pgCK 0.4.17 · cklib 1.5.3); `scripts/check-versions.sh` fails CI if any Dockerfile disagrees.
 
 ---
 
-## Inside `ck-allinone:v0.7.19` — layer composition
+## How the classes compose — `ck-allinone`
 
-The numbers below are illustrative — they were last measured against `v0.7.0` (the size profile is close enough to the current cut that the relative shape still holds; v0.7.11+ added the `pgx`-equipped relay binary, which moves the bundle from ~125 MiB to ~128 MiB). For exact byte counts on a specific tag, run `docker manifest inspect ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19`.
+`ck-allinone` is **not** a re-pull of pg17/pgRDF/pgCK — those enter **once**, inside `pg-base`, which `ck-allinone` inherits. The Delta on top is s6 + busybox + cklib + the two Go tools:
 
-Layer composition (compressed, amd64; 9 layers total, 5 inherited from `pg_base`, 4 added in this repo):
+```mermaid
+graph TD
+  ck["ck-allinone · v0.7.25<br/><i>oci:FleetImage</i>"]:::fleet
+  base["pg-base · v0.1.16<br/><i>oci:FleetImage</i>"]:::fleet
+  pgrdf["pgrdf 0.6.19<br/><i>ext:DBExtension</i>"]:::ext
+  pgck["pgck 0.4.17<br/><i>ext:DBExtension</i>"]:::ext
+  cklib["cklib 1.5.3<br/><i>bin:StaticArtifact</i>"]:::art
+  s6["s6-overlay 3.2.3.0<br/><i>bin:StaticArtifact</i>"]:::warn
+  bb["busybox<br/><i>oci:UpstreamImage</i>"]:::up
+  pg["postgres 17-bookworm<br/><i>oci:UpstreamImage</i>"]:::up
+  nats["nats 2.14.2<br/><i>oci:UpstreamImage</i>"]:::up
+  launcher["ociger-pg-launcher<br/><i>bin:StaticArtifact</i>"]:::art
+  relay["ociger-pgck-relay<br/><i>bin:StaticArtifact</i>"]:::art
 
-| # | MB (gz) | Source / role |
+  base -->|COPIES_FROM| pgrdf
+  base -->|COPIES_FROM| pgck
+  base -->|COPIES_FROM| pg
+  base -->|COPIES_FROM| nats
+  ck -->|INHERITS_FROM| base
+  ck -->|COPIES_FROM| cklib
+  ck -->|COPIES_FROM| bb
+  ck -->|COPIES_FROM| s6
+  ck -->|BUILDS| launcher
+  ck -->|BUILDS| relay
+  relay -.->|SHIMS_FOR| pgck
+
+  classDef fleet fill:#0b7285,stroke:#083f4d,color:#fff;
+  classDef ext fill:#2b8a3e,stroke:#1a5028,color:#fff;
+  classDef art fill:#5f3dc4,stroke:#3a2578,color:#fff;
+  classDef up fill:#495057,stroke:#212529,color:#fff;
+  classDef warn fill:#e8590c,stroke:#a03800,color:#fff;
+```
+
+The six edge types (`INHERITS_FROM`, `COPIES_FROM`, `BUILDS`, `SUPERVISES`, `SHIMS_FOR`, `SMOKES_BY`) are the closed predicate set; `SUPERVISES`/`SMOKES_BY` are elided above for legibility.
+
+---
+
+## Attestation — what is proven, and how
+
+**110% transparency means stating the ceiling as plainly as the floor.** Here is exactly what is and isn't proven today.
+
+**What ships and verifies now:**
+- Every `oci:FleetImage` carries a **SLSA Build Provenance v1** attestation. `gh attestation verify oci://<image>:<tag> --repo sporaxis-com/oci-germination` returns exit 0. This proves *the image digest was built by this repo's GitHub Actions from a specific commit* — a **build** attestation.
+- The three externally-attested components (`pgRDF`, `pgCK`, `cklib`) each carry their **own** gh-SLSA attestation in their source repos, verifiable by digest (see the tables above).
+- Attestation is **smoke-gated**: an image cannot advance to attestation unless its `SMOKES_BY` gate passes on a fresh volume (`build-bundles.yml`, per-bundle release workflows).
+
+**What is NOT yet proven — named, not hidden:**
+
+| Component | Attestation method | gh-verifiable? |
+|---|---|---|
+| pgRDF · pgCK · cklib · our FleetImages | gh-SLSA Build Provenance v1 | ✅ yes |
+| postgres · busybox · nats | docker-official (registry provenance) | ⚠️ not via `gh attestation` |
+| **s6-overlay** | **none** — `curl`'d tarball, no attestation, no checksum pin | ❌ **no — declared gap** |
+| pgcrypto · in-tree Go tools | inherited / transitive via the image build | ➖ n/a |
+
+- The **build** attestation on `ck-allinone` does **not yet link** the upstream component attestations into one supply-chain chain. A verifier learns "built by us," not "and layer *N* is pgRDF 0.6.19, itself attested by styk-tv." Closing that — a per-component provenance manifest, mapped to layers, linked into the image attestation — is active work in [`sporaxis`](https://github.com/sporaxis-com/sporaxis) (the `composition.ttl` already emits per-component `digest + origin + attestation-method`, with the **s6-overlay gap forced to be a declared exemption**, not silence).
+- `s6-overlay` is the honest hole: pinned by release tag only. It is called out here, in the graph (orange), and in the composition — never quietly.
+
+See [`PROVENANCE.md`](./PROVENANCE.md) for the publishing rules and the attestation chain.
+
+---
+
+## Inside the image — bytes (the additive layers)
+
+The ontology view above is *what* is composed. This is *how many bytes*, and it also shows **why per-component provenance needs the referenced manifest** (in progress): additive Docker layers **squash** distinct sources together, so you cannot attest at layer granularity — e.g. layer 1 mixes fleet-authored `.so`s with the upstream pg17 binary and ICU data.
+
+<details>
+<summary><b>Layer composition</b> (compressed, amd64; ~illustrative, last measured near this profile — run <code>docker manifest inspect</code> for exact bytes on a tag)</summary>
+
+| # | MB (gz) | Class-mix / role |
 |---|---:|---|
-| 1 | 35.23 | pg_base — pg17 binary + extensions + ICU/glibc/TLS/Kerberos libs (mixed: fleet + upstream) |
-| 2 | 1.59 | pg_base — additional shared libs |
-| 3 | 1.60 | pg_base — more shared libs |
-| 4 | 6.52 | pg_base — `nats-server`, `ociger-pg-launcher`, `ociger-supervisor` |
-| 5 | 0.00 | pg_base — `/etc/{passwd,group,nats/,…}` |
-| 6 | 2.68 | Delta — s6-overlay (PID 1 supervisor) |
-| 7 | 0.73 | Delta — `/bin/busybox` (httpd applet on `:8000`) |
-| 8 | 0.06 | Delta — CK.Lib.Js → `/app/cklib/` |
-| 9 | 0.00 | Delta — `/etc/s6-overlay/s6-rc.d/*` service definitions |
-| **Σ** | **48.42** | |
+| 1 | 35.23 | `pg-base` — pg17 binary + `pgrdf`/`pgck` `.so` + ICU/glibc/TLS/Kerberos (**mixed: DBExtension + UpstreamImage**) |
+| 2–3 | 3.19 | `pg-base` — additional shared libs (UpstreamImage) |
+| 4 | 6.52 | `pg-base` — `nats-server` + `ociger-pg-launcher` (StaticArtifact + UpstreamImage) |
+| 5 | 0.00 | `pg-base` — `/etc/{passwd,group,nats/,…}` (from `postgres:17-bookworm`) |
+| 6 | 2.68 | Delta — `s6-overlay` (StaticArtifact ⚠ unattested) |
+| 7 | 0.73 | Delta — `/bin/busybox` (UpstreamImage) |
+| 8 | 0.06 | Delta — `cklib` → `/app/cklib/` (StaticArtifact) |
+| 9 | 0.00 | Delta — s6 service definitions |
+| **Σ** | **~48** | |
 
-The bulk of the image is **upstream baggage** (libicudata.so.72 alone is 30 MB uncompressed for Unicode collation data). The **fleet code** — the part this group authors — totals **~14 MB** uncompressed within layer 1, split:
+**Fleet code** (the part this group authors) is ~14 MB uncompressed inside layer 1: `pgrdf.so` **12.90 MB** (oxigraph + RDF stack, static) vs `pgck.so` **0.80 MB**; `pgck`'s SQL is 2.7× `pgrdf`'s (governance lives in PL/pgSQL). Together ~16 % of the layer — the other 84 % is upstream pg17 + ICU (`libicudata.so.72` alone is 30 MB uncompressed) + glibc/TLS. Net Delta added here on top of `pg-base`: **~3.5 MB compressed**.
 
-### Fleet extensions by repo (within layer 1, uncompressed)
-
-| File | pgRDF | pgCK |
-|---|---:|---:|
-| `<ext>.so` (Rust/pgrx-compiled) | **12.90 MB** | 0.80 MB |
-| `<ext>--<ver>.sql` (PL/pgSQL governance) | 15.44 KB | **42.05 KB** |
-| `<ext>.control` | 1.03 KB | 0.37 KB |
-| **Subtotal** | **12.92 MB** | **0.84 MB** |
-
-pgRDF's `.so` is 16× pgCK's (oxigraph + RDF stack statically linked). pgCK's SQL is 2.7× pgRDF's (PL/pgSQL governance code lives in SQL, not Rust). Together they are ~16 % of the layer; the other 84 % is the upstream pg17 binary, ICU character data, glibc, TLS, etc.
-
-Net contribution added in this repo on top of `pg_base`: **~3.5 MB compressed** (s6-overlay + busybox + cklib + service definitions).
+</details>
 
 ---
 
 ## Run
 
-Pull and run the marketplace-minimal image:
-
 ```bash
-docker run --rm -d \
-  --name ck-allinone \
-  -e PGDATA=/var/lib/postgresql/data \
+docker run --rm -d --name ck-allinone \
   -v "$PWD/ck-allinone-data:/var/lib/postgresql/data" \
   -p 15432:5432 -p 18000:8000 -p 14222:4222 -p 19222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25
 ```
 
-Verify the runtime:
+The image is **ready-to-use** on a fresh volume: extensions are auto-created and `pgck.nats_url` is set on first boot — no consumer SQL. Verify:
 
 ```bash
-# Postgres + extensions
-docker run --rm --network host -e PGPASSWORD= postgres:17-bookworm psql \
-  -h 127.0.0.1 -p 15432 -U postgres -d postgres \
-  -c "CREATE EXTENSION pgcrypto;
-      CREATE EXTENSION pgrdf;
-      CREATE EXTENSION pgck CASCADE;
-      SELECT pgrdf.version(), pgck_version();"
+# extensions already present (NOT created by you) at the expected versions
+docker run --rm --network host postgres:17-bookworm psql -h 127.0.0.1 -p 15432 -U postgres -d postgres \
+  -c "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pgrdf','pgck','pgcrypto');"
 
-# busybox httpd serving cklib
-curl -I http://127.0.0.1:18000/cklib/ck-client.js   # → 200
+curl -I http://127.0.0.1:18000/cklib/ck-client.js        # busybox httpd serving cklib → 200
+nc -zv 127.0.0.1 19222                                    # NATS WSS listening
 
-# NATS reachable
-nc 127.0.0.1 14222 < /dev/null                       # → INFO {...}
-nc -zv 127.0.0.1 19222                               # WSS listening
-```
-
-Verify the attestation chain (Sigstore Rekor + GitHub Fulcio OIDC):
-
-```bash
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19 \
+# supply-chain: verify the build attestation
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.25 \
   --repo sporaxis-com/oci-germination
 ```
 
-For browser-side smoke (NATS-WSS + cklib), point any modern browser at `http://127.0.0.1:18000/cklib/` and open dev tools — the page imports `ck-page.js` which initialises a CKP client.
-
----
-
-## Sibling: `ociger-pgck-bench` (devel / benchmark only)
-
-Python + FastAPI + pgck-web — runs **alongside** ck-allinone on the same docker network, never inside it. Labelled `ck.bundle.role=bench` + `ck.bundle.never-prod=true` on the manifest:
-
-```bash
-docker network create ckp-net
-docker run --rm -d --name ck-allinone --network ckp-net \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.19
-docker run --rm -d --name pgck-bench --network ckp-net -p 18001:8000 \
-  ghcr.io/sporaxis-com/ociger-pgck-bench:v0.1.0
-```
-
-`pgck-bench` defaults to connecting to `ck-allinone` over the shared network (`PG=ck-allinone:5432`, `NATS=ws://ck-allinone:9222`). Override env vars to target other ck-allinone instances. Sibling, not sidecar: prod images stay Python-free.
+Browser smoke: open `http://127.0.0.1:18000/` — the landing page opens NATS over WSS and renders **✓ WSS round-trip OK**.
 
 ---
 
@@ -155,10 +213,9 @@ docker run --rm -d --name pgck-bench --network ckp-net -p 18001:8000 \
 
 ```
 bundles/                     OCI bundle Dockerfiles + bundle.yaml + s6 service trees
-cmd/                         ociger-pg-launcher, ociger-supervisor, ociger-static-server, ociger-gen,
-                             ociger-pgck-relay
-internal/supervisor/         supervisor profile selection (used by static-cklib only; ck-allinone uses s6)
-scripts/                     build-* and smoke-* per bundle
+cmd/                         ociger-pg-launcher, ociger-pgck-relay, ociger-gen (+ legacy tools)
+scripts/                     build-* and smoke-* per bundle; check-versions.sh (drift gate); cut-plan.sh
+versions.yaml                single source of truth for component pins (drift-gated)
 .github/workflows/           release pipelines (one per bundle line; all attest via SLSA v1)
 LATEST.md                    auto-rendered head per bundle (attestation-gated; no manual edits)
 PROVENANCE.md                publishing rules + attestation chain
@@ -169,23 +226,18 @@ CONTRIBUTING.CI.md           tag/release flow
 
 ## Discipline
 
-Headlines of the fleet packaging contract:
-
-- **No manual GHCR pushes.** Every published image carries a verifiable SLSA Build Provenance v1 attestation produced by the `Build OCI Bundles` workflow (or its siblings). See [`PROVENANCE.md`](./PROVENANCE.md).
-- **`LATEST.md` is auto-rendered.** It refreshes only after `gh attestation verify` accepts the digest. Manual edits are reverted.
-- **This repo never compiles upstream code.** pg17, pgRDF, pgCK, NATS, CK.Lib.Js, pgck-web, s6-overlay, busybox all arrive pre-built. The only binaries this repo produces are tiny in-tree Go tools.
-- **Prod images are Python-free.** The CI gate refuses any prod-track image carrying python / uvicorn / fastapi / venv. `ociger-pgck-bench` is the sole sanctioned home for Python and runs as a sibling to prod images, never embedded.
-- **Prod Shape A composition = Delta.** Scratch final base, supervised by s6-overlay, web served by busybox httpd or equivalent statically-linked binary. No apt-install to satisfy upstream-binary NEEDED lists.
-- **Every image carries `ck.bundle.role` and `ck.bundle.never-prod` manifest labels** so tooling can refuse a `never-prod=true` image into a prod environment.
+- **No manual GHCR pushes.** Every published image carries a verifiable SLSA Build Provenance v1 attestation from the release workflows. See [`PROVENANCE.md`](./PROVENANCE.md).
+- **`LATEST.md` is auto-rendered** — refreshes only after `gh attestation verify` accepts the digest; manual edits are reverted.
+- **This repo never compiles upstream code.** pg17, pgRDF, pgCK, NATS, CK.Lib.Js, s6-overlay, busybox all arrive pre-built; the only binaries built here are the tiny in-tree Go tools.
+- **Prod images are Python-free**, scratch-final, s6-supervised, busybox-served. `ociger-pgck-bench` is the sole sanctioned Python home and runs as a sibling, never embedded.
+- **Every image carries `ck.bundle.role` + `ck.bundle.never-prod` labels** so tooling can refuse a `never-prod=true` image into prod.
+- **Component versions are monotonic and never reused**; every release attempt (shipped or dropped) is recorded in [`CHANGELOG.md`](./CHANGELOG.md), so version gaps are always explained.
 
 ---
 
 ## References
 
-- BFO: <https://basic-formal-ontology.org/>
-- PROV-O: <https://www.w3.org/TR/prov-o/>
-- pgRDF: <https://github.com/styk-tv/pgRDF>
-- pgCK extension + pgck-web: <https://github.com/styk-tv/pgCK>
-- CK.Lib.Js: <https://github.com/ConceptKernel/CK.Lib.Js>
-- Attestation policy: [`PROVENANCE.md`](./PROVENANCE.md)
-- Tag / release flow: [`CONTRIBUTING.CI.md`](./CONTRIBUTING.CI.md)
+- BFO: <https://basic-formal-ontology.org/> · PROV-O: <https://www.w3.org/TR/prov-o/>
+- pgRDF: <https://github.com/styk-tv/pgRDF> · pgCK: <https://github.com/styk-tv/pgCK> · CK.Lib.Js: <https://github.com/ConceptKernel/CK.Lib.Js>
+- Composition ontology + composer: <https://github.com/sporaxis-com/sporaxis>
+- Attestation policy: [`PROVENANCE.md`](./PROVENANCE.md) · Tag/release flow: [`CONTRIBUTING.CI.md`](./CONTRIBUTING.CI.md)
