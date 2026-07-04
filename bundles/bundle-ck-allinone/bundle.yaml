@@ -1,6 +1,6 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.24
+version: v0.7.25
 role: prod
 never_prod: false
 description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.6.19 + pgCK 0.4.17 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.3 (byte-verified stripped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL the GOVERNED 2-arg ckp.dispatch(verb, payload) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."

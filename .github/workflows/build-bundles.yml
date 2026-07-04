@@ -11,6 +11,10 @@ on:
       # pgck-bench is the ONLY sanctioned home for Python in the ociger group.
       # Sibling to ck-allinone (not embedded). Never tagged as prod.
       - 'release-pgck-bench-*'
+  # Manual re-trigger for a release tag whose push GitHub silently dropped
+  # (recover WITHOUT delete+re-push: `gh workflow run build-bundles.yml --ref <tag>`).
+  # The build/version is read from github.ref_name, which equals the tag on dispatch.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
