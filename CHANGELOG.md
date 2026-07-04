@@ -33,6 +33,11 @@ See [PROVENANCE.md](./PROVENANCE.md) §Release attempt policy for the rules that
 
 ## ociger-ck-allinone
 
+### v0.7.26 — 2026-07-04 — scoring-loop republish: pgCK 0.4.17 → 0.4.19 (role-floor-reachable derived verb)
+- **Tried:** pgCK-only bump **0.4.17 → 0.4.19** — the release that ships the **role-floor-reachable derived-read dispatch verb** (generic `plane='derived'`), reachable by `ck_participant` through `ckp.dispatch` (0.4.16/0.4.17 shipped only internal `ckp.*` reads the participant can't reach). This is the **last hop for the scoring loop**: with the bundle at 0.4.19 + pgRDF 0.6.19, ConceptKernel/CK.Lib.Js can live-verify its derived-read path (`doFresh` / `recompute_in_progress`) over NATS-WSS — cklib needs zero change. pgRDF 0.6.19 + cklib 1.5.3 unchanged. Base re-cut `pg17-pgrdf-pgck-nats-micro` v0.1.16 → **v0.1.17**. Additive/inert (`CREATE EXTENSION pgck CASCADE` unchanged) → minor bump. Last cut on the ck-allinone name + the frozen Dockerfile path; the `conceptkernel` rename rides the sporaxis-composed reset (v0.7.26 milestone).
+- **Tested:** drift gate green; pgCK 0.4.19 `gh attestation verify` exit 0. CI ready-to-use smoke asserts pgRDF 0.6.19 + pgCK 0.4.19 install + self-report on a fresh volume, gating attestation. [SHIPPED digest + attestation appended post-cut.]
+- **Verdict:** *pending CI attestation.*
+
 ### v0.7.23 — 2026-07-04 — DROPPED (tag never triggered CI)
 - **Verdict:** DROPPED, no artifact. The `release-ck-allinone-v0.7.23` tag was pushed onto a `docs(auto): refresh LATEST.md … [skip ci]` commit — the base's attestation had auto-advanced LATEST.md on `main` between the merge and the tag, and `git pull` moved HEAD onto that `[skip ci]` commit. GitHub Actions skipped the tag entirely (zero runs, no build, no attestation). Per the monotonic never-reuse rule the number is retired; re-cut identically as v0.7.24 on a CI-eligible commit. Content is unchanged from the v0.7.24 entry below.
 

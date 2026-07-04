@@ -19,7 +19,7 @@ extensions:
   pgrdf:
     version: 0.6.19
   pgck:
-    version: 0.4.17
+    version: 0.4.19
 platforms:
   - linux/amd64
   - linux/arm64
