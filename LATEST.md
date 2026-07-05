@@ -13,37 +13,37 @@ Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
 
 
-## ociger-ck-allinone — `v0.7.26`
+## ociger-ck-allinone — `v0.7.27`
 
 PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:b4efd7897de2fdb4c69931c3afc5ee5360821205b9a5c48600a3896c91c9afe7`  | 2026-07-04 22:22:38 |
-| arm64 | `sha256:89b1b7e4488748c23177feaf53130de3be46ed8c800fbed26fcece774a611d92`  | 2026-07-04 22:22:38 |
+| amd64 | `sha256:eb398631387159d951ba3e2234ddbdf066181a8fa2596dd6540972bc1ffc7f0c`  | 2026-07-05 08:05:35 |
+| arm64 | `sha256:e28ed30e34756fc7dca81c03f45b6207289dd411eb82e9046f3b150dd73f4797`  | 2026-07-05 08:05:35 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.26`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.27`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:e6b41dd6dd4a63baefe49f14693035b92c123fdfe75908d08803d39e04f5de01`                                                         |
+| Index digest       | `sha256:dbb538c9c7a3bd4d8b4ec66801d15643d5f738c27ff39f61c1f6b65535fa4557`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-**Version composition** — **test-confirmed** against this digest at `2026-07-04T22:24:03Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
+**Version composition** — **test-confirmed** against this digest at `2026-07-05T08:06:30Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
 
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
-| `base image` | base | `ociger-pg17-pgrdf-pgck-nats-micro:v0.1.17` | `FROM` | gate-before-push | ✓ gated |
+| `base image` | base | `ociger-pg17-pgrdf-pgck-nats-micro:v0.1.18` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `17` | `server` | `17.10 (Debian 17.10-1.pgdg12+1)` | ✓ |
 | `pgcrypto` | extension | `builtin` | `CREATE EXTENSION` | gate-before-push | ✓ gated |
 | `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `0.6.19` | ✓ |
 | `pgrdf.version()` | native | `0.6.19` | `self-report` | `0.6.19` | ✓ |
-| `pgck` | extension | `0.4.19` | `CREATE EXTENSION` | `0.4.19` | ✓ |
-| `pgck.version()` | native | `0.4.19` | `self-report` | `pgck 0.4.19` | ✓ |
+| `pgck` | extension | `0.4.20` | `CREATE EXTENSION` | `0.4.20` | ✓ |
+| `pgck.version()` | native | `0.4.20` | `self-report` | `pgck 0.4.20` | ✓ |
 | `s6-overlay` | component | `3.2.3.0` | `—` | gate-before-push | ✓ gated |
 | `busybox` | component | `1.36.1` | `httpd :8000` | gate-before-push | ✓ gated |
 | `cklib` | component | `1.5.3` | `/app/cklib` | gate-before-push | ✓ gated |
