@@ -1,6 +1,6 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:dbb538c9c7a3bd4d8b4ec66801d15643d5f738c27ff39f61c1f6b65535fa4557",
+  "index_digest": "sha256:c652647fed8e433a4668b3cac590175ddbb65a1bf9472e04504ca19b0d9a1dfa",
   "all_match": true,
   "layers": [
     {
@@ -51,19 +51,19 @@
     {
       "layer": "pgck",
       "kind": "extension",
-      "expected": "0.4.20",
+      "expected": "0.4.21",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "0.4.20",
+      "confirmed": "0.4.21",
       "verdict": "✓"
     },
     {
       "layer": "pgck.version()",
       "kind": "native",
-      "expected": "0.4.20",
+      "expected": "0.4.21",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "pgck 0.4.20",
+      "confirmed": "pgck 0.4.21",
       "verdict": "✓"
     },
     {
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.27",
-  "confirmed_at": "2026-07-05T08:06:30Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.28",
+  "confirmed_at": "2026-07-06T11:16:01Z"
 }
