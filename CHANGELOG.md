@@ -33,6 +33,11 @@ See [PROVENANCE.md](./PROVENANCE.md) §Release attempt policy for the rules that
 
 ## ociger-ck-allinone
 
+### v0.7.28 — 2026-07-06 — pgCK 0.4.20 → 0.4.21 (create_typed lifecycle_state NS fix)
+- **Tried:** pgCK-only bump **0.4.20 → 0.4.21** (pgRDF 0.6.19 + cklib 1.5.3 unchanged). Base re-cut `pg17-pgrdf-pgck-nats-micro` v0.1.18 → **v0.1.19**. pgCK 0.4.21 files bare core lifecycle keys (`lifecycle_state`) under the v3.7 core NS in `create_typed` (regression `s57`), closing the `create(pending) → transition invalid_transition` root cause traced in #11: `create_typed` had filed the key under the *type* NS, where the transition gate never reads it, so a client-created "pending" instance was silently `planned` and `pending→sealed` was denied. Additive/inert (`CREATE EXTENSION pgck CASCADE` unchanged) → minor bump, no-op for existing consumers.
+- **Tested:** drift gate green; pgCK 0.4.21 `gh attestation verify` exit 0; local pre-release bundle confirmed `create(pending)` now stores `lifecycle_state` under the core NS and `create(pending)→transition(pending→sealed)` seals (`source:kernel`). CI ready-to-use smoke asserts pgRDF 0.6.19 + pgCK 0.4.21 install + self-report on a fresh volume, gating attestation. [SHIPPED digest + attestation appended post-cut.]
+- **Verdict:** *pending CI attestation.*
+
 ### v0.7.27 — 2026-07-05 — pgCK 0.4.19 → 0.4.20
 - **Tried:** pgCK-only bump **0.4.19 → 0.4.20** (pgRDF 0.6.19 + cklib 1.5.3 unchanged). Base re-cut `pg17-pgrdf-pgck-nats-micro` v0.1.17 → **v0.1.18**. Additive/inert (`CREATE EXTENSION pgck CASCADE` unchanged) → minor bump, no-op for existing consumers. Cut on the ck-allinone name + the (still-enabled) old Dockerfile path; the `conceptkernel` rename + sporaxis Shape-A assembly remain the reset (#12 / sporaxis#21).
 - **Tested:** drift gate green; pgCK 0.4.20 `gh attestation verify` exit 0. CI ready-to-use smoke asserts pgRDF 0.6.19 + pgCK 0.4.20 install + self-report on a fresh volume, gating attestation. [SHIPPED digest + attestation appended post-cut.]

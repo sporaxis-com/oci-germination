@@ -17,17 +17,17 @@ ARG OCIGER_RELAY_GENERATION=v0.7.11
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.6.19 + pgCK 0.4.20 + NATS + ociger-pg-launcher) ───
-# v0.1.18 carries pgCK v0.4.20 "install-from-zero" — durable tables are
+# ─── Stage 1: pg base (pg17 + pgRDF 0.6.19 + pgCK 0.4.21 + NATS + ociger-pg-launcher) ───
+# v0.1.19 carries pgCK v0.4.21 "install-from-zero" — durable tables are
 # top-level install DDL born owned by ck_substrate, ontology modules ship
 # WITH the artifact at /ontology, and the floor pass covers everything —
 # plus pgRDF v0.6.19 (out-of-the-box at-scale staged ingest, T1–T5 GUC levers;
 # carve_graph subgraph slicing). pgRDF 0.6.6→0.6.19 is .so/GUC-only — no schema
 # change, no base/SONAME move (still 17-bookworm). CREATE EXTENSION pgck CASCADE
-# is genuinely sufficient. pgCK 0.4.20 now reports pgck_version() correctly
-# (CARGO_PKG_VERSION-derived; the frozen "0.4.3 (rc3)" literal through 0.4.14 is
-# fixed) — the smoke asserts the true version.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.18 AS pg_base
+# is genuinely sufficient. pgCK 0.4.21 files bare core lifecycle keys under the
+# v3.7 core NS (create_typed) — closes the create(pending)→transition invalid_transition
+# root cause (og#11); the smoke asserts the true version.
+FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.19 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the
