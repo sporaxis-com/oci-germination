@@ -22,12 +22,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.19-pg17-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.20-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.19-pg17-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.20-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.19.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.20.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -35,10 +35,10 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.21-pg17-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.23-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.21.sql; \
+  test -s /work/share/extension/pgck--0.4.23.sql; \
   test -s /work/ontology/task.ttl; \
   test -s /work/ontology/goal.ttl
 
@@ -46,44 +46,44 @@ RUN set -eux; \
 FROM nats:2.14.2-scratch AS nats_source
 
 
-FROM postgres:17-bookworm AS postgres_source
+FROM postgres:18-trixie AS postgres_source
 RUN set -eux; \
-  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/17/bin /out/usr/lib/postgresql/17/lib /out/usr/share/postgresql /out/usr/share/postgresql/17/extension /out/usr/share/postgresql/17/tsearch_data /out/usr/share/postgresql/17/timezonesets /out/var/lib/postgresql /out/var/run/postgresql; \
+  mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/18/bin /out/usr/lib/postgresql/18/lib /out/usr/share/postgresql /out/usr/share/postgresql/18/extension /out/usr/share/postgresql/18/tsearch_data /out/usr/share/postgresql/18/timezonesets /out/var/lib/postgresql /out/var/run/postgresql; \
   cp -L /bin/sh /out/bin/sh; \
-  cp -L /usr/lib/postgresql/17/bin/postgres /out/usr/lib/postgresql/17/bin/postgres; \
-  cp -L /usr/lib/postgresql/17/bin/initdb /out/usr/lib/postgresql/17/bin/initdb; \
-  cp -L /usr/lib/postgresql/17/lib/dict_snowball.so /out/usr/lib/postgresql/17/lib/dict_snowball.so; \
-  cp -L /usr/lib/postgresql/17/lib/plpgsql.so /out/usr/lib/postgresql/17/lib/plpgsql.so; \
-  cp -L /usr/share/postgresql/17/catalog_version /out/usr/share/postgresql/17/catalog_version; \
-  cp -L /usr/share/postgresql/17/errcodes.txt /out/usr/share/postgresql/17/errcodes.txt; \
-  cp -L /usr/share/postgresql/17/postgres.bki /out/usr/share/postgresql/17/postgres.bki; \
-  cp -L /usr/share/postgresql/17/information_schema.sql /out/usr/share/postgresql/17/information_schema.sql; \
-  cp -L /usr/share/postgresql/17/snowball_create.sql /out/usr/share/postgresql/17/snowball_create.sql; \
-  cp -L /usr/share/postgresql/17/sql_features.txt /out/usr/share/postgresql/17/sql_features.txt; \
-  cp -L /usr/share/postgresql/17/system_functions.sql /out/usr/share/postgresql/17/system_functions.sql; \
-  cp -L /usr/share/postgresql/17/system_views.sql /out/usr/share/postgresql/17/system_views.sql; \
-  cp -L /usr/share/postgresql/17/system_constraints.sql /out/usr/share/postgresql/17/system_constraints.sql; \
-  cp -a /usr/share/postgresql/17/tsearch_data/. /out/usr/share/postgresql/17/tsearch_data/; \
-  cp -a /usr/share/postgresql/17/timezonesets/. /out/usr/share/postgresql/17/timezonesets/; \
+  cp -L /usr/lib/postgresql/18/bin/postgres /out/usr/lib/postgresql/18/bin/postgres; \
+  cp -L /usr/lib/postgresql/18/bin/initdb /out/usr/lib/postgresql/18/bin/initdb; \
+  cp -L /usr/lib/postgresql/18/lib/dict_snowball.so /out/usr/lib/postgresql/18/lib/dict_snowball.so; \
+  cp -L /usr/lib/postgresql/18/lib/plpgsql.so /out/usr/lib/postgresql/18/lib/plpgsql.so; \
+  cp -L /usr/share/postgresql/18/catalog_version /out/usr/share/postgresql/18/catalog_version; \
+  cp -L /usr/share/postgresql/18/errcodes.txt /out/usr/share/postgresql/18/errcodes.txt; \
+  cp -L /usr/share/postgresql/18/postgres.bki /out/usr/share/postgresql/18/postgres.bki; \
+  cp -L /usr/share/postgresql/18/information_schema.sql /out/usr/share/postgresql/18/information_schema.sql; \
+  cp -L /usr/share/postgresql/18/snowball_create.sql /out/usr/share/postgresql/18/snowball_create.sql; \
+  cp -L /usr/share/postgresql/18/sql_features.txt /out/usr/share/postgresql/18/sql_features.txt; \
+  cp -L /usr/share/postgresql/18/system_functions.sql /out/usr/share/postgresql/18/system_functions.sql; \
+  cp -L /usr/share/postgresql/18/system_views.sql /out/usr/share/postgresql/18/system_views.sql; \
+  cp -L /usr/share/postgresql/18/system_constraints.sql /out/usr/share/postgresql/18/system_constraints.sql; \
+  cp -a /usr/share/postgresql/18/tsearch_data/. /out/usr/share/postgresql/18/tsearch_data/; \
+  cp -a /usr/share/postgresql/18/timezonesets/. /out/usr/share/postgresql/18/timezonesets/; \
   cp -L /usr/share/postgresql/postgresql.conf.sample /out/usr/share/postgresql/postgresql.conf.sample; \
-  cp -L /usr/share/postgresql/17/postgresql.conf.sample /out/usr/share/postgresql/17/postgresql.conf.sample; \
-  cp -L /usr/share/postgresql/17/pg_hba.conf.sample /out/usr/share/postgresql/17/pg_hba.conf.sample; \
-  cp -L /usr/share/postgresql/17/pg_ident.conf.sample /out/usr/share/postgresql/17/pg_ident.conf.sample; \
-  cp -L /usr/share/postgresql/17/pg_service.conf.sample /out/usr/share/postgresql/17/pg_service.conf.sample; \
-  cp -L /usr/share/postgresql/17/psqlrc.sample /out/usr/share/postgresql/17/psqlrc.sample; \
-  cp -L /usr/share/postgresql/17/extension/plpgsql.control /out/usr/share/postgresql/17/extension/plpgsql.control; \
-  cp -L /usr/share/postgresql/17/extension/plpgsql--*.sql /out/usr/share/postgresql/17/extension/; \
+  cp -L /usr/share/postgresql/18/postgresql.conf.sample /out/usr/share/postgresql/18/postgresql.conf.sample; \
+  cp -L /usr/share/postgresql/18/pg_hba.conf.sample /out/usr/share/postgresql/18/pg_hba.conf.sample; \
+  cp -L /usr/share/postgresql/18/pg_ident.conf.sample /out/usr/share/postgresql/18/pg_ident.conf.sample; \
+  cp -L /usr/share/postgresql/18/pg_service.conf.sample /out/usr/share/postgresql/18/pg_service.conf.sample; \
+  cp -L /usr/share/postgresql/18/psqlrc.sample /out/usr/share/postgresql/18/psqlrc.sample; \
+  cp -L /usr/share/postgresql/18/extension/plpgsql.control /out/usr/share/postgresql/18/extension/plpgsql.control; \
+  cp -L /usr/share/postgresql/18/extension/plpgsql--*.sql /out/usr/share/postgresql/18/extension/; \
   printf 'root:x:0:0:root:/root:/bin/sh\npostgres:x:999:999:postgres:/var/lib/postgresql:/bin/sh\n' > /out/etc/passwd; \
   printf 'root:x:0:\npostgres:x:999:\n' > /out/etc/group; \
-  ldd /usr/lib/postgresql/17/bin/postgres | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/17/bin/initdb | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/17/lib/plpgsql.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-  ldd /usr/lib/postgresql/17/lib/dict_snowball.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
-COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/17/lib/pgrdf.so
-COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/17/extension/
+  ldd /usr/lib/postgresql/18/bin/postgres | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/18/bin/initdb | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/18/lib/plpgsql.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  ldd /usr/lib/postgresql/18/lib/dict_snowball.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out
+COPY --from=pgrdf_fetch /out/lib/pgrdf.so /out/usr/lib/postgresql/18/lib/pgrdf.so
+COPY --from=pgrdf_fetch /out/share/extension/ /out/usr/share/postgresql/18/extension/
 
-COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/17/lib/pgck.so
-COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/17/extension/
+COPY --from=pgck_fetch /work/lib/pgck.so /out/usr/lib/postgresql/18/lib/pgck.so
+COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/18/extension/
 # pgCK v0.4.2+ ships its ontology modules WITH the extension artifact (their
 # install-cascade ask-3 fix). /ontology is the documented default root for
 # ckp.boot() / ckp.import_module(). This makes the artifact the canonical
@@ -91,15 +91,15 @@ COPY --from=pgck_fetch /work/share/extension/ /out/usr/share/postgresql/17/exten
 COPY --from=pgck_fetch /work/ontology/ /out/ontology/
 
 RUN set -eux; \
-  if [ -f /out/usr/lib/postgresql/17/lib/pgrdf.so ]; then \
-    ldd /out/usr/lib/postgresql/17/lib/pgrdf.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  if [ -f /out/usr/lib/postgresql/18/lib/pgrdf.so ]; then \
+    ldd /out/usr/lib/postgresql/18/lib/pgrdf.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   fi; \
-  if [ -f /out/usr/lib/postgresql/17/lib/pgck.so ]; then \
-    cp -L /usr/lib/postgresql/17/lib/pgcrypto.so /out/usr/lib/postgresql/17/lib/pgcrypto.so; \
-    cp -L /usr/share/postgresql/17/extension/pgcrypto.control /out/usr/share/postgresql/17/extension/pgcrypto.control; \
-    cp -L /usr/share/postgresql/17/extension/pgcrypto--*.sql /out/usr/share/postgresql/17/extension/; \
-    ldd /out/usr/lib/postgresql/17/lib/pgck.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
-    ldd /out/usr/lib/postgresql/17/lib/pgcrypto.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+  if [ -f /out/usr/lib/postgresql/18/lib/pgck.so ]; then \
+    cp -L /usr/lib/postgresql/18/lib/pgcrypto.so /out/usr/lib/postgresql/18/lib/pgcrypto.so; \
+    cp -L /usr/share/postgresql/18/extension/pgcrypto.control /out/usr/share/postgresql/18/extension/pgcrypto.control; \
+    cp -L /usr/share/postgresql/18/extension/pgcrypto--*.sql /out/usr/share/postgresql/18/extension/; \
+    ldd /out/usr/lib/postgresql/18/lib/pgck.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
+    ldd /out/usr/lib/postgresql/18/lib/pgcrypto.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   fi
 
 

@@ -27,7 +27,7 @@ ARG BUNDLE_VERSION=dev
 # is genuinely sufficient. pgCK 0.4.21 files bare core lifecycle keys under the
 # v3.7 core NS (create_typed) — closes the create(pending)→transition invalid_transition
 # root cause (og#11); the smoke asserts the true version.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.19 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.0-local AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the
@@ -38,7 +38,7 @@ FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.19 AS pg_base
 # result.kernel.<K>.> subscription), ck-store.js (the typed-instance cache),
 # vendor/{msgpack,nats.ws}.js. No index.html, no ck-page (the legacy
 # console is gone). The smoke ⑤± gate asserts this exact file set.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.5.3 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.5.5 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -57,18 +57,9 @@ COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
-# ─── Stage 5: build ociger-pgck-relay ────────────────────────────────────
-# Bus-level shim: subscribes input.kernel.pgCK.action.> → re-PUBs to
-# event.kernel.pgCK.<verb>. Self-disables when upstream pgck.so embeds
-# the relay strings (boot-time probe).
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pgckrelay_build
-ARG TARGETARCH
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY cmd/ociger-pgck-relay ./cmd/ociger-pgck-relay
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags='-s -w' -o /out/ociger-pgck-relay ./cmd/ociger-pgck-relay
+# ─── Stage 5 (ociger-pgck-relay) removed at pg18/trixie ───────────────────
+# pgCK's -nats build (pgck:0.4.23-pg18-nats) owns the inbound relay + outbox
+# drain in-.so; the Go relay is dropped. Activated by pgck.nats_url (set below).
 
 # ─── Stage 6: extract s6-overlay release tarballs into /s6root ────────────
 FROM debian:trixie-slim AS s6_extract
@@ -130,11 +121,10 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
-# Bus-level dispatcher shim (CHECKLIST §B4). Self-disables when upstream
-# pgck.so embeds the relay strings; opt-out via OCIGER_DISABLE_PGCK_RELAY=1.
-COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay
+# (ociger-pgck-relay dropped at pg18/trixie — pgCK's -nats .so owns the
+#  inbound relay + outbox drain in-process; activated by pgck.nats_url.)
 
-# s6 service definitions (postgres, nats, httpd, pgck-relay) compiled by s6-rc at boot.
+# s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot.
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
 ENV PGDATA=/var/lib/postgresql/data

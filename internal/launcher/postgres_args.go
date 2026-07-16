@@ -4,7 +4,7 @@ import "path/filepath"
 
 func PostgresArgs(pgData string, preload string) []string {
 	args := []string{
-		filepath.Join("/usr/lib/postgresql", "17", "bin", "postgres"),
+		filepath.Join("/usr/lib/postgresql", "18", "bin", "postgres"),
 		"-D", pgData,
 	}
 

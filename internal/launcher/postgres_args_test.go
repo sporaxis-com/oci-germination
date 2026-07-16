@@ -9,7 +9,7 @@ func TestPostgresArgsDefaultToPlainDataDirLaunch(t *testing.T) {
 	args := PostgresArgs("/var/lib/postgresql/data", "")
 
 	want := []string{
-		"/usr/lib/postgresql/17/bin/postgres",
+		"/usr/lib/postgresql/18/bin/postgres",
 		"-D", "/var/lib/postgresql/data",
 	}
 
@@ -22,7 +22,7 @@ func TestPostgresArgsIncludeSharedPreloadLibrariesWhenRequested(t *testing.T) {
 	args := PostgresArgs("/var/lib/postgresql/data", "pgck")
 
 	want := []string{
-		"/usr/lib/postgresql/17/bin/postgres",
+		"/usr/lib/postgresql/18/bin/postgres",
 		"-D", "/var/lib/postgresql/data",
 		"-c", "shared_preload_libraries=pgck",
 	}
