@@ -5,36 +5,26 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.18
+ARG PG_BASE_VERSION=v0.2.0
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.5.3
-# v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
-# bridge calling ckp.dispatch over TCP+scram as ck_participant); the
-# bridge itself is unchanged in v0.7.12+ — only the upstream pg_base
-# pin moves with pgRDF/pgCK release cadence.
-ARG OCIGER_RELAY_GENERATION=v0.7.11
+ARG CKLIB_VERSION=1.5.5
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.6.19 + pgCK 0.4.21 + NATS + ociger-pg-launcher) ───
-# v0.1.19 carries pgCK v0.4.21 "install-from-zero" — durable tables are
-# top-level install DDL born owned by ck_substrate, ontology modules ship
-# WITH the artifact at /ontology, and the floor pass covers everything —
-# plus pgRDF v0.6.19 (out-of-the-box at-scale staged ingest, T1–T5 GUC levers;
-# carve_graph subgraph slicing). pgRDF 0.6.6→0.6.19 is .so/GUC-only — no schema
-# change, no base/SONAME move (still 17-bookworm). CREATE EXTENSION pgck CASCADE
-# is genuinely sufficient. pgCK 0.4.21 files bare core lifecycle keys under the
-# v3.7 core NS (create_typed) — closes the create(pending)→transition invalid_transition
-# root cause (og#11); the smoke asserts the true version.
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.0-local AS pg_base
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.23-nats + NATS) ───
+# v0.2.0 moves the base to postgres:18-trixie (glibc 2.41): pgRDF v0.6.20's
+# arm64 .so requires GLIBC_2.39, so bookworm (2.36) cannot load it. Carries
+# pgCK 0.4.23-pg18-nats — the -nats build owns the inbound relay + outbox
+# drain in-process, which is why the Go relay is gone.
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.0 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the
+# 1.5.5 — the dispatch-only client, verified TYPED-SEALED live against the
 # v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop).
 # Ships EXACTLY: LICENSE, README.md, ck.js (the L2 dispatch facade —
 # CK/ConceptKernel/ckOn, the instance.*/kernel.* op→verb table, the
-# v1.5.3 entry point), ck-client.js (vendored transport, grammar-agnostic
+# v1.5.5 entry point), ck-client.js (vendored transport, grammar-agnostic
 # result.kernel.<K>.> subscription), ck-store.js (the typed-instance cache),
 # vendor/{msgpack,nats.ws}.js. No index.html, no ck-page (the legacy
 # console is gone). The smoke ⑤± gate asserts this exact file set.
@@ -84,7 +74,7 @@ RUN set -eux; \
 FROM pg_base
 ARG BUNDLE_VERSION
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.8 all-in-one minimal — PG17 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
+LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
