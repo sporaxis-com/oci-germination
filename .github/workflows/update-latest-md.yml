@@ -17,7 +17,7 @@ on:
       - pg17-pgrdf-release
       - pg17-pgrdf-pgck-release
       - pg17-pgrdf-pgck-nats-release
-      - pg17-pgrdf-pgck-nats-micro-release
+      - pg18-pgrdf-pgck-nats-micro-release
     types:
       - completed
   # Manual re-trigger for recovery — e.g. when a push race (below) loses, or

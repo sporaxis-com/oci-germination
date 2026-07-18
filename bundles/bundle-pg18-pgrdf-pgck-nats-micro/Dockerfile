@@ -115,7 +115,7 @@ COPY --from=postgres_source /out/ /
 COPY --from=launcher_build /out/ociger-pg-launcher /usr/local/bin/ociger-pg-launcher
 COPY --from=supervisor_build /out/ociger-supervisor /usr/local/bin/ociger-supervisor
 COPY --from=nats_source /nats-server /usr/local/bin/nats-server
-COPY bundles/bundle-pg17-pgrdf-pgck-nats-micro/nats-server.conf /etc/nats/nats-server.conf
+COPY bundles/bundle-pg18-pgrdf-pgck-nats-micro/nats-server.conf /etc/nats/nats-server.conf
 EXPOSE 5432 4222 9222
 
 VOLUME ["/var/lib/postgresql/data"]

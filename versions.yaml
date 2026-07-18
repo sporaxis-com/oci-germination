@@ -34,11 +34,15 @@ components:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg17-pgrdf-pgck-nats-micro: "v0.2.0"   # the ck-allinone base (pgRDF 0.6.19 + pgCK 0.4.21)
+  pg18-pgrdf-pgck-nats-micro: "v0.2.0"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.23-nats)
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the
 # report so the freeze stays visible, not forgotten.
 frozen:
+  pg17-bookworm-pgrdf: "RETIRED at the pg18 move — pgRDF is pg18-only from v0.6.20; no pg17 artifact exists to pin. Retire or re-cut on pg18 (og#9)."
+  pg17-pgrdf: "RETIRED at the pg18 move — pgRDF pg18-only from v0.6.20 (og#9)."
+  pg17-pgrdf-pgck: "RETIRED at the pg18 move — pgRDF/pgCK are both pg18-only; pg17 artifacts are no longer built upstream (og#9)."
+  pg17-pgrdf-pgck-nats: "RETIRED at the pg18 move — pgRDF/pgCK pg18-only (og#9)."
   pgck-bench: "Python/FastAPI benchmark sibling on its own pgck-web cadence; re-cut deliberately, not in the component wave."
   pg17-pgrdf-pgck-static-cklib: "ck-allinone sibling (Go static server). Bringing it current needs the full v0.7.18-era scaffolding (base v0.1.12 + pgCK 0.4.2 install-from-zero init.sql + the outbox drain + cklib 1.5.0 byte-set), not a pin bump — a coordinated re-cut, tracked separately. Until then use ck-allinone."

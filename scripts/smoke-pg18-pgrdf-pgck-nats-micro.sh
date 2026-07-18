@@ -5,11 +5,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_PHYSICAL="$(cd -P "$ROOT" && pwd)"
 # shellcheck source=lib/assert-pgrdf-pgatomic.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/assert-pgrdf-pgatomic.sh"
-DATA_DIR="$ROOT/.artifacts/ociger-pg17-pgrdf-pgck-nats-micro-smoke/pgdata"
-NETWORK="ociger-pg17-pgrdf-pgck-nats-micro-net"
-CONTAINER="ociger-pg17-pgrdf-pgck-nats-micro-smoke"
-OWNERSHIP_LABEL="pg17-pgrdf-pgck-nats-micro-smoke"
-IMAGE="${1:-ociger-pg17-pgrdf-pgck-nats-micro:local}"
+DATA_DIR="$ROOT/.artifacts/ociger-pg18-pgrdf-pgck-nats-micro-smoke/pgdata"
+NETWORK="ociger-pg18-pgrdf-pgck-nats-micro-net"
+CONTAINER="ociger-pg18-pgrdf-pgck-nats-micro-smoke"
+OWNERSHIP_LABEL="pg18-pgrdf-pgck-nats-micro-smoke"
+IMAGE="${1:-ociger-pg18-pgrdf-pgck-nats-micro:local}"
 # Versions come from versions.yaml (single source of truth) via lib/versions.sh;
 # env still overrides. pgck_native is carried there because pgCK 0.4.13 reports a
 # stale "0.4.3 (rc3)" natively (extension is correctly 0.4.13 — pgCK NOTIFY filed).

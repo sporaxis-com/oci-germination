@@ -78,7 +78,7 @@ jobs:
           - bundles/bundle-ck-allinone/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck-static-cklib/Dockerfile
           - bundles/bundle-pgck-bench/Dockerfile
-          - bundles/bundle-pg17-pgrdf-pgck-nats-micro/Dockerfile
+          - bundles/bundle-pg18-pgrdf-pgck-nats-micro/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck-nats/Dockerfile
           - bundles/bundle-pg17-pgrdf-pgck/Dockerfile
           - bundles/bundle-pg17-pgrdf/Dockerfile

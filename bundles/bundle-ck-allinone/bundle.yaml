@@ -1,35 +1,35 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.27
+version: v0.7.29
 role: prod
 never_prod: false
-description: "CKP v3.9 Critical Isolation ENFORCED + dispatch-bridge relay — PostgreSQL 17 + pgRDF 0.6.19 + pgCK 0.4.20 (CI-A role floor + CI-B sealed registry + CI-C plan compiler + CI-D governance plane + CI-E typed reads — all five tracks shipped) + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.3 (byte-verified stripped cut), supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python. No postgres client (bootstrap via `postgres --single`). v0.7.11+ carries the dispatch-bridge relay — subscribe input.kernel.<K>.action.<verb>, CALL the GOVERNED 2-arg ckp.dispatch(verb, payload) over TCP+scram as ck_participant, publish typed reply on result.kernel.<K>.<verb> preserving inbound headers. The bundle bakes the ck_substrate/ck_participant role floor automatically via CREATE EXTENSION pgck; external consumers (web2/) MUST connect as ck_participant with a deploy-supplied password (OCIGER_CK_PARTICIPANT_PASSWORD env)."
+description: "CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 18 (trixie, glibc 2.41) + pgRDF 0.6.20 + pgCK 0.4.23-pg18-nats + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python, no postgres client. The Go ociger-pgck-relay is DROPPED: pgCK's -nats build owns the inbound relay + ckp.outbox drain in-process, activated by pgck.nats_url."
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
-# in-tree Go binaries on top of pg17-pgrdf-pgck-nats-micro. Generator
+# in-tree Go binaries on top of pg18-pgrdf-pgck-nats-micro. Generator
 # does not yet model FROM-image composition or s6-rc.d service trees,
 # so the Dockerfile + s6-services/ tree are maintained by hand.
 skip_render: true
 
 image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
-  pg_major: 17
-  base_image: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
-  base_image_version: v0.1.18
+  pg_major: 18
+  base_image: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
+  base_image_version: v0.2.0
   final_image: scratch
   runtime_profile: micro
 
 extensions:
   pgcrypto:
     version: builtin
-    source: https://www.postgresql.org/docs/17/pgcrypto.html
+    source: https://www.postgresql.org/docs/18/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.6.19
+    version: 0.6.20
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.4.21
+    version: 0.4.23
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,7 +46,7 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.5.3
+    version: 1.5.5
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
     description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
@@ -61,19 +61,10 @@ components:
     version: in-tree
     source: ./cmd/ociger-pg-launcher
     description: PID-stable postgres launcher; handles initdb on first boot, appends OCIGER_POSTGRES_CONF_EXTRA, and pipes OCIGER_INITDB_SQL_FILE through `postgres --single` so the image needs no postgres client.
-  ociger-pgck-relay:
-    version: in-tree (v0.7.11 generation — dispatch bridge)
-    role: bridge
-    source: ./cmd/ociger-pgck-relay
-    shims_for: pgck@0.4.x (nats-client Cargo feature OFF through Track D; not a v0.4.0 gate)
-    notify_ref: pgck/publish-nats-client-feature-build
-    retire_probe: pgck.so contains BOTH 'RELAY_OUT_PREFIX' AND 'async_nats::' (multi-marker conjunction; ratified with pgCK upstream 2026-06-10)
-    opt_out_env: OCIGER_DISABLE_PGCK_RELAY=1
-    description: NATS → pgCK dispatch bridge. Subscribes input.kernel.<K>.action.<verb>; connects to postgres as ck_participant over Unix socket; calls ckp.dispatch(verb, kernel_urn, payload::jsonb, identity); publishes typed jsonb reply on result.kernel.<K>.<verb> preserving inbound headers (incl. Trace-Id, X-Identity-Key). Replaces the v0.7.5–v0.7.10 bus-level echo per CK.Lib.Js NOTIFY v0.7.9.integration-gaps-block-v150.
 
 supervisor:
   binary: s6-overlay v3.2.3.0
-  description: s6-svscan PID 1 supervises postgres + nats + httpd + pgck-relay as longruns. Bootstrap SQL runs in `postgres --single` inside the launcher on first boot; no oneshot service is required.
+  description: s6-svscan PID 1 supervises postgres + nats + httpd as longruns (pgCK -nats .so owns the drain). Bootstrap SQL runs in `postgres --single` inside the launcher on first boot; no oneshot service is required.
 
 platforms:
   - linux/amd64

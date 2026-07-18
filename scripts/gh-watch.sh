@@ -54,7 +54,7 @@ pick_workflow() {
     pg17-pgrdf-v*)                     echo "pg17-pgrdf-release" ;;
     pg17-pgrdf-pgck-v*)                echo "pg17-pgrdf-pgck-release" ;;
     pg17-pgrdf-pgck-nats-v*)           echo "pg17-pgrdf-pgck-nats-release" ;;
-    pg17-pgrdf-pgck-nats-micro-v*)     echo "pg17-pgrdf-pgck-nats-micro-release" ;;
+    pg18-pgrdf-pgck-nats-micro-v*)     echo "pg18-pgrdf-pgck-nats-micro-release" ;;
     *) on_fail "unknown tag pattern: ${tag}" ;;
   esac
 }
