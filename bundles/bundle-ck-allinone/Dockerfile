@@ -47,9 +47,22 @@ COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
-# ─── Stage 5 (ociger-pgck-relay) removed at pg18/trixie ───────────────────
-# pgCK's -nats build (pgck:0.4.23-pg18-nats) owns the inbound relay + outbox
-# drain in-.so; the Go relay is dropped. Activated by pgck.nats_url (set below).
+# ─── Stage 5: build ociger-pgck-relay (inbound-dispatch half ONLY) ────────
+# v0.7.29 interim (pgCK NOTIFY-RESPONSE ASK-1 = option b): pgCK 0.4.23-nats
+# owns the OUTBOX DRAIN in-.so, but its inbound path is a governance-free
+# fan-out — no ckp.dispatch until 0.4.24 (F1-inbound). The relay is retained
+# for its dispatch bridge (input.kernel.<K>.action.<verb> → GOVERNED 2-arg
+# ckp.dispatch → result.kernel.<K>.<verb>) with the drain DISABLED via
+# OCIGER_DISABLE_OUTBOX_DRAIN=1 (pgCK drains; double-drain would double-publish).
+# Fully deleted at v0.7.30 when pgCK 0.4.24 lands the governed dispatcher.
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pgckrelay_build
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ociger-pgck-relay ./cmd/ociger-pgck-relay
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags='-s -w' -o /out/ociger-pgck-relay ./cmd/ociger-pgck-relay
 
 # ─── Stage 6: extract s6-overlay release tarballs into /s6root ────────────
 FROM debian:trixie-slim AS s6_extract
@@ -111,10 +124,16 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
-# (ociger-pgck-relay dropped at pg18/trixie — pgCK's -nats .so owns the
-#  inbound relay + outbox drain in-process; activated by pgck.nats_url.)
+# Dispatch bridge (inbound half only — drain disabled below; see Stage 5).
+COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay
 
-# s6 service definitions (postgres, nats, httpd) compiled by s6-rc at boot.
+# nats-server.conf overlay: the *.sealed publish-deny mitigation (pgCK
+# NOTIFY-RESPONSE §1) — 0.4.23's fan-out echoes client bytes onto
+# event.kernel.pgCK.<verb>, so deny the one input pattern that would let a
+# client forge a governed *.sealed event. Retired at v0.7.30.
+COPY bundles/bundle-ck-allinone/nats-server.conf /etc/nats/nats-server.conf
+
+# s6 service definitions (postgres, nats, httpd, pgck-relay) compiled by s6-rc at boot.
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
 ENV PGDATA=/var/lib/postgresql/data
@@ -128,6 +147,8 @@ ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
 # ck_participant exists but cannot log in (no default password — a default
 # would make the role floor cosmetic per pgCK v3.9 §7).
 ENV OCIGER_CK_PARTICIPANT_HBA=1
+# pgCK 0.4.23-nats drains ckp.outbox in-process; the relay must NOT double-drain.
+ENV OCIGER_DISABLE_OUTBOX_DRAIN=1
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1

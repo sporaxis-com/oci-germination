@@ -62,9 +62,18 @@ components:
     source: ./cmd/ociger-pg-launcher
     description: PID-stable postgres launcher; handles initdb on first boot, appends OCIGER_POSTGRES_CONF_EXTRA, and pipes OCIGER_INITDB_SQL_FILE through `postgres --single` so the image needs no postgres client.
 
+  ociger-pgck-relay:
+    version: in-tree (v0.7.29 posture — inbound-dispatch half ONLY)
+    role: bridge
+    source: ./cmd/ociger-pgck-relay
+    shims_for: pgck@0.4.23-nats (governed inbound dispatch lands upstream in 0.4.24 F1-inbound)
+    retire_when: pgCK 0.4.24 ships the governed dispatcher (relay fully deleted at v0.7.30)
+    opt_out_env: OCIGER_DISABLE_PGCK_RELAY=1
+    description: NATS → pgCK dispatch bridge, inbound half only. Subscribes input.kernel.<K>.action.<verb>; calls the GOVERNED 2-arg ckp.dispatch(verb, payload) as ck_participant; publishes typed reply on result.kernel.<K>.<verb> preserving headers. Its outbox drain is DISABLED (OCIGER_DISABLE_OUTBOX_DRAIN=1) — pgCK 0.4.23-nats drains ckp.outbox in-process.
+
 supervisor:
   binary: s6-overlay v3.2.3.0
-  description: s6-svscan PID 1 supervises postgres + nats + httpd as longruns (pgCK -nats .so owns the drain). Bootstrap SQL runs in `postgres --single` inside the launcher on first boot; no oneshot service is required.
+  description: s6-svscan PID 1 supervises postgres + nats + httpd + pgck-relay (dispatch half) as longruns; pgCK -nats .so owns the outbox drain. Bootstrap SQL runs in `postgres --single` inside the launcher on first boot; no oneshot service is required.
 
 platforms:
   - linux/amd64
