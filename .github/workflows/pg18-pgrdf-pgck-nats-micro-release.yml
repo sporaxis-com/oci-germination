@@ -1,4 +1,4 @@
-name: pg17-pgrdf-pgck-nats-micro-release
+name: pg18-pgrdf-pgck-nats-micro-release
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     tags:
-      - pg17-pgrdf-pgck-nats-micro-v*
+      - pg18-pgrdf-pgck-nats-micro-v*
   schedule:
     - cron: '59 4 * * *'
   workflow_dispatch:
@@ -20,7 +20,7 @@ permissions:
   attestations: write
 
 concurrency:
-  group: pg17-pgrdf-pgck-nats-micro-${{ github.ref }}
+  group: pg18-pgrdf-pgck-nats-micro-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -51,13 +51,13 @@ jobs:
         run: bash scripts/lint-pgrdf-preload.sh
 
       - name: Build native all-in-one NATS micro image
-        run: bash scripts/build-pg17-pgrdf-pgck-nats-micro.sh
+        run: bash scripts/build-pg18-pgrdf-pgck-nats-micro.sh
 
       - name: Smoke test native all-in-one NATS micro image
-        run: bash scripts/smoke-pg17-pgrdf-pgck-nats-micro.sh
+        run: bash scripts/smoke-pg18-pgrdf-pgck-nats-micro.sh
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pg17-pgrdf-pgck-nats-micro-v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/pg18-pgrdf-pgck-nats-micro-v')
     needs: verify
     runs-on: ubuntu-24.04
     steps:
@@ -96,8 +96,8 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
-          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-pg17-pgrdf-pgck-nats-micro" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME#pg17-pgrdf-pgck-nats-micro-}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ociger-pg18-pgrdf-pgck-nats-micro" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME#pg18-pgrdf-pgck-nats-micro-}" >> "$GITHUB_OUTPUT"
 
       - name: Publish multi-arch image
         id: publish
@@ -105,7 +105,7 @@ jobs:
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file bundles/bundle-pg17-pgrdf-pgck-nats-micro/Dockerfile \
+            --file bundles/bundle-pg18-pgrdf-pgck-nats-micro/Dockerfile \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=${{ steps.meta.outputs.tag }}" \
             --label "org.opencontainers.image.description=PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners" \
@@ -136,7 +136,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/ensure-ghcr-public.sh ociger-pg17-pgrdf-pgck-nats-micro
+        run: bash scripts/ensure-ghcr-public.sh ociger-pg18-pgrdf-pgck-nats-micro
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -148,9 +148,9 @@ jobs:
 
             ```bash
             docker run --rm -d \
-              --name ociger-pg17-pgrdf-pgck-nats-micro \
+              --name ociger-pg18-pgrdf-pgck-nats-micro \
               -e PGDATA=/var/lib/postgresql/data \
-              -v "$PWD/ociger-pg17-pgrdf-pgck-nats-micro-data:/var/lib/postgresql/data" \
+              -v "$PWD/ociger-pg18-pgrdf-pgck-nats-micro-data:/var/lib/postgresql/data" \
               -p 15439:5432 \
               -p 34223:4222 \
               -p 39223:9222 \

@@ -8,9 +8,9 @@ import (
 
 func TestBin_ConstructsPgBinaryPath(t *testing.T) {
 	cases := map[string]string{
-		"initdb":   "/usr/lib/postgresql/17/bin/initdb",
-		"postgres": "/usr/lib/postgresql/17/bin/postgres",
-		"pg_ctl":   "/usr/lib/postgresql/17/bin/pg_ctl",
+		"initdb":   "/usr/lib/postgresql/18/bin/initdb",
+		"postgres": "/usr/lib/postgresql/18/bin/postgres",
+		"pg_ctl":   "/usr/lib/postgresql/18/bin/pg_ctl",
 	}
 	for name, want := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -5,40 +5,30 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.1.18
+ARG PG_BASE_VERSION=v0.2.0
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.5.3
-# v0.7.11 carries the rewritten ociger-pgck-relay (real NATS→dispatch
-# bridge calling ckp.dispatch over TCP+scram as ck_participant); the
-# bridge itself is unchanged in v0.7.12+ — only the upstream pg_base
-# pin moves with pgRDF/pgCK release cadence.
-ARG OCIGER_RELAY_GENERATION=v0.7.11
+ARG CKLIB_VERSION=1.5.5
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg17 + pgRDF 0.6.19 + pgCK 0.4.21 + NATS + ociger-pg-launcher) ───
-# v0.1.19 carries pgCK v0.4.21 "install-from-zero" — durable tables are
-# top-level install DDL born owned by ck_substrate, ontology modules ship
-# WITH the artifact at /ontology, and the floor pass covers everything —
-# plus pgRDF v0.6.19 (out-of-the-box at-scale staged ingest, T1–T5 GUC levers;
-# carve_graph subgraph slicing). pgRDF 0.6.6→0.6.19 is .so/GUC-only — no schema
-# change, no base/SONAME move (still 17-bookworm). CREATE EXTENSION pgck CASCADE
-# is genuinely sufficient. pgCK 0.4.21 files bare core lifecycle keys under the
-# v3.7 core NS (create_typed) — closes the create(pending)→transition invalid_transition
-# root cause (og#11); the smoke asserts the true version.
-FROM ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.19 AS pg_base
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.23-nats + NATS) ───
+# v0.2.0 moves the base to postgres:18-trixie (glibc 2.41): pgRDF v0.6.20's
+# arm64 .so requires GLIBC_2.39, so bookworm (2.36) cannot load it. Carries
+# pgCK 0.4.23-pg18-nats — the -nats build owns the inbound relay + outbox
+# drain in-process, which is why the Go relay is gone.
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.0 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the
+# 1.5.5 — the dispatch-only client, verified TYPED-SEALED live against the
 # v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop).
 # Ships EXACTLY: LICENSE, README.md, ck.js (the L2 dispatch facade —
 # CK/ConceptKernel/ckOn, the instance.*/kernel.* op→verb table, the
-# v1.5.3 entry point), ck-client.js (vendored transport, grammar-agnostic
+# v1.5.5 entry point), ck-client.js (vendored transport, grammar-agnostic
 # result.kernel.<K>.> subscription), ck-store.js (the typed-instance cache),
 # vendor/{msgpack,nats.ws}.js. No index.html, no ck-page (the legacy
 # console is gone). The smoke ⑤± gate asserts this exact file set.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.5.3 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.5.5 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -57,10 +47,14 @@ COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
-# ─── Stage 5: build ociger-pgck-relay ────────────────────────────────────
-# Bus-level shim: subscribes input.kernel.pgCK.action.> → re-PUBs to
-# event.kernel.pgCK.<verb>. Self-disables when upstream pgck.so embeds
-# the relay strings (boot-time probe).
+# ─── Stage 5: build ociger-pgck-relay (inbound-dispatch half ONLY) ────────
+# v0.7.29 interim (pgCK NOTIFY-RESPONSE ASK-1 = option b): pgCK 0.4.23-nats
+# owns the OUTBOX DRAIN in-.so, but its inbound path is a governance-free
+# fan-out — no ckp.dispatch until 0.4.24 (F1-inbound). The relay is retained
+# for its dispatch bridge (input.kernel.<K>.action.<verb> → GOVERNED 2-arg
+# ckp.dispatch → result.kernel.<K>.<verb>) with the drain DISABLED via
+# OCIGER_DISABLE_OUTBOX_DRAIN=1 (pgCK drains; double-drain would double-publish).
+# Fully deleted at v0.7.30 when pgCK 0.4.24 lands the governed dispatcher.
 FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pgckrelay_build
 ARG TARGETARCH
 WORKDIR /src
@@ -93,7 +87,7 @@ RUN set -eux; \
 FROM pg_base
 ARG BUNDLE_VERSION
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.8 all-in-one minimal — PG17 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
+LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
@@ -130,9 +124,14 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
-# Bus-level dispatcher shim (CHECKLIST §B4). Self-disables when upstream
-# pgck.so embeds the relay strings; opt-out via OCIGER_DISABLE_PGCK_RELAY=1.
+# Dispatch bridge (inbound half only — drain disabled below; see Stage 5).
 COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay
+
+# nats-server.conf overlay: the *.sealed publish-deny mitigation (pgCK
+# NOTIFY-RESPONSE §1) — 0.4.23's fan-out echoes client bytes onto
+# event.kernel.pgCK.<verb>, so deny the one input pattern that would let a
+# client forge a governed *.sealed event. Retired at v0.7.30.
+COPY bundles/bundle-ck-allinone/nats-server.conf /etc/nats/nats-server.conf
 
 # s6 service definitions (postgres, nats, httpd, pgck-relay) compiled by s6-rc at boot.
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
@@ -148,6 +147,8 @@ ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
 # ck_participant exists but cannot log in (no default password — a default
 # would make the role floor cosmetic per pgCK v3.9 §7).
 ENV OCIGER_CK_PARTICIPANT_HBA=1
+# pgCK 0.4.23-nats drains ckp.outbox in-process; the relay must NOT double-drain.
+ENV OCIGER_DISABLE_OUTBOX_DRAIN=1
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1

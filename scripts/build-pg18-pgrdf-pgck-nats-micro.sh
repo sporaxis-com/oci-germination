@@ -24,6 +24,6 @@ bash scripts/generate.sh
 docker buildx build \
   --load \
   --platform "$platform" \
-  -f bundles/bundle-pg17-pgrdf-pgck-nats-micro/Dockerfile \
-  -t ociger-pg17-pgrdf-pgck-nats-micro:local \
+  -f bundles/bundle-pg18-pgrdf-pgck-nats-micro/Dockerfile \
+  -t ociger-pg18-pgrdf-pgck-nats-micro:local \
   .

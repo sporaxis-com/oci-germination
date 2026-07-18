@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	pgMajor     = "17"
+	pgMajor     = "18"
 	postgresUID = 999
 	postgresGID = 999
 )
@@ -103,8 +103,17 @@ func main() {
 			} else if os.Getenv("OCIGER_CK_PARTICIPANT_HBA") != "" {
 				log.Println("ociger-pg-launcher: WARNING — OCIGER_CK_PARTICIPANT_HBA set but OCIGER_CK_PARTICIPANT_PASSWORD unset; ck_participant cannot log in until you set it")
 			}
-			runAsPostgresStdin(runUID, runGID, sqlStr,
-				bin("postgres"), "--single", "-D", pgData, "postgres")
+			// Preload the same libraries in --single as the postmaster does:
+			// pgCK's -nats build registers PGC_POSTMASTER GUCs (pgck.nats_url,
+			// worker_database, oidc_*) in _PG_init, which must run at backend
+			// startup — otherwise CREATE EXTENSION pgck aborts with
+			// "cannot create PGC_POSTMASTER variables after startup".
+			singleArgs := []string{"--single", "-D", pgData}
+			if pl := os.Getenv("OCIGER_SHARED_PRELOAD_LIBRARIES"); pl != "" {
+				singleArgs = append(singleArgs, "-c", "shared_preload_libraries="+pl)
+			}
+			singleArgs = append(singleArgs, "postgres")
+			runAsPostgresStdin(runUID, runGID, sqlStr, bin("postgres"), singleArgs...)
 		}
 	}
 

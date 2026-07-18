@@ -62,9 +62,9 @@ cleanup() {
 trap cleanup EXIT
 
 # pg_base ships only initdb + postgres server — no client tools (psql, pg_isready).
-# Use a sidecar postgres:17-bookworm to connect over the smoke network.
-PSQL="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoketest postgres:17-bookworm psql -h $CONTAINER_NAME -U postgres -d postgres -At -v ON_ERROR_STOP=1"
-PGISREADY="docker run --rm --network $NETWORK_NAME postgres:17-bookworm pg_isready -h $CONTAINER_NAME -U postgres"
+# Use a sidecar postgres:18-trixie (pg18 base) to connect over the smoke network.
+PSQL="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoketest postgres:18-trixie psql -h $CONTAINER_NAME -U postgres -d postgres -At -v ON_ERROR_STOP=1"
+PGISREADY="docker run --rm --network $NETWORK_NAME postgres:18-trixie pg_isready -h $CONTAINER_NAME -U postgres"
 
 echo "[ck-allinone] ① waiting for postgres..."
 for i in $(seq 1 30); do
@@ -407,6 +407,33 @@ if [[ "$DISP_OUT" != OK* ]]; then
 fi
 echo "[ck-allinone] ✓ §B4 dispatch bridge GOVERNED seal round-trip ($DISP_OUT)"
 
+echo "[ck-allinone] ⑤d2 §B4b forge-deny — a client CANNOT publish a governed *.sealed event"
+# v0.7.29 interim mitigation (pgCK NOTIFY-RESPONSE §1). pgCK 0.4.23-nats echoes
+# client bytes onto event.kernel.pgCK.<verb>; without this deny a client could
+# PUB input.kernel.pgCK.action.Task.sealed and forge a sealed fact (+ by: header).
+# nats-server.conf maps the anon connection to a deny of that exact pattern.
+# The relay's legit result.kernel round-trip above proves non-.sealed still flows.
+FORGE_OUT=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+  mkdir /w && cd /w && npm init -y >/dev/null 2>&1 && npm i ws >/dev/null 2>&1
+  cat > /w/f.mjs <<EOF
+import { WebSocket } from "ws";
+const ws = new WebSocket("ws://'"$CONTAINER_NAME"':9222");
+const t = setTimeout(() => { console.log("FAIL not-denied"); process.exit(2); }, 6000);
+ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"protocol\":1}\r\n"));
+let s = false;
+ws.on("message", (d) => { const x = d.toString();
+  if (x.startsWith("INFO ") && !s) { s = true;
+    const p = "{\"forged\":true}";
+    ws.send("PUB input.kernel.pgCK.action.Task.sealed " + p.length + "\r\n" + p + "\r\n"); }
+  else if (x.startsWith("-ERR") && /Permissions Violation/.test(x)) { clearTimeout(t); console.log("DENIED"); process.exit(0); } });
+EOF
+  node /w/f.mjs' 2>&1 | tail -1)
+if [[ "$FORGE_OUT" != "DENIED" ]]; then
+  echo "✗ §B4b forge-deny FAILED — client could forge a *.sealed event: $FORGE_OUT" >&2
+  exit 1
+fi
+echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.pgCK.action.*.sealed)"
+
 echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advances the kernel epoch (CKP v3.9 §5)"
 # The adoption-critical path: a participant (not superuser) governs a type
 # change in through the sealed door. Asserts the FULL lifecycle: Proposal
@@ -419,7 +446,7 @@ echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advance
 # requires detail.targetClass + detail.path as IRIs. The 0.4.2-era
 # detail.property (no targetClass) no longer translates — apply raises
 # op_translate_failed "add_property: targetClass must be an IRI, got <NULL>".
-PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:17-bookworm psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
+PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:18-trixie psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
 EPOCH_BEFORE=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
 GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.8/core#Task\",\"path\":\"https://conceptkernel.org/ontology/v3.8/core#smokeProp\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text;" 2>&1)
 GOV_IRI=$(echo "$GOV_PROPOSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)

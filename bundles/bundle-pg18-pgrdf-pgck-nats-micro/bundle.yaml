@@ -1,5 +1,5 @@
 spec_version: 0.4
-name: bundle-pg17-pgrdf-pgck-nats-micro
+name: bundle-pg18-pgrdf-pgck-nats-micro
 role: prod
 never_prod: false
 description: PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners
@@ -10,7 +10,7 @@ description: PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS co
 skip_render: true
 
 image:
-  registry: ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro
+  registry: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
   pg_major: 17
   base_image: postgres:17-bookworm
   final_image: scratch
@@ -38,6 +38,6 @@ services:
     jetstream: false
 local:
   prefix: ociger-
-  data_dir: .artifacts/ociger-pg17-pgrdf-pgck-nats-micro-smoke/pgdata
-  network: ociger-pg17-pgrdf-pgck-nats-micro-net
-  container: ociger-pg17-pgrdf-pgck-nats-micro-smoke
+  data_dir: .artifacts/ociger-pg18-pgrdf-pgck-nats-micro-smoke/pgdata
+  network: ociger-pg18-pgrdf-pgck-nats-micro-net
+  container: ociger-pg18-pgrdf-pgck-nats-micro-smoke

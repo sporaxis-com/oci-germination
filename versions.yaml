@@ -22,23 +22,27 @@
 
 components:
   # Latest consumable upstream pins (verified pullable + attested 2026-06-13).
-  pgrdf:      "0.6.19"         # latest published release (styk-tv/pgrdf); attested head. 0.6.14 = out-of-the-box at-scale staged ingest (T1–T5 GUCs); 0.6.16+ adds carve_graph. .so/GUC-only — NO schema change + NO base/SONAME move across 0.6.6→0.6.17 (still postgres:17.4-bookworm).
-  pgck:       "0.4.21"         # latest published release (styk-tv/pgck); install-from-zero. 0.4.21: create_typed files bare core lifecycle keys (lifecycle_state) under the v3.7 core NS — closes the create(pending)→transition invalid_transition root cause (og#11; regression s57).
-  pgck_native: "pgck 0.4.21"   # pgck_version() now derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15 — was a frozen "0.4.3 (rc3)" literal through 0.4.14). Self-report == extversion again; the pgck_version()-stale NOTIFY is closed.
-  cklib:      "1.5.3"          # dispatch-only client + typed-edge forms (TE-10) + G5a gov-door + create() target_kernel pass-through fix (1.5.1 stripped it → Task seal failed under v0.7.20's real enforcement); latest published release. Requires pgCK >= 0.4.13.
+  pgrdf:      "0.6.20"         # latest published release (styk-tv/pgrdf); attested head. 0.6.14 = out-of-the-box at-scale staged ingest (T1–T5 GUCs); 0.6.16+ adds carve_graph. .so/GUC-only — NO schema change + NO base/SONAME move across 0.6.6→0.6.17 (still postgres:17.4-bookworm).
+  pgck:       "0.4.23"         # latest published release (styk-tv/pgck); install-from-zero. 0.4.21: create_typed files bare core lifecycle keys (lifecycle_state) under the v3.7 core NS — closes the create(pending)→transition invalid_transition root cause (og#11; regression s57).
+  pgck_native: "pgck 0.4.23"   # pgck_version() now derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15 — was a frozen "0.4.3 (rc3)" literal through 0.4.14). Self-report == extversion again; the pgck_version()-stale NOTIFY is closed.
+  cklib:      "1.5.5"          # dispatch-only client + typed-edge forms (TE-10) + G5a gov-door + create() target_kernel pass-through fix (1.5.1 stripped it → Task seal failed under v0.7.20's real enforcement); latest published release. Requires pgCK >= 0.4.13.
   nats:       "2.14.2"
-  postgres:   "17-bookworm"
+  postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
   busybox:    "1.36.1-musl"
 
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg17-pgrdf-pgck-nats-micro: "v0.1.19"   # the ck-allinone base (pgRDF 0.6.19 + pgCK 0.4.21)
+  pg18-pgrdf-pgck-nats-micro: "v0.2.0"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.23-nats)
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the
 # report so the freeze stays visible, not forgotten.
 frozen:
+  pg17-bookworm-pgrdf: "RETIRED at the pg18 move — pgRDF is pg18-only from v0.6.20; no pg17 artifact exists to pin. Retire or re-cut on pg18 (og#9)."
+  pg17-pgrdf: "RETIRED at the pg18 move — pgRDF pg18-only from v0.6.20 (og#9)."
+  pg17-pgrdf-pgck: "RETIRED at the pg18 move — pgRDF/pgCK are both pg18-only; pg17 artifacts are no longer built upstream (og#9)."
+  pg17-pgrdf-pgck-nats: "RETIRED at the pg18 move — pgRDF/pgCK pg18-only (og#9)."
   pgck-bench: "Python/FastAPI benchmark sibling on its own pgck-web cadence; re-cut deliberately, not in the component wave."
   pg17-pgrdf-pgck-static-cklib: "ck-allinone sibling (Go static server). Bringing it current needs the full v0.7.18-era scaffolding (base v0.1.12 + pgCK 0.4.2 install-from-zero init.sql + the outbox drain + cklib 1.5.0 byte-set), not a pin bump — a coordinated re-cut, tracked separately. Until then use ck-allinone."
