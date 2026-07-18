@@ -126,16 +126,6 @@ PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Cano
 | Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
 
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.20` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.20` | `self-report` | `—` | ? unprobed |
 
 ## ociger-pg17-pgrdf-pgck-nats — `v0.1.11`
 
