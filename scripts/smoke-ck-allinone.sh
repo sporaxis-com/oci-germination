@@ -332,8 +332,13 @@ echo "[ck-allinone] ✓ floor intact: ck_participant has no pgrdf reach"
 echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + GOVERNED seal (semantic pass: ok=true + proof_digest)"
 # v0.7.14+ : the round-trip asserts not just envelope shape but envelope
 # SEMANTICS — the reply must be `ok:true` with a proof_digest, proving the
-# relay actually called the GOVERNED 2-arg `ckp.dispatch(verb, payload)`
-# that runs the per-verb seal handlers in pgCK 0.4.x. This is the gate
+# dispatch actually called the GOVERNED 2-arg `ckp.dispatch(verb, payload)`
+# that runs the per-verb seal handlers in pgCK 0.4.x.
+# v0.7.30: the inbound dispatch is now pgCK 0.4.24-nats IN-EXTENSION (the Go
+# relay is deleted). The wire contract is unchanged — PUB input.kernel.pgCK.
+# action.<verb> → reply on result.kernel.pgCK.<verb> — but the reply is now
+# emitted by pgCK, not the relay; confirm the {ok,proof_digest,id} envelope
+# shape against 0.4.24 at (unfrozen) build time. This is the gate
 # that would have caught the v0.7.11..v0.7.13 escape — those cuts called
 # the 4-arg CI-A-2 stub by mistake, which returns `{"ok":false,"error":
 # "verb not governed yet (CI-B): <verb>",…}` for EVERY verb. CK.Lib.Js's
@@ -343,7 +348,7 @@ echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + GOVERNED seal (semant
 # Why this gate is necessary and not redundant with the shape check above
 # it (kept for the parse-error catch): the shape check passes any typed
 # envelope; only a semantic check that asserts `ok===true` distinguishes
-# "the relay reached pg + got a typed reply" from "the relay reached pg +
+# "the dispatch reached pg + got a typed reply" from "the dispatch reached pg +
 # got a typed reply that proves the seal happened."
 #
 # Payload structure for the smoke fixture:
@@ -379,7 +384,7 @@ ws.on("message", (data) => {
     var hasDelegate = Object.prototype.hasOwnProperty.call(env, "delegate");
     var isStubError = /not governed yet/.test(String(env.error||""));
     if (hasDelegate || isStubError) {
-      console.log("FAIL relay-called-4-arg-stub must-call-GOVERNED-2-arg body=" + body.slice(0,240));
+      console.log("FAIL called-4-arg-stub must-call-GOVERNED-2-arg body=" + body.slice(0,240));
       process.exit(10);
     }
     if (/does not exist/.test(String(env.error||""))) {
@@ -402,17 +407,19 @@ EOF
 ' 2>&1 | tail -1)
 if [[ "$DISP_OUT" != OK* ]]; then
   echo "✗ §B4 dispatch bridge GOVERNED-seal round-trip failed: $DISP_OUT"
-  docker logs "$CONTAINER_NAME" 2>&1 | grep -i 'pgck-relay' | tail -20
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck|nats|dispatch' | tail -20
   exit 1
 fi
 echo "[ck-allinone] ✓ §B4 dispatch bridge GOVERNED seal round-trip ($DISP_OUT)"
 
 echo "[ck-allinone] ⑤d2 §B4b forge-deny — a client CANNOT publish a governed *.sealed event"
-# v0.7.29 interim mitigation (pgCK NOTIFY-RESPONSE §1). pgCK 0.4.23-nats echoes
-# client bytes onto event.kernel.pgCK.<verb>; without this deny a client could
-# PUB input.kernel.pgCK.action.Task.sealed and forge a sealed fact (+ by: header).
-# nats-server.conf maps the anon connection to a deny of that exact pattern.
-# The relay's legit result.kernel round-trip above proves non-.sealed still flows.
+# v0.7.30 INTERIM mitigation (pending the auth-callout wiring, og#19). An
+# anonymous connection may still publish to input.*; without this deny a client
+# could PUB input.kernel.pgCK.action.Task.sealed and forge a sealed fact (+ by:
+# header). nats-server.conf maps the anon connection to a deny of that exact
+# pattern. SUPERSEDED once pgck.nats_account_seed is delivered — the auth-callout
+# anon tier is subscribe-only (no publish at all), a strictly stronger deny.
+# The legit result.kernel round-trip above proves non-.sealed still flows.
 FORGE_OUT=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
   mkdir /w && cd /w && npm init -y >/dev/null 2>&1 && npm i ws >/dev/null 2>&1
   cat > /w/f.mjs <<EOF
@@ -474,13 +481,14 @@ fi
 echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
 
 echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.pgCK.<class>.sealed (NO host bridge)"
-# v0.7.18+ : every seal enqueues a ckp.outbox row; the relay's native drain
-# (as ck_drainer) publishes it onto event.kernel.pgCK.<class>.sealed. This
-# gate proves the bundle moves sealed events onto NATS BY ITSELF — the
-# regression class CK.Lib.Js's no-native-outbox-drain NOTIFY surfaced (their
-# verify only passed with a stray host-side dev drain). The probe subscribes
-# to event.kernel.pgCK.> first, triggers a seal via the relay, and asserts an
-# event lands — with no drain process anywhere but inside the container.
+# v0.7.18+ : every seal enqueues a ckp.outbox row; pgCK's in-.so native drain
+# publishes it onto event.kernel.pgCK.<class>.sealed. This gate proves the
+# bundle moves sealed events onto NATS BY ITSELF — the regression class
+# CK.Lib.Js's no-native-outbox-drain NOTIFY surfaced (their verify only passed
+# with a stray host-side dev drain). v0.7.30: the drain is owned by pgCK
+# 0.4.24-nats in-process (was 0.4.23-nats; the Go relay never drained). The
+# probe subscribes to event.kernel.pgCK.> first, triggers a seal, and asserts
+# an event lands — with no drain process anywhere but inside the container.
 DRAIN_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
   cat > /probe.mjs <<EOF
 import { WebSocket } from "ws";
@@ -514,8 +522,8 @@ EOF
 ' 2>&1 | tail -1)
 if [[ "$DRAIN_OK" != OK* ]]; then
   echo "✗ native outbox drain failed: $DRAIN_OK"
-  echo "   (a seal did not emit an event on event.kernel.pgCK.* — the relay drain isn't running)"
-  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck-relay|drain' | tail -15
+  echo "   (a seal did not emit an event on event.kernel.pgCK.* — pgCK's in-.so drain isn't running)"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck|nats|drain' | tail -15
   exit 1
 fi
 echo "[ck-allinone] ✓ native drain OK — seal → $DRAIN_OK (no host bridge)"

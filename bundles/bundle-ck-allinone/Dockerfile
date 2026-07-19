@@ -5,19 +5,22 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.0
+ARG PG_BASE_VERSION=v0.2.1
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.5.5
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
 
-# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.23-nats + NATS) ───
-# v0.2.0 moves the base to postgres:18-trixie (glibc 2.41): pgRDF v0.6.20's
-# arm64 .so requires GLIBC_2.39, so bookworm (2.36) cannot load it. Carries
-# pgCK 0.4.23-pg18-nats — the -nats build owns the inbound relay + outbox
-# drain in-process, which is why the Go relay is gone.
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.0 AS pg_base
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS) ───
+# v0.2.1 bumps pgCK 0.4.23-nats → 0.4.24-nats. 0.4.24's -nats build owns the
+# in-extension INBOUND DISPATCH (F1-inbound, hop 4): it reads the broker-enforced
+# verified identity from the subject and sets ckp.requester before ckp.dispatch,
+# and answers the NATS auth-callout. That fully supersedes the Go
+# ociger-pgck-relay's inbound bridge — so the relay is DELETED at v0.7.30
+# (keeping it would double-dispatch every inbound action). Base still on
+# postgres:18-trixie (glibc 2.41; pgRDF 0.6.20 arm64 .so needs GLIBC_2.39).
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.1 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.5 — the dispatch-only client, verified TYPED-SEALED live against the
@@ -47,22 +50,27 @@ COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
     go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
 
-# ─── Stage 5: build ociger-pgck-relay (inbound-dispatch half ONLY) ────────
-# v0.7.29 interim (pgCK NOTIFY-RESPONSE ASK-1 = option b): pgCK 0.4.23-nats
-# owns the OUTBOX DRAIN in-.so, but its inbound path is a governance-free
-# fan-out — no ckp.dispatch until 0.4.24 (F1-inbound). The relay is retained
-# for its dispatch bridge (input.kernel.<K>.action.<verb> → GOVERNED 2-arg
-# ckp.dispatch → result.kernel.<K>.<verb>) with the drain DISABLED via
-# OCIGER_DISABLE_OUTBOX_DRAIN=1 (pgCK drains; double-drain would double-publish).
-# Fully deleted at v0.7.30 when pgCK 0.4.24 lands the governed dispatcher.
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pgckrelay_build
+# ─── (v0.7.30) Go ociger-pgck-relay stage REMOVED ────────────────────────
+# pgCK 0.4.24-nats owns the in-extension inbound dispatch (F1-inbound, hop 4):
+# it sets ckp.requester from the broker-enforced verified identity before
+# ckp.dispatch. The Go relay's inbound bridge is fully superseded — building it
+# alongside 0.4.24 would double-dispatch every inbound action — so its build
+# stage, binary COPY, s6 service, and cmd/ociger-pgck-relay are all deleted.
+
+# ─── Stage 5: build ociger-ck-identity (boot-time auth-callout provisioner) ──
+# Runs as an s6 oneshot BEFORE nats + postgres. Resolves the callout ACCOUNT
+# nkey (operator OCIGER_NATS_ACCOUNT_SEED, else minted per-boot), then writes
+# /etc/nats/nats-server.conf (auth_callout issuer = account pubkey) + the
+# /run/ck-identity/pgck.conf fragment postgres pulls in (pgck.nats_account_seed
+# + worker-cred nats_url). The seed is NEVER baked into the image.
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS ckidentity_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY cmd/ociger-pgck-relay ./cmd/ociger-pgck-relay
+COPY cmd/ociger-ck-identity ./cmd/ociger-ck-identity
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags='-s -w' -o /out/ociger-pgck-relay ./cmd/ociger-pgck-relay
+    go build -trimpath -ldflags='-s -w' -o /out/ociger-ck-identity ./cmd/ociger-ck-identity
 
 # ─── Stage 6: extract s6-overlay release tarballs into /s6root ────────────
 FROM debian:trixie-slim AS s6_extract
@@ -87,7 +95,7 @@ RUN set -eux; \
 FROM pg_base
 ARG BUNDLE_VERSION
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF + pgCK + NATS + cklib, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client."
+LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
@@ -124,21 +132,33 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
-# Dispatch bridge (inbound half only — drain disabled below; see Stage 5).
-COPY --from=pgckrelay_build /out/ociger-pgck-relay /usr/local/bin/ociger-pgck-relay
+# (v0.7.30) No Go relay COPY — pgCK 0.4.24-nats owns inbound dispatch in-.so.
 
-# nats-server.conf overlay: the *.sealed publish-deny mitigation (pgCK
-# NOTIFY-RESPONSE §1) — 0.4.23's fan-out echoes client bytes onto
-# event.kernel.pgCK.<verb>, so deny the one input pattern that would let a
-# client forge a governed *.sealed event. Retired at v0.7.30.
+# Boot-time auth-callout provisioner (the ck-identity s6 oneshot runs it before
+# nats + postgres): mints/derives the callout account and writes both
+# /etc/nats/nats-server.conf and /run/ck-identity/pgck.conf from one account.
+COPY --from=ckidentity_build /out/ociger-ck-identity /usr/local/bin/ociger-ck-identity
+
+# nats-server.conf here is the PRE-ONESHOT FALLBACK only. On every boot the
+# ck-identity oneshot OVERWRITES it with the auth_callout config (issuer = the
+# resolved account pubkey; anon connections become subscribe-only via the
+# callout — strictly stronger than this file's interim forge-deny). Because
+# nats depends on ck-identity, nats never actually starts on this fallback; it
+# is kept only as a safe default if the oneshot is disabled.
 COPY bundles/bundle-ck-allinone/nats-server.conf /etc/nats/nats-server.conf
 
-# s6 service definitions (postgres, nats, httpd, pgck-relay) compiled by s6-rc at boot.
+# s6 service definitions (ck-identity oneshot → postgres, nats, httpd) compiled
+# by s6-rc at boot. nats + postgres depend on ck-identity (it writes their config).
 COPY bundles/bundle-ck-allinone/s6-services/ /etc/s6-overlay/s6-rc.d/
 
 ENV PGDATA=/var/lib/postgresql/data
 ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
-ENV OCIGER_POSTGRES_CONF_EXTRA="pgck.nats_url='nats://127.0.0.1:4222'"
+# (v0.7.30) postgresql.conf pulls the boot-generated pgck secrets (nats_url with
+# worker creds + pgck.nats_account_seed) from the ck-identity oneshot's output
+# via include_if_exists — re-read every boot, so a freshly-minted account stays
+# consistent with the nats-server.conf issuer. The launcher appends this line at
+# first initdb.
+ENV OCIGER_POSTGRES_CONF_EXTRA="include_if_exists = '/run/ck-identity/pgck.conf'"
 ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
 # v3.9 Critical Isolation Alpha — opt the bundle into the role floor:
 # the launcher appends `host all ck_participant 0.0.0.0/0 scram-sha-256`
@@ -147,8 +167,8 @@ ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
 # ck_participant exists but cannot log in (no default password — a default
 # would make the role floor cosmetic per pgCK v3.9 §7).
 ENV OCIGER_CK_PARTICIPANT_HBA=1
-# pgCK 0.4.23-nats drains ckp.outbox in-process; the relay must NOT double-drain.
-ENV OCIGER_DISABLE_OUTBOX_DRAIN=1
+# (v0.7.30) OCIGER_DISABLE_OUTBOX_DRAIN removed — it only gated the deleted Go
+# relay's drain. pgCK 0.4.24-nats owns the ckp.outbox drain in-process.
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1

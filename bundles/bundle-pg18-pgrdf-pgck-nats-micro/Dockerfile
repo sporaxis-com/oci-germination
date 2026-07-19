@@ -35,10 +35,10 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.23-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.24-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.23.sql; \
+  test -s /work/share/extension/pgck--0.4.24.sql; \
   test -s /work/ontology/task.ttl; \
   test -s /work/ontology/goal.ttl
 
