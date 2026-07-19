@@ -162,6 +162,19 @@ jobs:
           echo "Smoking $IMAGE …"
           bash scripts/smoke-ck-allinone.sh "$IMAGE"
 
+      # v0.7.30 gate (og#19): prove the auth-callout verified path on the SHIPPED
+      # artifact. Boots the image with a self-contained test realm (a fresh
+      # Ed25519 key plays the OIDC issuer) and asserts verified dispatch seals
+      # `by: urn:ckp:participant:<sub>` while anon/forged/foreign-id are denied.
+      # Same docker-run+network mechanism the smoke above already uses in CI.
+      - name: Verify auth-callout identity path (ck-allinone)
+        if: ${{ steps.extract.outputs.bundle == 'ck-allinone' }}
+        run: |
+          set -euo pipefail
+          IMAGE="ociger-${{ steps.extract.outputs.bundle }}:ci-gate"
+          echo "Verifying callout on $IMAGE …"
+          bash scripts/verify-callout.sh "$IMAGE"
+
       # All gates green — NOW build + push the multi-arch manifest. The
       # native-arch layers come straight from the gha cache populated by
       # the gating build; only the cross-arch half builds here. A gate
