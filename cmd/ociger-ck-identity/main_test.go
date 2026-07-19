@@ -104,8 +104,10 @@ func TestResolveWorkerPassword(t *testing.T) {
 	}
 }
 
-// The rendered configs must carry the issuer + callout on the nats side and the
-// seed + worker-cred URL on the pg side, so the two halves reference one account.
+var testOIDC = oidcConfig{jwks: `{"keys":[{"kty":"OKP"}]}`, issuer: "https://realm.test/", audience: "ck-allinone"}
+
+// REALM-mode configs must carry the callout issuer on the nats side and the
+// seed + worker-cred URL + oidc verifier config on the pg side.
 func TestRenderedConfigs(t *testing.T) {
 	nats := natsServerConf("ATESTPUBKEY", "wpass")
 	for _, want := range []string{"auth_callout", "issuer: \"ATESTPUBKEY\"", "auth_users: [ pgck_worker ]", "port: 9222"} {
@@ -114,11 +116,17 @@ func TestRenderedConfigs(t *testing.T) {
 		}
 	}
 	if strings.Contains(nats, "no_auth_user") {
-		t.Fatal("nats-server.conf still has no_auth_user — the interim forge-deny must be gone under the callout")
+		t.Fatal("REALM nats-server.conf must NOT have no_auth_user (callout admits everyone)")
 	}
 
-	pg := pgckSecretsConf("SATESTSEED", "wpass")
-	for _, want := range []string{"pgck.nats_account_seed = 'SATESTSEED'", "nats://pgck_worker:wpass@127.0.0.1:4222"} {
+	pg := pgckSecretsConf("SATESTSEED", "wpass", testOIDC)
+	for _, want := range []string{
+		"pgck.nats_account_seed = 'SATESTSEED'",
+		"nats://pgck_worker:wpass@127.0.0.1:4222",
+		"pgck.oidc_issuer = 'https://realm.test/'",
+		"pgck.oidc_audience = 'ck-allinone'",
+		`pgck.oidc_jwks = '{"keys":[{"kty":"OKP"}]}'`,
+	} {
 		if !strings.Contains(pg, want) {
 			t.Fatalf("pgck.conf missing %q:\n%s", want, pg)
 		}
@@ -128,11 +136,57 @@ func TestRenderedConfigs(t *testing.T) {
 // A worker password with URL-reserved characters must stay well-formed in the
 // nats_url (operators may supply their own).
 func TestPgckSecretsConf_EncodesReservedPassword(t *testing.T) {
-	pg := pgckSecretsConf("SATESTSEED", "p@ss:w/rd")
+	pg := pgckSecretsConf("SATESTSEED", "p@ss:w/rd", testOIDC)
 	if strings.Contains(pg, "p@ss:w/rd") {
 		t.Fatalf("reserved chars not encoded in nats_url:\n%s", pg)
 	}
 	if !strings.Contains(pg, "pgck_worker:p%40ss%3Aw%2Frd@127.0.0.1:4222") {
 		t.Fatalf("expected percent-encoded userinfo:\n%s", pg)
+	}
+}
+
+// A JWKS containing a single quote must be doubled for postgresql.conf.
+func TestPgckSecretsConf_EscapesSingleQuote(t *testing.T) {
+	pg := pgckSecretsConf("S", "w", oidcConfig{jwks: `a'b`, issuer: "i", audience: "a"})
+	if !strings.Contains(pg, "pgck.oidc_jwks = 'a''b'") {
+		t.Fatalf("single quote not doubled:\n%s", pg)
+	}
+}
+
+// resolveOIDC requires all three fields; a partial config is anonymous mode.
+func TestResolveOIDC(t *testing.T) {
+	t.Setenv("OCIGER_OIDC_JWKS", "")
+	t.Setenv("OCIGER_OIDC_ISSUER", "")
+	t.Setenv("OCIGER_OIDC_AUDIENCE", "")
+	if _, ok := resolveOIDC(); ok {
+		t.Fatal("empty env must be anonymous mode")
+	}
+	t.Setenv("OCIGER_OIDC_JWKS", "{}")
+	t.Setenv("OCIGER_OIDC_ISSUER", "iss")
+	if _, ok := resolveOIDC(); ok {
+		t.Fatal("partial config (no audience) must be anonymous mode")
+	}
+	t.Setenv("OCIGER_OIDC_AUDIENCE", "aud")
+	c, ok := resolveOIDC()
+	if !ok || c.issuer != "iss" || c.audience != "aud" {
+		t.Fatalf("full config should be realm mode: ok=%v c=%+v", ok, c)
+	}
+}
+
+// Anonymous-mode configs: no callout / no account seed, so anon can dispatch.
+func TestAnonModeConfigs(t *testing.T) {
+	nats := anonNatsServerConf()
+	if !strings.Contains(nats, "no_auth_user: anon") {
+		t.Fatalf("anon nats-server.conf must map anon via no_auth_user:\n%s", nats)
+	}
+	if strings.Contains(nats, "auth_callout") {
+		t.Fatalf("anon nats-server.conf must NOT have auth_callout:\n%s", nats)
+	}
+	pg := anonPgckConf()
+	if strings.Contains(pg, "nats_account_seed") {
+		t.Fatalf("anon pgck.conf must NOT set an account seed (responder stays off):\n%s", pg)
+	}
+	if !strings.Contains(pg, "pgck.nats_url = 'nats://127.0.0.1:4222'") {
+		t.Fatalf("anon pgck.conf must set an anonymous nats_url:\n%s", pg)
 	}
 }

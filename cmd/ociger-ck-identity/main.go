@@ -1,23 +1,28 @@
-// Command ociger-ck-identity is the boot-time provisioner for the ck-allinone
-// NATS auth-callout account (bundle v0.7.30). It runs as an s6 oneshot BEFORE
-// the nats and postgres longruns and closes the last identity hop by making the
-// broker's callout issuer and pgCK's signing seed the SAME account, every boot:
+// Command ociger-ck-identity is the boot-time provisioner for ck-allinone's NATS
+// admittance (bundle v0.7.30). It runs as an s6 oneshot BEFORE the nats and
+// postgres longruns and writes /etc/nats/nats-server.conf plus the
+// /run/ck-identity/pgck.conf fragment postgres pulls in via include_if_exists.
 //
-//  1. Resolve the callout ACCOUNT nkey pair. OCIGER_NATS_ACCOUNT_SEED, if the
-//     operator supplied one, gives a STABLE account; otherwise a fresh account
-//     is minted per boot (ephemeral — clients simply reconnect).
-//  2. Resolve the pgck_worker bypass password (OCIGER_NATS_WORKER_PASSWORD, else
-//     a fresh random one).
-//  3. Write /etc/nats/nats-server.conf with the auth_callout stanza — issuer is
-//     the account PUBLIC key; pgck_worker is the sole auth_user that bypasses
-//     the callout so pgCK's own connection can service $SYS.REQ.USER.AUTH.
-//  4. Write /run/ck-identity/pgck.conf with pgck.nats_account_seed (the PRIVATE
-//     half pgCK signs admittance with) + pgck.nats_url (worker creds). postgres
-//     pulls it in via `include_if_exists` at every start, so the seed the
-//     responder signs with always matches the issuer the broker verifies.
+// It has two modes, chosen by whether an OIDC realm is configured:
 //
-// The seed is NEVER baked into the image: absent an operator seed it is minted
-// fresh each boot and lives only in tmpfs (/run) and process memory.
+//	REALM (OCIGER_OIDC_JWKS + OCIGER_OIDC_ISSUER + OCIGER_OIDC_AUDIENCE all set):
+//	  activate the auth-callout. Resolve the callout ACCOUNT nkey
+//	  (OCIGER_NATS_ACCOUNT_SEED if the operator supplied one → stable, else
+//	  minted per boot) and write nats-server.conf with the auth_callout stanza
+//	  (issuer = the account public key; pgck_worker the sole bypass user) plus
+//	  pgck.conf with pgck.nats_account_seed, the worker-cred nats_url, and the
+//	  pgck.oidc_* verifier config. pgCK then verifies bearers against the realm
+//	  and binds the verified sub to ckp.requester (hop 4). Anonymous connections
+//	  are admitted subscribe-only.
+//
+//	NO REALM (default): no auth-callout, no account seed — pgCK's responder is
+//	  not started (admission unchanged) and anonymous connections may dispatch
+//	  (the v0.7.29 behavior). This is the zero-config default for adopters
+//	  without an identity plane; a client cannot forge a governed *.sealed event
+//	  (the interim publish-deny is retained).
+//
+// The account seed is NEVER baked into the image: absent an operator seed it is
+// minted fresh each boot and lives only in tmpfs (/run) and process memory.
 package main
 
 import (
@@ -41,9 +46,29 @@ const (
 	natsWssPort     = 9222
 )
 
+// oidcConfig is the operator-supplied realm the callout verifies bearers against.
+type oidcConfig struct {
+	jwks     string
+	issuer   string
+	audience string
+}
+
 func main() {
 	natsConf := getenv("OCIGER_NATS_CONF", defaultNatsConf)
 	pgckConf := getenv("OCIGER_PGCK_CONF", defaultPgckConf)
+
+	oidc, realm := resolveOIDC()
+
+	if !realm {
+		if err := writeFileMode(natsConf, anonNatsServerConf(), 0o644); err != nil {
+			log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
+		}
+		if err := writeFileMode(pgckConf, anonPgckConf(), 0o644); err != nil {
+			log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
+		}
+		log.Printf("ociger-ck-identity: no OIDC realm (OCIGER_OIDC_*) → ANONYMOUS mode (callout off); wrote %s + %s", natsConf, pgckConf)
+		return
+	}
 
 	seed, pub, err := resolveAccount(os.Getenv("OCIGER_NATS_ACCOUNT_SEED"))
 	if err != nil {
@@ -54,21 +79,35 @@ func main() {
 		log.Fatalf("ociger-ck-identity: worker password: %v", err)
 	}
 
-	// nats-server.conf world-readable (nats reads it); pgck.conf carries the
-	// seed so keep it tighter (0640 — the container is single-tenant, postgres
-	// reads it as its own uid via the include).
+	// Both configs are 0644: postgres reads pgck.conf via include_if_exists as
+	// its own uid (999), which is not root and not in root's group — a 0640
+	// root-owned file is unreadable to it and postgres silently treats the
+	// include as "missing". /run is not externally reachable and the container is
+	// single-tenant, so world-readable inside the container is acceptable (the
+	// same posture as nats-server.conf, which already carries the worker password).
 	if err := writeFileMode(natsConf, natsServerConf(pub, workerPass), 0o644); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
 	}
-	if err := writeFileMode(pgckConf, pgckSecretsConf(seed, workerPass), 0o640); err != nil {
+	if err := writeFileMode(pgckConf, pgckSecretsConf(seed, workerPass, oidc), 0o644); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
 	}
 
 	source := "minted per-boot (ephemeral)"
 	if strings.TrimSpace(os.Getenv("OCIGER_NATS_ACCOUNT_SEED")) != "" {
-		source = "operator-supplied (OCIGER_NATS_ACCOUNT_SEED)"
+		source = "operator-supplied"
 	}
-	log.Printf("ociger-ck-identity: auth-callout account %s [%s]; wrote %s + %s", pub, source, natsConf, pgckConf)
+	log.Printf("ociger-ck-identity: OIDC realm %q → auth-callout ACTIVE; account %s [%s]; wrote %s + %s", oidc.issuer, pub, source, natsConf, pgckConf)
+}
+
+// resolveOIDC reads the realm config. All three fields are required — a partial
+// config is a misconfiguration, treated as "no realm" (anonymous mode).
+func resolveOIDC() (oidcConfig, bool) {
+	c := oidcConfig{
+		jwks:     strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS")),
+		issuer:   strings.TrimSpace(os.Getenv("OCIGER_OIDC_ISSUER")),
+		audience: strings.TrimSpace(os.Getenv("OCIGER_OIDC_AUDIENCE")),
+	}
+	return c, c.jwks != "" && c.issuer != "" && c.audience != ""
 }
 
 // resolveAccount returns the account seed (canonical string form, e.g. "SA...")
@@ -116,14 +155,13 @@ func resolveWorkerPassword(envPass string) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// natsServerConf renders the server-config-mode auth_callout config. Every
-// connection that is NOT an auth_user is routed to the in-extension responder,
-// which admits a verified bearer as its id-scoped identity or (absent/invalid)
-// as anonymous subscribe-only. This supersedes the interim forge-deny: an anon
-// client cannot publish at all.
+// natsServerConf renders the server-config-mode auth_callout config (REALM mode).
+// Every connection that is NOT an auth_user is routed to the in-extension
+// responder, which admits a verified bearer as its id-scoped identity or (absent/
+// invalid) as anonymous subscribe-only.
 func natsServerConf(issuerPub, workerPass string) string {
 	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
-# Regenerated every boot from the resolved auth-callout account (issuer below).
+# REALM mode: auth-callout active. issuer = the resolved account public key.
 port: %d
 websocket {
   port: %d
@@ -141,10 +179,31 @@ authorization {
 `, natsCorePort, natsWssPort, workerUser, workerPass, issuerPub, workerUser)
 }
 
-// pgckSecretsConf renders the postgresql.conf fragment postgres pulls in via
-// `include_if_exists`. nats_url carries the worker bypass creds (URL-encoded so
-// an operator-supplied password with reserved characters stays well-formed).
-func pgckSecretsConf(seed, workerPass string) string {
+// anonNatsServerConf renders the no-realm config: no callout, every connection
+// maps to the anon no_auth_user, denied only publish on input.*.*.sealed so a
+// client cannot forge a governed sealed event.
+func anonNatsServerConf() string {
+	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
+# ANONYMOUS mode: no OIDC realm configured, so no auth-callout.
+port: %d
+websocket {
+  port: %d
+  no_tls: true
+}
+authorization {
+  users: [
+    { user: anon, password: anon,
+      permissions: { publish: { deny: "input.kernel.pgCK.action.*.sealed" } } }
+  ]
+}
+no_auth_user: anon
+`, natsCorePort, natsWssPort)
+}
+
+// pgckSecretsConf renders the postgresql.conf fragment for REALM mode: the
+// account seed, worker-cred nats_url, and the pgck.oidc_* verifier config. Values
+// are single-quoted; embedded single quotes are doubled (postgresql.conf escaping).
+func pgckSecretsConf(seed, workerPass string, oidc oidcConfig) string {
 	u := url.URL{
 		Scheme: "nats",
 		User:   url.UserPassword(workerUser, workerPass),
@@ -153,8 +212,21 @@ func pgckSecretsConf(seed, workerPass string) string {
 	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
 pgck.nats_account_seed = '%s'
 pgck.nats_url = '%s'
-`, seed, u.String())
+pgck.oidc_jwks = '%s'
+pgck.oidc_issuer = '%s'
+pgck.oidc_audience = '%s'
+`, sqlQuote(seed), sqlQuote(u.String()), sqlQuote(oidc.jwks), sqlQuote(oidc.issuer), sqlQuote(oidc.audience))
 }
+
+// anonPgckConf renders the no-realm fragment: an anonymous nats_url and NO
+// account seed, so pgCK's callout responder is not started.
+func anonPgckConf() string {
+	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
+pgck.nats_url = 'nats://127.0.0.1:%d'
+`, natsCorePort)
+}
+
+func sqlQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
 
 func writeFileMode(path, contents string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

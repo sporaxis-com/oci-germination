@@ -160,6 +160,15 @@ ENV OCIGER_SHARED_PRELOAD_LIBRARIES=pgrdf,pgck
 # first initdb.
 ENV OCIGER_POSTGRES_CONF_EXTRA="include_if_exists = '/run/ck-identity/pgck.conf'"
 ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
+# (v0.7.30) OPTIONAL identity-plane env (read by ck-identity at boot; not set here
+# — supplied by the deploy). Provide ALL THREE to activate the auth-callout so
+# dispatch is identity-gated (verified sub → ckp.requester → sealed `by:`):
+#   OCIGER_OIDC_JWKS       the realm's JWKS ({"keys":[{kty:OKP,crv:Ed25519,kid,x}]})
+#   OCIGER_OIDC_ISSUER     the realm token issuer (JWT `iss`)
+#   OCIGER_OIDC_AUDIENCE   the client audience (JWT `aud`)
+# Optional with a realm: OCIGER_NATS_ACCOUNT_SEED (stable callout account; else
+# minted per-boot) and OCIGER_NATS_WORKER_PASSWORD. With NONE set the bundle runs
+# anonymous (no callout) — zero-config dispatch for adopters without an IdP.
 # v3.9 Critical Isolation Alpha — opt the bundle into the role floor:
 # the launcher appends `host all ck_participant 0.0.0.0/0 scram-sha-256`
 # to pg_hba.conf on first initdb. Deploys MUST set
