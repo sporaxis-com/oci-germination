@@ -1,5 +1,11 @@
 # syntax=docker/dockerfile:1.7
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS launcher_build
+# v0.2.2: the source commit, stamped into every arch as
+# org.opencontainers.image.revision (CI's cross-arch parity gate asserts all
+# published arches share one revision). Also drops the bookworm Go builder —
+# golang:1.24-trixie ships the same go1.24.13 toolchain, and with CGO_ENABLED=0
+# the builder's userland contributes nothing to the scratch runtime.
+ARG GIT_SHA=unknown
+FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS launcher_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
@@ -7,7 +13,7 @@ COPY go.sum ./
 COPY cmd/ociger-pg-launcher/main.go ./cmd/ociger-pg-launcher/main.go
 COPY internal/launcher ./internal/launcher
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o /out/ociger-pg-launcher ./cmd/ociger-pg-launcher
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS supervisor_build
+FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS supervisor_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
@@ -104,6 +110,8 @@ RUN set -eux; \
 
 
 FROM scratch
+ARG GIT_SHA
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL ck.bundle.role="prod"

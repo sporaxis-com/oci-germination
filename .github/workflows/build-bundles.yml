@@ -120,8 +120,14 @@ jobs:
             ociger-${{ steps.extract.outputs.bundle }}:ci-gate
           build-args: |
             BUNDLE_VERSION=${{ steps.semver.outputs.semantic_version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            GIT_SHA=${{ github.sha }}
+          # v0.7.31: cache scoped to THIS COMMIT. Previously an unscoped gha
+          # cache let a layer built from an EARLIER commit be reused for one
+          # arch while the other arch built fresh — i.e. amd64/arm64 binaries
+          # could come from different commits, with nothing detecting it.
+          # Scoping by github.sha makes cross-commit layer pairing impossible.
+          cache-from: type=gha,scope=${{ github.sha }}
+          cache-to: type=gha,mode=max,scope=${{ github.sha }}
 
       # Python-free gate: prod images MUST contain zero python /
       # uvicorn / fastapi / venv hits. pgck-bench is the sole sanctioned
@@ -199,8 +205,49 @@ jobs:
           # the bundle from misadvertising its parent's version.
           build-args: |
             BUNDLE_VERSION=${{ steps.semver.outputs.semantic_version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            GIT_SHA=${{ github.sha }}
+          # Same commit-scoped cache as the gating build (see there) — both
+          # arches must derive from THIS commit, never a cached earlier one.
+          cache-from: type=gha,scope=${{ github.sha }}
+          cache-to: type=gha,mode=max,scope=${{ github.sha }}
+
+      # v0.7.31 cross-arch parity gate. Runs BEFORE attestation, so a divergent
+      # build is never attested and never advances LATEST.md. Asserts that every
+      # published arch carries (a) the SAME source revision label and (b) the
+      # SAME runtime glibc build — the exact pair of properties an external
+      # report questioned for v0.7.30. Enforced, not asserted.
+      - name: Cross-arch parity gate (same commit, same libc)
+        if: ${{ steps.extract.outputs.bundle == 'ck-allinone' }}
+        run: |
+          set -euo pipefail
+          IMG="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}@${{ steps.push.outputs.digest }}"
+          rev_ref=""; libc_ref=""; floor_ref=""
+          for arch in amd64 arm64; do
+            tri=$([ "$arch" = amd64 ] && echo x86_64 || echo aarch64)
+            rev="$(docker buildx imagetools inspect "$IMG" --format '{{ json .Image }}' 2>/dev/null \
+                   | python3 -c "import sys,json;d=json.load(sys.stdin);k=[x for x in d if 'linux/$arch' in x];print(d[k[0]]['config']['Labels'].get('org.opencontainers.image.revision','') if k else '')")"
+            cid="$(docker create --platform "linux/$arch" "$IMG")"
+            docker cp "$cid:/lib/$tri-linux-gnu/libc.so.6" "/tmp/libc-$arch" >/dev/null
+            rm -rf "/tmp/lib-$arch"; mkdir -p "/tmp/lib-$arch"
+            docker cp "$cid:/usr/lib/postgresql/18/lib/." "/tmp/lib-$arch/" >/dev/null
+            docker rm -f "$cid" >/dev/null
+            libc="$(strings "/tmp/libc-$arch" | grep -m1 'GNU C Library (Debian GLIBC')"
+            # The floor that ACTUALLY matters: the highest GLIBC_* any shipped
+            # extension .so requires. v0.7.30 had amd64=2.34 vs arm64=2.39 for
+            # pgrdf.so (upstream built its two arches on mismatched bare runners)
+            # while revision + runtime libc were identical — so revision/libc
+            # checks alone are NOT sufficient. This is the check that catches it.
+            floor="$(cat /tmp/lib-$arch/*.so 2>/dev/null | strings | grep -o 'GLIBC_[0-9][0-9.]*' | sort -V | tail -1)"
+            echo "  $arch: revision=${rev:-<none>}  ext-glibc-floor=${floor:-<none>}  libc=${libc}"
+            [ -n "$rev" ] || { echo "::error::$arch has no org.opencontainers.image.revision label"; exit 1; }
+            [ "$rev" = "${{ github.sha }}" ] || { echo "::error::$arch revision $rev != building commit ${{ github.sha }}"; exit 1; }
+            if [ -z "$rev_ref" ]; then rev_ref="$rev"; libc_ref="$libc"; floor_ref="$floor"; else
+              [ "$rev"   = "$rev_ref"   ] || { echo "::error::arch revision mismatch"; exit 1; }
+              [ "$libc"  = "$libc_ref"  ] || { echo "::error::arch libc mismatch: '$libc' != '$libc_ref'"; exit 1; }
+              [ "$floor" = "$floor_ref" ] || { echo "::error::EXTENSION GLIBC FLOOR MISMATCH across arches: $floor != $floor_ref — an upstream .so was built on a different base per arch (see CHANGELOG v0.7.31)"; exit 1; }
+            fi
+          done
+          echo "cross-arch parity OK — one commit ($rev_ref), one ext floor ($floor_ref), one libc."
 
       # SLSA Build Provenance v1 attestation — signed by GitHub's Fulcio
       # CA via the Sigstore keyless flow. The attestation is pushed to

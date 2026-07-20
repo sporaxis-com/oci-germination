@@ -5,12 +5,17 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.1
+ARG PG_BASE_VERSION=v0.2.2
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.5.5
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
+# v0.7.31: the source commit, stamped into EVERY arch as
+# org.opencontainers.image.revision. CI's cross-arch parity gate asserts every
+# published arch carries the same revision AND the same runtime glibc, so
+# "amd64 and arm64 came from one commit" is enforced, not asserted.
+ARG GIT_SHA=unknown
 
 # ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS) ───
 # v0.2.1 bumps pgCK 0.4.23-nats → 0.4.24-nats. 0.4.24's -nats build owns the
@@ -20,7 +25,7 @@ ARG BUNDLE_VERSION=dev
 # ociger-pgck-relay's inbound bridge — so the relay is DELETED at v0.7.30
 # (keeping it would double-dispatch every inbound action). Base still on
 # postgres:18-trixie (glibc 2.41; pgRDF 0.6.20 arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.1 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.2 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.5 — the dispatch-only client, verified TYPED-SEALED live against the
@@ -40,7 +45,7 @@ FROM busybox:1.36.1-musl AS busybox_src
 # Adds OCIGER_POSTGRES_CONF_EXTRA + OCIGER_INITDB_SQL_FILE. The latter
 # is what eliminates psql from the runtime image: postgres single-user
 # mode runs the bootstrap SQL after initdb, before the supervised server.
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS pglauncher_build
+FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS pglauncher_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
@@ -63,7 +68,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \
 # /etc/nats/nats-server.conf (auth_callout issuer = account pubkey) + the
 # /run/ck-identity/pgck.conf fragment postgres pulls in (pgck.nats_account_seed
 # + worker-cred nats_url). The seed is NEVER baked into the image.
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS ckidentity_build
+FROM --platform=$BUILDPLATFORM golang:1.24-trixie AS ckidentity_build
 ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -94,6 +99,8 @@ RUN set -eux; \
 # ─── Final stage: layer everything on pg_base ─────────────────────────────
 FROM pg_base
 ARG BUNDLE_VERSION
+ARG GIT_SHA
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
 LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
 LABEL org.opencontainers.image.licenses="MIT"

@@ -34,7 +34,7 @@ components:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.1"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats) — v0.2.0→v0.2.1 is the pgCK 0.4.23→0.4.24 pin bump
+  pg18-pgrdf-pgck-nats-micro: "v0.2.2"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats) — v0.2.2 drops the bookworm Go builder (golang:1.24-trixie)
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the
