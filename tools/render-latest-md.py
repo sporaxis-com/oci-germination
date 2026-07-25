@@ -37,72 +37,21 @@ import version_composition as vc  # noqa: E402
 # ----------------------------------------------------------------------
 
 # Each entry: (package_name, heading, short_description, bundle_dir)
+# Only the ACTIVE pg18/trixie wave is advertised. The pg17 + core-pg17 matrix is
+# RETIRED/frozen (pgRDF/pgCK are pg18-only from 0.6.20/0.4.x — og#9); those images
+# stay published on GHCR but are no longer tracked here. See versions.yaml `frozen:`.
 BUNDLES = [
     (
         "ociger-ck-allinone",
-        "CKP Development Default",
-        "PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.",
+        "CKP v3.9 all-in-one (the default)",
+        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.",
         "bundles/bundle-ck-allinone",
     ),
     (
-        "ociger-pg17-pgrdf-pgck-static-cklib",
-        "CKP v3.8-aligned web bundle",
-        "PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at `/cklib/`. No Python, no FastAPI. Browser ↔ kernel via NATS WSS; HTTP serves only static assets.",
-        "bundles/bundle-pg17-pgrdf-pgck-static-cklib",
-    ),
-    (
-        "ociger-pg17-pgrdf-pgck-web-cklib",
-        "Standard web bundle (no NATS) — retired",
-        "Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. Replaced by `static-cklib` for the web layer.",
-        "bundles/bundle-pg17-pgrdf-pgck-web-cklib",
-    ),
-    (
-        "ociger-pg17-pgrdf-pgck-nats-micro",
-        "Triple bundle + NATS, scratch base",
-        "PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.",
-        "bundles/bundle-pg17-pgrdf-pgck-nats-micro",
-    ),
-    (
-        "ociger-pg17-pgrdf-pgck-nats",
-        "Triple bundle + NATS, distroless base",
-        "PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc available).",
-        "bundles/bundle-pg17-pgrdf-pgck-nats",
-    ),
-    (
-        "ociger-pg17-pgrdf-pgck",
-        "Triple bundle (no NATS)",
-        "PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgrdf,pgck`). No NATS. Distroless base.",
-        "bundles/bundle-pg17-pgrdf-pgck",
-    ),
-    (
-        "ociger-pg17-pgrdf",
-        "pgRDF only",
-        "PostgreSQL 17 + pgRDF. No pgCK. Distroless base.",
-        "bundles/bundle-pg17-pgrdf",
-    ),
-    (
-        "ociger-core-pg17-nats-micro",
-        "PostgreSQL 17 + NATS (scratch)",
-        "PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.",
-        "bundles/core-pg17-nats-micro",
-    ),
-    (
-        "ociger-core-pg17-nats",
-        "PostgreSQL 17 + NATS (distroless)",
-        "PostgreSQL 17 + NATS + NATS WSS. No extensions. Distroless base.",
-        "bundles/core-pg17-nats",
-    ),
-    (
-        "ociger-core-pg17-micro",
-        "PostgreSQL 17 only (scratch)",
-        "PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bundle.",
-        "bundles/core-pg17-micro",
-    ),
-    (
-        "ociger-core-pg17-min",
-        "PostgreSQL 17 only (distroless)",
-        "PostgreSQL 17 only. Distroless base (shell + libc available).",
-        "bundles/core-pg17",
+        "ociger-pg18-pgrdf-pgck-nats-micro",
+        "pg18 base — pgRDF + pgCK-nats + NATS (scratch)",
+        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + NATS (4222) + NATS WSS (9222). Scratch base, both arches built consistently on trixie. The canonical base `ck-allinone` builds `FROM`.",
+        "bundles/bundle-pg18-pgrdf-pgck-nats-micro",
     ),
 ]
 
@@ -412,9 +361,9 @@ def main() -> int:
 
 # oci-germination — latest published artifacts
 
-Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images, four `pg17-pgrdf-*` extension bundles, and three web-bearing variants for CKP v3.8 development. All multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the head of each. See [Repo packages view](https://github.com/orgs/{owner}/packages?repo_name=oci-germination) for the full version matrix.
+The active **CKP v3.9** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/{owner}/packages?repo_name=oci-germination).
 
-> **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
+> **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
 """
 

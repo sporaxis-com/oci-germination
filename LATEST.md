@@ -8,14 +8,14 @@
 
 # oci-germination — latest published artifacts
 
-Eleven OCI bundles ship from this repo: four `core-pg17-*` infrastructure images, four `pg17-pgrdf-*` extension bundles, and three web-bearing variants for CKP v3.8 development. All multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the head of each. See [Repo packages view](https://github.com/orgs/sporaxis-com/packages?repo_name=oci-germination) for the full version matrix.
+The active **CKP v3.9** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/sporaxis-com/packages?repo_name=oci-germination).
 
-> **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here. Bundles still on pre-attestation tags display *"no attested release yet"* until their next release crosses the bootstrap gate.
+> **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
 
 ## ociger-ck-allinone — `v0.7.32`
 
-PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js mounted at `/cklib/`. s6-overlay supervises; busybox httpd serves `/app` on :8000. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. Includes the `ociger-pgck-relay` shim for input.kernel.pgCK.action.> → event.kernel.pgCK.<verb> fan-out while the upstream pgck.so ships without the nats-client feature.
+PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
@@ -51,101 +51,25 @@ PostgreSQL 17 + pgRDF + pgCK + pgcrypto (auto-installed on first boot) + NATS co
 | `ociger-pg-launcher` | component | `in-tree` | `—` | gate-before-push | ✓ gated |
 | `ociger-ck-identity` | component | `in-tree` | `boot-provisioner` | gate-before-push | ✓ gated |
 
-## ociger-pg17-pgrdf-pgck-static-cklib — `v0.6.7`
+## ociger-pg18-pgrdf-pgck-nats-micro — `v0.2.2`
 
-PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS + Go static-server + CK.Lib.Js at `/cklib/`. No Python, no FastAPI. Browser ↔ kernel via NATS WSS; HTTP serves only static assets.
+PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + NATS (4222) + NATS WSS (9222). Scratch base, both arches built consistently on trixie. The canonical base `ck-allinone` builds `FROM`.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:1cb141a8196013c3bc476f804e87afdbfc677cc2bf154b727baf3357d7a793c4`  | 2026-05-31 18:41:52 |
-| arm64 | `sha256:632f8660a066a9f4e4168baf4b56e07a286ae0a72f44119c04b3669aad676b92`  | 2026-05-31 18:41:52 |
+| amd64 | `sha256:5a064594e1c12bd032deae6e9e112c5c899fb5a4229322fc36b393b393f775f1`  | 2026-07-25 13:27:34 |
+| arm64 | `sha256:948d035b90e181b3300cfe6dcc6235251928d438db864bacd1cfe900315105d0`  | 2026-07-25 13:27:34 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:v0.6.7`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.2`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:99513229cddaebc917b56826983723ccd2a0c5377a87b1827d9a8c309a23bf54`                                                         |
+| Index digest       | `sha256:61f9c1847094646e2733a9586642b9e0444e7f29fff7e40c2699562fe408dced`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-static-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-static-cklib/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-static-cklib |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.5.28` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.5.28` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.2.2` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.2.2` | `self-report` | `—` | ? unprobed |
-| `static_server` | component | `0.1.0` | `httpd :8000` | gate-before-push | ✓ gated |
-| `cklib` | component | `1.3.11` | `/cklib` | gate-before-push | ✓ gated |
-| `nats` | component | `2.14.1` | `—` | gate-before-push | ✓ gated |
-
-## ociger-pg17-pgrdf-pgck-web-cklib — `v0.6.5`
-
-Retired 2026-05-31. PostgreSQL 17 + pgRDF + pgCK + pgckweb (FastAPI) + CK.Lib.Js at `/cklib/`. Distroless base. Replaced by `static-cklib` for the web layer.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:6d117346c918854fb0536bfcaef05481da0d0cffb2f9e154cfef36bbcfedc2c3`  | 2026-05-29 14:05:58 |
-| arm64 | `sha256:a2c4ac9b1492f0751e0f2a1bdb2b0110775c590b5c8e5bea7f0347c31d01341d`  | 2026-05-29 14:05:58 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-web-cklib:v0.6.5`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:8a1d0c3044cd5525a2dc4c74d68b89a64850dcbf0a1ef5983bb14c344804c468`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-web-cklib/`](./bundles/bundle-pg17-pgrdf-pgck-web-cklib/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-web-cklib |
-
-
-## ociger-pg17-pgrdf-pgck-nats-micro — `v0.1.19`
-
-PostgreSQL 17 + pgRDF + pgCK + NATS (4222) + NATS WSS (9222). Scratch base. Canonical base for ck-allinone and static-cklib.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:be03116fbbbf3f1aad0fbcfa4f8ffc4d5f9ccc827a1b862bafb4253dd8f704bd`  | 2026-07-06 10:59:24 |
-| arm64 | `sha256:dcb82a66bc557cf7ef542c2cccd1e9b7879ff83a08f5e6672aca553d13399e40`  | 2026-07-06 10:59:24 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:v0.1.19`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:72683c62482c9b247132d3867fbec2a6c17bc52642d4027368df9bc53da4c3d6`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg17-pgrdf-pgck-nats-micro/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats-micro |
-
-
-## ociger-pg17-pgrdf-pgck-nats — `v0.1.11`
-
-PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc available).
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:579525ac61246c8e2b9fc35db0f20281244c8a2e90ae3bc7d614328e266682e4`  | 2026-06-18 22:02:25 |
-| arm64 | `sha256:996f90fbd7cbb885ba05281c2068b8deb1147cf90ad3f12eb54f4351274410e2`  | 2026-06-18 22:02:25 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:v0.1.11`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:f9d4e2b442811e5dd53729c4f50c97af8f6ca4b29851367ff0e2258cca8c02cb`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck-nats/`](./bundles/bundle-pg17-pgrdf-pgck-nats/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck-nats |
+| Source bundle      | [`bundles/bundle-pg18-pgrdf-pgck-nats-micro/`](./bundles/bundle-pg18-pgrdf-pgck-nats-micro/)                                          |
+| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg18-pgrdf-pgck-nats-micro |
 
 **Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
 
@@ -155,176 +79,8 @@ PostgreSQL 17 + pgRDF + pgCK + NATS + NATS WSS. Distroless base (shell + libc av
 | `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.21` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.21` | `self-report` | `—` | ? unprobed |
-
-## ociger-pg17-pgrdf-pgck — `v0.1.11`
-
-PostgreSQL 17 + pgRDF + pgCK preloaded by default (`shared_preload_libraries=pgrdf,pgck`). No NATS. Distroless base.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:55db4d2e315cfca5ae665c2de97de798ee6ab323c0d4204e06e1066b991e6f67`  | 2026-06-18 22:02:24 |
-| arm64 | `sha256:5920eac8e3968abcb815358a4fd8d727d6238df328d507c2ddd27decfc7f84a4`  | 2026-06-18 22:02:24 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:v0.1.11`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:54db9acc38fca4e649b899e166896134e58c76d04b6cec86a1377c6a8a1697d5`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf-pgck/`](./bundles/bundle-pg17-pgrdf-pgck/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf-pgck |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.21` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.21` | `self-report` | `—` | ? unprobed |
-
-## ociger-pg17-pgrdf — `v0.1.11`
-
-PostgreSQL 17 + pgRDF. No pgCK. Distroless base.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:14426407c2ff58e4e2eb3cf460fc920158cdff99766ab8ba13a26356080808fd`  | 2026-06-18 22:01:53 |
-| arm64 | `sha256:3b9e5c9e054f241e9553eeed77c20c15a8eca5e870b5140b71ec09c7954c87d0`  | 2026-06-18 22:01:53 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:v0.1.11`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:ccdf92bce1dcffc9a09d0f3729a2cfcfe5d79e52c438aa6c6cf25e02974f5c58`                                                         |
-| Role               | `prod`                                                                |
-| Production use     | Production-ready                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/bundle-pg17-pgrdf/`](./bundles/bundle-pg17-pgrdf/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-pg17-pgrdf |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-
-## ociger-core-pg17-nats-micro — `v0.1.2`
-
-PostgreSQL 17 + NATS + NATS WSS. No extensions. Scratch base.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:d6fda67f4b21be6ced4e91a96b960b3e2a3b0f65fc1e5849af89f72d2a3b9e31`  | 2026-05-28 19:00:27 |
-| arm64 | `sha256:277f68b09d1150bfcf1f9aea6e0e00f6c2f2079b35db6091903400928a976253`  | 2026-05-28 19:00:27 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:v0.1.2`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:988e81a04bce15bf255ab19e48987eefd0e77f6791a2c158d48946fc1e3fc7a1`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/core-pg17-nats-micro/`](./bundles/core-pg17-nats-micro/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats-micro |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-
-## ociger-core-pg17-nats — `v0.1.2`
-
-PostgreSQL 17 + NATS + NATS WSS. No extensions. Distroless base.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:dc303a2ac9bca965fa1505129dc69e235b362caf34c6a673e64ed09a14566ffe`  | 2026-05-28 19:00:58 |
-| arm64 | `sha256:ce350151e83e9e615063e85f06e2d09f5bc685b9fb64aeee75f5d645b97c42c7`  | 2026-05-28 19:00:58 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-nats:v0.1.2`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:07e2a997518a87e3a4a9071de8c0dd3a6c55897e20a2862ecbaaf4c05d552e7b`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/core-pg17-nats/`](./bundles/core-pg17-nats/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-nats |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-
-## ociger-core-pg17-micro — `v0.1.2`
-
-PostgreSQL 17 only. No extensions, no NATS. Scratch base. Smallest postgres bundle.
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:aeb2d7245c5cebcad24f3ffcc56ec29fcfe8d55fd647191dbf3396835bb84eaf`  | 2026-05-28 18:59:52 |
-| arm64 | `sha256:58b7e9a8c6d523cec72d7e3b9305c94ad31c6a12b806830eb8a03c43eebeba8f`  | 2026-05-28 18:59:52 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-micro:v0.1.2`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:25aca368af58b68d7f07cb837a43f8a20e5b0efff0a5ba5cde5047ae1ccfab11`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/core-pg17-micro/`](./bundles/core-pg17-micro/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-micro |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-
-## ociger-core-pg17-min — `core-pg17-v0.1.3`
-
-PostgreSQL 17 only. Distroless base (shell + libc available).
-
-| arch  | Platform digest                                                            | Created (UTC)       |
-|-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:d81998763e41a04603eb1235ab1c13bd1cb0b355e8ab4ed84e345bc40c7c877a`  | 2026-05-28 18:59:54 |
-| arm64 | `sha256:858a43bad4089840976c9720815f7c9667347ad210edeb10ff020659cbc4d813`  | 2026-05-28 18:59:54 |
-
-|                    |                                                                          |
-|--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-core-pg17-min:core-pg17-v0.1.3`                                                            |
-| Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:e68908d1e6fbefd2c2723670e96f98a6f0faaecf26cd5858e8ada52bb5af6dc5`                                                         |
-| Role               | `—`                                                                |
-| Production use     | —                                                              |
-| Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
-| Source bundle      | [`bundles/core-pg17/`](./bundles/core-pg17/)                                          |
-| Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-core-pg17-min |
-
-**Version composition** — expected layer map (bundle.yaml); live confirmation re-attaches on the next gated build for this digest.
-
-| Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
-|-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.20` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.20` | `self-report` | `—` | ? unprobed |
 
 ## Pin policy
 
