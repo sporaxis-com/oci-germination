@@ -150,6 +150,20 @@ Any of these returning **404 Not Found** or rejection blocks the bump. Surface i
 
 GitHub Actions takes over. There is no step in this flow that requires `docker buildx --push`, `docker push`, `gh release create`, or any local-token credential.
 
+### What CI enforces before it attests (the `ck-allinone` gate sequence)
+
+Every gate below runs **before** SLSA attestation; a failure at any gate skips attest and (Rule 2) leaves `LATEST.md` where it was. The base `pg18-pgrdf-pgck-nats-micro` release runs its own build + boot smoke + attest; `ck-allinone` (`build-bundles.yml`) then runs, in order:
+
+1. **Build the native gating image** (`:ci-gate`, no push) — all subsequent gates run against this exact image.
+2. **Python-free** — prod images MUST contain zero `python`/`uvicorn`/`fastapi`/`venv` (the `pgck-bench` sibling is the only sanctioned Python home and skips this).
+3. **Smoke** (`scripts/smoke-ck-allinone.sh`) — pg + pgRDF + pgCK + pgcrypto install/self-report, NATS core + WSS, cklib byte-set, governed `ckp.dispatch` seal round-trip, native outbox drain, typed-edge non-vacuous, PID 1 = s6-svscan, **and the ⑧ privilege gate**: no exposed longrun (`nats-server`, `httpd`) runs as uid 0, and the auth-callout seed file is not world-readable (v0.7.31+ hardening; see `_WIP/AUDIT.CK-ALLINONE`).
+4. **Verify auth-callout identity path** (`scripts/verify-callout.sh`) — boots a self-contained test realm and proves the server-derived identity chain over `/wss`: a verified token seals `by: urn:ckp:participant:<sub>`; anonymous/forged/foreign-id-segment are all denied (v0.7.30+).
+5. **Build + push the multi-arch manifest** to GHCR (`linux/amd64,linux/arm64`), cache scoped to `github.sha`, `GIT_SHA` stamped into `org.opencontainers.image.revision` per arch.
+6. **Cross-arch parity gate** — every published arch must share (a) `image.revision` **equal to the building commit**, (b) the same runtime glibc, and (c) the **same maximum `GLIBC_*` floor across every shipped extension `.so`**. This is the check that catches an upstream built per-arch on mismatched bases (the v0.7.30 `pgrdf.so` 2.34-vs-2.39 divergence); a revision+libc check alone would miss it. *Implementation note (learned v0.7.31): resolve each arch's own manifest digest from the index and `docker create` by that — `docker create --platform` off the shared index digest fails with "cannot overwrite digest"; and because push precedes this gate, a failure here can leave an unattested `:latest` until the fixed re-cut attests.*
+7. **SLSA Build Provenance v1 attest** (`actions/attest-build-provenance`) — keyless, GitHub-OIDC-signed, pushed as an OCI referrer.
+8. **Publish the GitHub Release.**
+9. (async) **`update-latest-md.yml`** advances `LATEST.md` + `composition.confirmed.json` only after `gh attestation verify` accepts every digest (Rules 2, 3, 11).
+
 ### Per-bundle tag format
 
 | Bundle | Tag prefix |
