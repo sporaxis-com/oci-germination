@@ -220,13 +220,21 @@ jobs:
         if: ${{ steps.extract.outputs.bundle == 'ck-allinone' }}
         run: |
           set -euo pipefail
-          IMG="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}@${{ steps.push.outputs.digest }}"
+          REPO="${{ env.REGISTRY }}/sporaxis-com/ociger-${{ steps.extract.outputs.bundle }}"
+          IMG="$REPO@${{ steps.push.outputs.digest }}"
           rev_ref=""; libc_ref=""; floor_ref=""
+          # Resolve each arch's OWN manifest digest from the index, then create by
+          # that distinct digest (NOT `docker create --platform` off the shared
+          # index digest, which conflicts in the local store: "cannot overwrite
+          # digest"). Extraction via docker cp does not execute the image, so a
+          # cross-arch manifest on an amd64 runner is fine.
+          IDX="$(docker buildx imagetools inspect "$IMG" --raw)"
           for arch in amd64 arm64; do
             tri=$([ "$arch" = amd64 ] && echo x86_64 || echo aarch64)
-            rev="$(docker buildx imagetools inspect "$IMG" --format '{{ json .Image }}' 2>/dev/null \
-                   | python3 -c "import sys,json;d=json.load(sys.stdin);k=[x for x in d if 'linux/$arch' in x];print(d[k[0]]['config']['Labels'].get('org.opencontainers.image.revision','') if k else '')")"
-            cid="$(docker create --platform "linux/$arch" "$IMG")"
+            adig="$(printf '%s' "$IDX" | python3 -c "import sys,json;d=json.load(sys.stdin);print(next(m['digest'] for m in d['manifests'] if m.get('platform',{}).get('architecture')=='$arch'))")"
+            ref="$REPO@$adig"
+            cid="$(docker create "$ref")"   # pulls the arch image
+            rev="$(docker image inspect "$ref" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
             docker cp "$cid:/lib/$tri-linux-gnu/libc.so.6" "/tmp/libc-$arch" >/dev/null
             rm -rf "/tmp/lib-$arch"; mkdir -p "/tmp/lib-$arch"
             docker cp "$cid:/usr/lib/postgresql/18/lib/." "/tmp/lib-$arch/" >/dev/null
