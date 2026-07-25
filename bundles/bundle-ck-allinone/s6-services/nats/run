@@ -1,2 +1,7 @@
 #!/bin/sh
-exec /usr/local/bin/nats-server --config /etc/nats/nats-server.conf
+# v0.7.31 hardening: drop to the non-root `nats` user (base /etc/passwd). NATS
+# binds unprivileged ports (4222/9222) and only reads its config, so it needs no
+# root. s6-setuidgid ships with s6-overlay at /command. The auth-callout account
+# SEED is never read here — it lives in pgck.conf (postgres-only) + the pgCK
+# bgworker's GUC; the broker only verifies minted JWTs against the issuer pubkey.
+exec /command/s6-setuidgid nats /usr/local/bin/nats-server --config /etc/nats/nats-server.conf

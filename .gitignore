@@ -56,3 +56,9 @@ examples/hello-kernel/.run-*
 
 # Playwright MCP snapshot scratch (local browser-tool artifact)
 .playwright-mcp/
+
+# stray go-build artifacts (built binaries land in repo root)
+/ociger-ck-identity
+/ociger-pg-launcher
+/ociger-supervisor
+/ociger-static-server

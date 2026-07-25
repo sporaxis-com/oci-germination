@@ -44,6 +44,12 @@ const (
 	workerUser      = "pgck_worker"
 	natsCorePort    = 4222
 	natsWssPort     = 9222
+	// pgck.conf carries the account SEED and is read ONLY by postgres (uid 999),
+	// which pulls it via include_if_exists; the in-process pgCK bgworker then
+	// consumes the GUCs. v0.7.31 hardening chowns it to postgres so the
+	// dropped-to-non-root nats/httpd users cannot read the seed.
+	postgresUID = 999
+	postgresGID = 999
 )
 
 // oidcConfig is the operator-supplied realm the callout verifies bearers against.
@@ -63,7 +69,7 @@ func main() {
 		if err := writeFileMode(natsConf, anonNatsServerConf(), 0o644); err != nil {
 			log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
 		}
-		if err := writeFileMode(pgckConf, anonPgckConf(), 0o644); err != nil {
+		if err := writePgckConf(pgckConf, anonPgckConf()); err != nil {
 			log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
 		}
 		log.Printf("ociger-ck-identity: no OIDC realm (OCIGER_OIDC_*) → ANONYMOUS mode (callout off); wrote %s + %s", natsConf, pgckConf)
@@ -79,16 +85,15 @@ func main() {
 		log.Fatalf("ociger-ck-identity: worker password: %v", err)
 	}
 
-	// Both configs are 0644: postgres reads pgck.conf via include_if_exists as
-	// its own uid (999), which is not root and not in root's group — a 0640
-	// root-owned file is unreadable to it and postgres silently treats the
-	// include as "missing". /run is not externally reachable and the container is
-	// single-tenant, so world-readable inside the container is acceptable (the
-	// same posture as nats-server.conf, which already carries the worker password).
+	// nats-server.conf stays 0644 — the dropped-to-non-root `nats` user must read
+	// it (issuer pubkey + worker password; NOT the seed). pgck.conf carries the
+	// account SEED, so writePgckConf writes it 0640 and chowns it to postgres
+	// (999) — the only reader (postgres → include_if_exists → GUC → in-process
+	// pgCK bgworker). The dropped `nats`/`httpd` users cannot read the seed.
 	if err := writeFileMode(natsConf, natsServerConf(pub, workerPass), 0o644); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
 	}
-	if err := writeFileMode(pgckConf, pgckSecretsConf(seed, workerPass, oidc), 0o644); err != nil {
+	if err := writePgckConf(pgckConf, pgckSecretsConf(seed, workerPass, oidc)); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
 	}
 
@@ -233,6 +238,18 @@ func writeFileMode(path, contents string, mode os.FileMode) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(contents), mode)
+}
+
+// writePgckConf writes the pgck secrets fragment 0640 and chowns it to postgres
+// (999) — the sole reader. The chown is mandatory: postgres reads the file via
+// include_if_exists as uid 999, so a root-owned 0640 file would be unreadable to
+// it (→ include skipped → no seed: the original v0.7.30 boot bug). This keeps the
+// account seed out of reach of the dropped-to-non-root nats/httpd services.
+func writePgckConf(path, contents string) error {
+	if err := writeFileMode(path, contents, 0o640); err != nil {
+		return err
+	}
+	return os.Chown(path, postgresUID, postgresGID)
 }
 
 func getenv(key, fallback string) string {

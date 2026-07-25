@@ -28,12 +28,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.20-pg18-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.22-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.20-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.22-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.20.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.22.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -79,8 +79,8 @@ RUN set -eux; \
   cp -L /usr/share/postgresql/18/psqlrc.sample /out/usr/share/postgresql/18/psqlrc.sample; \
   cp -L /usr/share/postgresql/18/extension/plpgsql.control /out/usr/share/postgresql/18/extension/plpgsql.control; \
   cp -L /usr/share/postgresql/18/extension/plpgsql--*.sql /out/usr/share/postgresql/18/extension/; \
-  printf 'root:x:0:0:root:/root:/bin/sh\npostgres:x:999:999:postgres:/var/lib/postgresql:/bin/sh\n' > /out/etc/passwd; \
-  printf 'root:x:0:\npostgres:x:999:\n' > /out/etc/group; \
+  printf 'root:x:0:0:root:/root:/bin/sh\npostgres:x:999:999:postgres:/var/lib/postgresql:/bin/sh\nnats:x:998:998:nats:/nonexistent:/bin/false\nhttpd:x:997:997:httpd:/nonexistent:/bin/false\n' > /out/etc/passwd; \
+  printf 'root:x:0:\npostgres:x:999:\nnats:x:998:\nhttpd:x:997:\n' > /out/etc/group; \
   ldd /usr/lib/postgresql/18/bin/postgres | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/18/bin/initdb | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \
   ldd /usr/lib/postgresql/18/lib/plpgsql.so | tr -s '[:space:]' '\n' | grep '^/' | sort -u | xargs -r -I '{}' cp --parents '{}' /out; \

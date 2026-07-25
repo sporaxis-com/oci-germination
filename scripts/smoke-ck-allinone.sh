@@ -567,6 +567,38 @@ if [[ "$PID1" != "s6-svscan" ]]; then
 fi
 echo "[ck-allinone] ✓ PID 1 = $PID1"
 
+echo "[ck-allinone] ⑧ privilege gate — exposed longruns NON-root + seed not world-readable (v0.7.31 hardening, AUDIT.CK-ALLINONE)"
+# Reads /proc via the image's /bin/sh (shell builtins + cat only — no grep/awk in
+# the image); parses on the host. Asserts nats-server + busybox httpd do NOT run
+# as uid 0, and that the account-seed file is 0640 owned by postgres(999) so the
+# dropped-to-non-root services cannot read it.
+PROC=$(docker exec "$CONTAINER_NAME" /bin/sh -c '
+for p in /proc/[0-9]*; do
+  [ -r "$p/comm" ] || continue
+  comm=$(cat "$p/comm" 2>/dev/null)
+  uid=""
+  while read k v _rest; do [ "$k" = "Uid:" ] && { uid=$v; break; }; done < "$p/status" 2>/dev/null
+  cmd=$(cat "$p/cmdline" 2>/dev/null)
+  echo "$comm|$uid|$cmd"
+done' 2>/dev/null)
+if echo "$PROC" | awk -F"|" '$1=="nats-server" && $2=="0"{f=1} END{exit !f}'; then
+  echo "✗ nats-server runs as ROOT (uid 0) — R1 regression"; echo "$PROC" | grep "^nats-server"; exit 1
+fi
+if echo "$PROC" | awk -F"|" '$3 ~ /httpd/ && $2=="0"{f=1} END{exit !f}'; then
+  echo "✗ busybox httpd runs as ROOT (uid 0) — R2 regression"; echo "$PROC" | grep "httpd" | head -1; exit 1
+fi
+SEED=$(docker exec "$CONTAINER_NAME" /bin/busybox ls -ln /run/ck-identity/pgck.conf 2>/dev/null)
+SPERM=$(echo "$SEED" | awk '{print $1}'); SUID=$(echo "$SEED" | awk '{print $3}')
+if [[ -n "$SEED" ]]; then
+  if [[ "$(printf '%s' "$SPERM" | cut -c8)" == "r" ]]; then
+    echo "✗ seed file pgck.conf is world/other-readable ($SPERM) — R3 regression"; exit 1
+  fi
+  if [[ "$SUID" != "999" ]]; then
+    echo "✗ seed file pgck.conf not owned by postgres(999): uid=$SUID — R3 regression"; exit 1
+  fi
+fi
+echo "[ck-allinone] ✓ nats-server + httpd NON-root; seed pgck.conf ${SPERM:-<none>} owner ${SUID:-?} (postgres-only)"
+
 echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "[ck-allinone] all checks passed"

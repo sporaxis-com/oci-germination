@@ -25,7 +25,7 @@ extensions:
     source: https://www.postgresql.org/docs/18/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.6.20
+    version: 0.6.22
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
@@ -67,7 +67,7 @@ components:
     source: ./cmd/ociger-ck-identity
     runs_as: s6 oneshot (before nats + postgres)
     description: >-
-      Boot-time NATS auth-callout provisioner (v0.7.30), GATED on an OIDC realm. When OCIGER_OIDC_JWKS + OCIGER_OIDC_ISSUER + OCIGER_OIDC_AUDIENCE are supplied it activates the callout: resolves the callout ACCOUNT nkey (OCIGER_NATS_ACCOUNT_SEED if supplied → stable, else minted per boot) + the pgck_worker bypass password, then writes /etc/nats/nats-server.conf (auth_callout issuer = account pubkey, pgck_worker the sole auth_user) and /run/ck-identity/pgck.conf (pgck.nats_account_seed + worker-cred pgck.nats_url + pgck.oidc_*) from ONE account, so the seed pgCK signs admittance with always matches the issuer the broker verifies. With no realm it writes an anonymous config (no callout, no seed → pgCK responder not started), so adopters without an IdP still dispatch. postgres pulls the fragment via include_if_exists (0644, readable by uid 999) every boot. The seed is NEVER baked into the image.
+      Boot-time NATS auth-callout provisioner (v0.7.30), GATED on an OIDC realm. When OCIGER_OIDC_JWKS + OCIGER_OIDC_ISSUER + OCIGER_OIDC_AUDIENCE are supplied it activates the callout: resolves the callout ACCOUNT nkey (OCIGER_NATS_ACCOUNT_SEED if supplied → stable, else minted per boot) + the pgck_worker bypass password, then writes /etc/nats/nats-server.conf (auth_callout issuer = account pubkey, pgck_worker the sole auth_user) and /run/ck-identity/pgck.conf (pgck.nats_account_seed + worker-cred pgck.nats_url + pgck.oidc_*) from ONE account, so the seed pgCK signs admittance with always matches the issuer the broker verifies. With no realm it writes an anonymous config (no callout, no seed → pgCK responder not started), so adopters without an IdP still dispatch. postgres pulls the fragment via include_if_exists; v0.7.31 hardening writes pgck.conf 0640 and chowns it to postgres(999) so the dropped-to-non-root nats/httpd services cannot read the seed. The seed is NEVER baked into the image.
     security: >-
       The account seed is the admittance-signing secret — anyone holding it can forge verified identities. It lives only in tmpfs (/run) + process memory; per-boot ephemeral by default. Operators wanting a stable account set OCIGER_NATS_ACCOUNT_SEED (delivered like the OIDC config); it is honored verbatim.
 
@@ -78,7 +78,8 @@ components:
 
 supervisor:
   binary: s6-overlay v3.2.3.0
-  description: s6-svscan PID 1 runs the ck-identity oneshot FIRST (provisions the auth-callout account → nats-server.conf + /run/ck-identity/pgck.conf), then supervises postgres + nats + httpd as longruns (both depend on ck-identity). The pgCK 0.4.24-nats .so owns the inbound dispatch, the auth-callout responder, and the ckp.outbox drain in-process (no Go relay). Bootstrap SQL runs in `postgres --single` inside the launcher on first boot.
+  description: >-
+    s6-svscan PID 1 (root — s6-overlay init) runs the ck-identity oneshot FIRST (provisions the auth-callout account → nats-server.conf + /run/ck-identity/pgck.conf), then supervises postgres (drops to uid 999), nats (v0.7.31 hardening drops to non-root `nats` via s6-setuidgid), and httpd (drops to non-root `httpd`) as longruns (both depend on ck-identity). No exposed longrun runs as root; smoke ⑧ enforces it. The pgCK 0.4.24-nats .so owns the inbound dispatch, the auth-callout responder, and the ckp.outbox drain in-process (no Go relay). Bootstrap SQL runs in `postgres --single` inside the launcher on first boot.
 
 platforms:
   - linux/amd64

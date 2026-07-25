@@ -1,2 +1,4 @@
 #!/bin/sh
-exec /bin/busybox httpd -f -p 8000 -h /app
+# v0.7.31 hardening: drop to the non-root `httpd` user (base /etc/passwd).
+# busybox httpd serves static /app on :8000 (unprivileged); no root needed.
+exec /command/s6-setuidgid httpd /bin/busybox httpd -f -p 8000 -h /app
