@@ -15,7 +15,7 @@
 8. **Voice inconsistencies between upstream `LATEST.md` and actual attestation state immediately, do not accept them.** If an upstream repo's `LATEST.md` advertises a version (e.g. pgRDF's `LATEST.md` listing `0.5.9-pg17-*` as the head) but `gh attestation verify` returns 404 or rejects that digest, that is a verifiable inconsistency. The agent surfaces it in the same turn the discrepancy is found, refuses to consume that version, and recommends one of: bug-report NOTIFY to the upstream, hold-back to the last attested version of theirs, or user-driven explicit override. Silent acceptance of an unattested upstream artifact is prohibited.
 9. **Version numbers are monotonic and never reused.** A failed CI run at `vN.M.K` retires that number permanently. The next attempt is `vN.M.(K+1)`, never a re-push of `vN.M.K`. Do not `git push origin :refs/tags/<name>` to delete a failed tag; do not `git tag -f` to move one. The tag stays where the failure happened; the fix is a new commit with a new tag. Gaps in the version sequence are expected — they are explained by the corresponding FAILED entries in `CHANGELOG.md`.
 10. **`CHANGELOG.md` records every release attempt, successful or failed; git tags exist only for successful attempts.** Failed attempts (CI failure, attestation failure, smoke failure, etc.) get a FAILED entry in `CHANGELOG.md` describing what was tried and why it failed. They do **not** get a git tag. The version number is permanently spent. `CHANGELOG.md` is the audit trail for gaps in the tag sequence; `LATEST.md` is the audit trail for what's live in production.
-11. **`LATEST.md` carries a TEST-CONFIRMED version composition per bundle, not just intended pins.** Each advertised bundle block ends with a *Version composition* table whose **Expected** column is the layer map read from that bundle's `bundle.yaml` (base image, postgres, every extension incl. its native `.version()`, and every runtime/web component with its mapping — `cklib`→`/app/cklib`, busybox httpd→`:8000`, the dispatch relay, …) and whose **Confirmed (real)** column is read back from the *running, attested* image. A native self-report that disagrees with its installed `extversion` is shown as `⚠ stale` with a footnote to its open NOTIFY — surfaced, never silently reconciled. Expected and confirmed must agree (or be a tracked, footnoted upstream deviation) for the entry to stand.
+11. **`LATEST.md` carries a TEST-CONFIRMED version composition per bundle, not just intended pins.** Each advertised bundle block ends with a *Version composition* table whose **Expected** column is the layer map read from that bundle's `bundle.yaml` (base image, postgres, every extension incl. its native `.version()`, and every runtime/web component with its mapping — `cklib`→`/app/cklib`, busybox httpd→`:8000`, the `ck-identity` boot-provisioner, …) and whose **Confirmed (real)** column is read back from the *running, attested* image. A native self-report that disagrees with its installed `extversion` is shown as `⚠ stale` with a footnote to its open NOTIFY — surfaced, never silently reconciled. Expected and confirmed must agree (or be a tracked, footnoted upstream deviation) for the entry to stand.
 12. **Public-repo disclosure discipline — coordinate in the open, carefully.** This repository and its issues, pull requests, commit messages, and committed docs are **PUBLIC**. Cross-repo coordination (fleet-internal or to upstreams) MAY use public GitHub issues/PRs — **only for content that is safe to disclose**. It MUST NOT expose: internal/confidential component codenames, the contents or paths of gitignored `_WIP/` drafts, security-sensitive internals (key material, unmitigated attack surface, embargoed fixes), or private roadmap / customer / partner detail. Confidential coordination stays in the gitignored `_WIP/` NOTIFIES. When unsure, keep it in `_WIP/` and use neutral language publicly. A leak is a **confidentiality incident**, not a style nit.
 
 Everything else in this document explains how those rules are enforced.
@@ -86,21 +86,15 @@ Every artifact this repo publishes — all 11 OCI bundles — is built and pushe
 
 ## What's enforced
 
+The active **CKP v3.9 / pg18** wave (the retired pg17 + core-pg17 matrix stays published on GHCR but is frozen — pgRDF/pgCK are pg18-only — and no longer released):
+
 | Surface | Build / push performed by | Provenance |
 |---|---|---|
-| `ghcr.io/sporaxis-com/ociger-ck-allinone:<ver>` | `Build OCI Bundles` workflow on `release-ck-allinone-v*` tag push | Pre-policy (no attestation yet); will be [SLSA Build Provenance v1](https://slsa.dev/spec/v1.0/provenance) via [`actions/attest-build-provenance@v1`](https://github.com/actions/attest-build-provenance) after the pipeline lands |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-static-cklib:<ver>` | same workflow on `release-pg17-pgrdf-pgck-static-cklib-v*` | same |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro:<ver>` | `pg17-pgrdf-pgck-nats-micro-release.yml` on every `main` push | same |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats:<ver>` | `pg17-pgrdf-pgck-nats-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck:<ver>` | `pg17-pgrdf-pgck-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-pg17-pgrdf:<ver>` | `pg17-pgrdf-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-core-pg17-nats-micro:<ver>` | `core-pg17-nats-micro-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-core-pg17-nats:<ver>` | `core-pg17-nats-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-core-pg17-micro:<ver>` | `core-pg17-micro-release.yml` | same |
-| `ghcr.io/sporaxis-com/ociger-core-pg17-min:<ver>` | `core-pg17-release.yml` | same |
-| `LATEST.md` at the repo root | (pending) `update-latest-md` workflow on successful `workflow_run` of the above | Refuses to advance unless `gh attestation verify` accepts every digest it's about to publish |
+| `ghcr.io/sporaxis-com/ociger-ck-allinone:<ver>` | `Build OCI Bundles` (`build-bundles.yml`) on a `release-ck-allinone-v*` tag — Python-free + smoke (incl. the ⑧ privilege gate) + verify-callout + cross-arch parity gate all pass **before** push+attest (see "What CI enforces" above) | **[SLSA Build Provenance v1](https://slsa.dev/spec/v1.0/provenance)** (live) via [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance) — `gh attestation verify oci://…:<ver> --repo sporaxis-com/oci-germination` returns 0 |
+| `ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:<ver>` | `pg18-pgrdf-pgck-nats-micro-release.yml` on a `pg18-pgrdf-pgck-nats-micro-v*` tag (both arches built on trixie + boot smoke, then attest) | **SLSA Build Provenance v1** (live) |
+| `LATEST.md` at the repo root | `update-latest-md.yml` on a successful `workflow_run` of the above | Refuses to advance unless `gh attestation verify` accepts every digest it advertises |
 
-If `gh attestation verify` rejects an artifact (post-bootstrap), `LATEST.md` stays where it was. That's how a workstation push gets caught — it cannot produce a valid GitHub-issued OIDC attestation.
+If `gh attestation verify` rejects an artifact, `LATEST.md` stays where it was. That's how a workstation push (or a burned tag whose gate failed before attest) gets caught — it cannot produce a valid GitHub-issued OIDC attestation.
 
 ## Verifying a release locally (post-attestation)
 
@@ -169,15 +163,9 @@ Every gate below runs **before** SLSA attestation; a failure at any gate skips a
 | Bundle | Tag prefix |
 |---|---|
 | `ck-allinone` | `release-ck-allinone-v*` |
-| `pg17-pgrdf-pgck-static-cklib` | `release-pg17-pgrdf-pgck-static-cklib-v*` |
-| `pg17-pgrdf-pgck-nats-micro` | `release-pg17-pgrdf-pgck-nats-micro-v*` |
-| `pg17-pgrdf-pgck-nats` | `release-pg17-pgrdf-pgck-nats-v*` |
-| `pg17-pgrdf-pgck` | `release-pg17-pgrdf-pgck-v*` |
-| `pg17-pgrdf` | `release-pg17-pgrdf-v*` |
-| `core-pg17-nats-micro` | `release-core-pg17-nats-micro-v*` |
-| `core-pg17-nats` | `release-core-pg17-nats-v*` |
-| `core-pg17-micro` | `release-core-pg17-micro-v*` |
-| `core-pg17-min` | `release-core-pg17-v*` |
+| `pg18-pgrdf-pgck-nats-micro` (base) | `pg18-pgrdf-pgck-nats-micro-v*` |
+
+> The retired pg17 + core-pg17 matrix (`release-pg17-*`, `release-core-pg17-*`) is **frozen** — pgRDF/pgCK are pg18-only from 0.6.20 / 0.4.x (og#9). Those tag prefixes still resolve to their last attested images on GHCR but are no longer cut. See `versions.yaml` `frozen:`.
 
 See [`SEMANTIC-VERSIONING.md`](./SEMANTIC-VERSIONING.md) for the 2-number vs 3-number tag form and patch derivation rules.
 
