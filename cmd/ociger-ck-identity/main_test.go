@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -188,5 +190,158 @@ func TestAnonModeConfigs(t *testing.T) {
 	}
 	if !strings.Contains(pg, "pgck.nats_url = 'nats://127.0.0.1:4222'") {
 		t.Fatalf("anon pgck.conf must set an anonymous nats_url:\n%s", pg)
+	}
+}
+
+// ── og#29: the JWKS is a DOCUMENT, injected at start, never fetched ──────────
+
+const goodJWKS = `{"keys":[{"kty":"OKP","crv":"Ed25519","kid":"k1","x":"AAAA"}]}`
+
+func TestValidateJWKS_RefusesURL(t *testing.T) {
+	for _, u := range []string{
+		"https://id.example.test/realms/R/protocol/openid-connect/certs",
+		"http://id.example.test/certs",
+	} {
+		if _, err := validateJWKS(u); err == nil {
+			t.Fatalf("a URL MUST be refused, got nil error for %q", u)
+		} else if !strings.Contains(err.Error(), "URL") {
+			t.Fatalf("the refusal must name the URL mistake, got: %v", err)
+		}
+	}
+}
+
+func TestValidateJWKS_RefusesNonJWKS(t *testing.T) {
+	for name, in := range map[string]string{
+		"empty":        "",
+		"not json":     "hello",
+		"json no keys": `{"issuer":"x"}`,
+		"empty keys":   `{"keys":[]}`,
+	} {
+		if _, err := validateJWKS(in); err == nil {
+			t.Fatalf("%s MUST be refused", name)
+		}
+	}
+}
+
+func TestValidateJWKS_AcceptsAndCompacts(t *testing.T) {
+	got, err := validateJWKS("  {\n \"keys\" : [ {\"kty\":\"OKP\",\"crv\":\"Ed25519\"} ]\n}  ")
+	if err != nil {
+		t.Fatalf("a well-formed JWKS must be accepted: %v", err)
+	}
+	if strings.ContainsAny(got, "\n\r") {
+		t.Fatalf("the value must be one line (postgresql.conf), got %q", got)
+	}
+}
+
+// A realm may legitimately publish several key types — the bench realm ships
+// EdDSA + RS256 + RSA-OAEP — so ONE usable key is enough and the rest are not
+// our business to reject.
+func TestValidateJWKS_AcceptsMixedSetWithOneEd25519(t *testing.T) {
+	mixed := `{"keys":[{"kty":"RSA","n":"x","e":"AQAB"},{"kty":"OKP","crv":"Ed25519","x":"abc"},{"kty":"RSA","alg":"RSA-OAEP"}]}`
+	if _, err := validateJWKS(mixed); err != nil {
+		t.Fatalf("a mixed JWKS carrying one Ed25519 key must be accepted: %v", err)
+	}
+}
+
+// The negative control this gate exists for. Without it an RSA-only document
+// is accepted, pgck.oidc_jwks is written, this process logs "token verify: ON",
+// and pgCK — whose verifier is EdDSA-only — loads no key and admits everyone
+// anonymously. Two layers reporting healthy, nobody verified.
+func TestValidateJWKS_RefusesRSAOnlyRealm(t *testing.T) {
+	for name, in := range map[string]string{
+		// Shaped like an Azure Entra key set: well-formed, ≥1 key, all RS256.
+		"entra-style RSA only": `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"a","n":"x","e":"AQAB"},{"kty":"RSA","use":"sig","alg":"RS256","kid":"b","n":"y","e":"AQAB"}]}`,
+		"EC only":              `{"keys":[{"kty":"EC","crv":"P-256","x":"a","y":"b"}]}`,
+		// OKP but the wrong curve — pgCK keeps only crv:Ed25519.
+		"OKP wrong curve": `{"keys":[{"kty":"OKP","crv":"X25519","x":"a"}]}`,
+	} {
+		if _, err := validateJWKS(in); err == nil {
+			t.Fatalf("%s MUST be refused: pgCK would load no key and silently degrade to anonymous", name)
+		}
+	}
+}
+
+func TestResolveJWKS_FileWinsOverEnv(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "jwks.json")
+	if err := os.WriteFile(p, []byte(goodJWKS), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OCIGER_OIDC_JWKS_FILE", p)
+	t.Setenv("OCIGER_OIDC_JWKS", `{"keys":[{"kty":"IGNORED"}]}`)
+
+	doc, src, err := resolveJWKS()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(doc, "Ed25519") {
+		t.Fatalf("the FILE must win over the env value, got %q", doc)
+	}
+	if !strings.Contains(src, p) {
+		t.Fatalf("the source must name the file, got %q", src)
+	}
+}
+
+func TestResolveJWKS_MissingFileIsRefusedNotSilent(t *testing.T) {
+	t.Setenv("OCIGER_OIDC_JWKS_FILE", "/nonexistent/jwks.json")
+	t.Setenv("OCIGER_OIDC_JWKS", "")
+	if _, _, err := resolveJWKS(); err == nil {
+		t.Fatal("an unreadable JWKS file MUST be an error, never a silent skip")
+	}
+}
+
+// The failure ladder: an unusable JWKS omits the GUC entirely — never a URL,
+// never a partial value — while the realm stays ACTIVE so the responder starts
+// and pgCK degrades to the anonymous tier.
+func TestPgckSecretsConf_OmitsJWKSWhenUnusable(t *testing.T) {
+	out := pgckSecretsConf("SEED", "pw", oidcConfig{issuer: "iss", audience: "aud"})
+	if strings.Contains(out, "pgck.oidc_jwks") {
+		t.Fatalf("an unusable JWKS MUST omit the GUC entirely, got:\n%s", out)
+	}
+	for _, want := range []string{"pgck.oidc_issuer", "pgck.oidc_audience", "pgck.nats_account_seed"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("omitting the JWKS must not drop %s:\n%s", want, out)
+		}
+	}
+}
+
+func TestPgckSecretsConf_WritesJWKSDocumentWhenUsable(t *testing.T) {
+	out := pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"})
+	if !strings.Contains(out, "pgck.oidc_jwks = '"+goodJWKS+"'") {
+		t.Fatalf("the document must be written verbatim, got:\n%s", out)
+	}
+	// header + seed + nats_url + jwks + issuer + audience
+	if got := strings.Count(out, "\n"); got != 6 {
+		t.Fatalf("expected 6 lines (header + 5 settings), got %d:\n%s", got, out)
+	}
+}
+
+// A URL keeps the bundle in REALM mode (responder up, verify off) rather than
+// dropping to ANONYMOUS mode, which would also disable the responder.
+func TestResolveOIDC_URLStaysRealmButOmitsJWKS(t *testing.T) {
+	t.Setenv("OCIGER_OIDC_JWKS_FILE", "")
+	t.Setenv("OCIGER_OIDC_JWKS", "https://id.example.test/certs")
+	t.Setenv("OCIGER_OIDC_ISSUER", "https://id.example.test/realms/R")
+	t.Setenv("OCIGER_OIDC_AUDIENCE", "aud")
+
+	c, realm := resolveOIDC()
+	if !realm {
+		t.Fatal("a URL must NOT drop the bundle out of realm mode")
+	}
+	if c.jwks != "" {
+		t.Fatalf("a URL must resolve to an EMPTY document, got %q", c.jwks)
+	}
+}
+
+// The contract, asserted rather than assumed: this command performs no egress.
+func TestNoEgressInThisPackage(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, banned := range []string{`"net/http"`, "http.Get(", "http.Client{"} {
+		if strings.Contains(string(src), banned) {
+			t.Fatalf("ociger-ck-identity MUST NOT perform egress; found %s", banned)
+		}
 	}
 }

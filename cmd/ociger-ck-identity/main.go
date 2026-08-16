@@ -26,8 +26,10 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -53,10 +55,19 @@ const (
 )
 
 // oidcConfig is the operator-supplied realm the callout verifies bearers against.
+//
+// `jwks` is the JWKS **DOCUMENT** (JSON), never a URL. pgCK verifies bearers
+// in-memory and performs no egress in the live path, so a URL in pgck.oidc_jwks
+// can never verify anything — the responder starts, token verify stays off, and
+// every connection lands in the anonymous tier (og#29). The document is INJECTED
+// at container start; this provisioner never fetches it, because it runs before
+// nats and postgres and a network call here would put DNS and realm availability
+// into the boot path of a bundle that is otherwise egress-free.
 type oidcConfig struct {
-	jwks     string
-	issuer   string
-	audience string
+	jwks       string // the JWKS document, or "" when it could not be resolved
+	jwksSource string // where it came from, for the boot log
+	issuer     string
+	audience   string
 }
 
 func main() {
@@ -101,18 +112,127 @@ func main() {
 	if strings.TrimSpace(os.Getenv("OCIGER_NATS_ACCOUNT_SEED")) != "" {
 		source = "operator-supplied"
 	}
-	log.Printf("ociger-ck-identity: OIDC realm %q → auth-callout ACTIVE; account %s [%s]; wrote %s + %s", oidc.issuer, pub, source, natsConf, pgckConf)
+	verify := "OFF (anonymous tier) — pgck.oidc_jwks omitted"
+	if oidc.jwks != "" {
+		verify = fmt.Sprintf("ON — JWKS document from %s (%d bytes, never fetched)", oidc.jwksSource, len(oidc.jwks))
+	}
+	log.Printf("ociger-ck-identity: OIDC realm %q → auth-callout ACTIVE; account %s [%s]; token verify: %s; wrote %s + %s",
+		oidc.issuer, pub, source, verify, natsConf, pgckConf)
 }
 
 // resolveOIDC reads the realm config. All three fields are required — a partial
 // config is a misconfiguration, treated as "no realm" (anonymous mode).
+//
+// The JWKS is resolved to a DOCUMENT (§resolveJWKS). A configured-but-unusable
+// JWKS does NOT drop the bundle out of realm mode: the callout still activates
+// and pgCK reports "token verify: off -> anonymous". That is the deliberate
+// degrade — service alive, identity off, one legible log line. Dropping to
+// anonymous mode instead would also disable the responder, and pairing an
+// unusable value with strict admittance would refuse every connection.
 func resolveOIDC() (oidcConfig, bool) {
 	c := oidcConfig{
-		jwks:     strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS")),
 		issuer:   strings.TrimSpace(os.Getenv("OCIGER_OIDC_ISSUER")),
 		audience: strings.TrimSpace(os.Getenv("OCIGER_OIDC_AUDIENCE")),
 	}
-	return c, c.jwks != "" && c.issuer != "" && c.audience != ""
+	configured := strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS")) != "" ||
+		strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS_FILE")) != ""
+
+	doc, src, err := resolveJWKS()
+	if err != nil {
+		// Never write a value that cannot verify. Omit the GUC and say why.
+		log.Printf("ociger-ck-identity: JWKS UNUSABLE — %v", err)
+		log.Printf("ociger-ck-identity: pgck.oidc_jwks will be OMITTED; the callout activates and " +
+			"pgCK reports token verify OFF (anonymous tier). Deliver the JWKS DOCUMENT at container " +
+			"start via OCIGER_OIDC_JWKS_FILE (preferred) or OCIGER_OIDC_JWKS. This bundle never fetches it.")
+	}
+	c.jwks, c.jwksSource = doc, src
+
+	return c, configured && c.issuer != "" && c.audience != ""
+}
+
+// resolveJWKS returns the JWKS DOCUMENT, injected at container start.
+//
+// Order: OCIGER_OIDC_JWKS_FILE (a path placed into the container) wins over
+// OCIGER_OIDC_JWKS (the document inline). A URL in either is refused by name —
+// it is the single most likely mistake and it fails silently downstream.
+//
+// This function performs NO network I/O and this package imports no HTTP client.
+// That is a contract, not an implementation detail: see the type comment.
+func resolveJWKS() (doc string, source string, err error) {
+	if p := strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS_FILE")); p != "" {
+		b, readErr := os.ReadFile(p)
+		if readErr != nil {
+			return "", "", fmt.Errorf("OCIGER_OIDC_JWKS_FILE=%s: %w", p, readErr)
+		}
+		v, vErr := validateJWKS(string(b))
+		if vErr != nil {
+			return "", "", fmt.Errorf("OCIGER_OIDC_JWKS_FILE=%s: %w", p, vErr)
+		}
+		return v, "file " + p, nil
+	}
+	if s := strings.TrimSpace(os.Getenv("OCIGER_OIDC_JWKS")); s != "" {
+		v, vErr := validateJWKS(s)
+		if vErr != nil {
+			return "", "", fmt.Errorf("OCIGER_OIDC_JWKS: %w", vErr)
+		}
+		return v, "env OCIGER_OIDC_JWKS", nil
+	}
+	return "", "", fmt.Errorf("no JWKS supplied (set OCIGER_OIDC_JWKS_FILE or OCIGER_OIDC_JWKS)")
+}
+
+// validateJWKS accepts only a JWKS document carrying at least one key, and
+// returns it collapsed to a single line (postgresql.conf values are one line).
+func validateJWKS(raw string) (string, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return "", fmt.Errorf("empty")
+	}
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		return "", fmt.Errorf("carries a URL, not the JWKS document — pgCK never fetches " +
+			"(no egress in the live path); deliver the JSON itself")
+	}
+	var parsed struct {
+		Keys []struct {
+			Kty string `json:"kty"`
+			Crv string `json:"crv"`
+		} `json:"keys"`
+	}
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return "", fmt.Errorf("not valid JSON: %w", err)
+	}
+	if len(parsed.Keys) == 0 {
+		return "", fmt.Errorf("parsed as JSON but carries no \"keys\" — not a JWKS")
+	}
+	// A JWKS pgCK cannot USE is worse than none: it would be written to
+	// pgck.oidc_jwks, this process would log "token verify: ON", and pgCK would
+	// then load zero keys and admit every connection to the anonymous tier —
+	// two layers both reporting healthy while nobody is ever verified.
+	//
+	// pgCK's verifier is EdDSA-only: it refuses any header whose `alg` is not
+	// EdDSA, and its JWKS parser keeps only kty:OKP + crv:Ed25519, skipping
+	// RSA/EC entries and erroring when none remain. Realms legitimately publish
+	// mixed key sets — the bench realm ships EdDSA + RS256 + RSA-OAEP — so this
+	// requires at least ONE usable key rather than rejecting the others.
+	//
+	// An RSA-only set (Azure Entra signs RS256 and offers no EdDSA) is refused
+	// here, by name, at boot — instead of silently degrading at admission.
+	usable := 0
+	for _, k := range parsed.Keys {
+		if k.Kty == "OKP" && k.Crv == "Ed25519" {
+			usable++
+		}
+	}
+	if usable == 0 {
+		return "", fmt.Errorf("carries %d key(s) but none are Ed25519 (kty:OKP, crv:Ed25519) — "+
+			"pgCK's auth-callout verifies EdDSA only and would load no key from this document, "+
+			"leaving every connection anonymous. An RSA-only realm (e.g. Azure Entra, RS256) "+
+			"cannot ground this bundle", len(parsed.Keys))
+	}
+	compact := &bytes.Buffer{}
+	if err := json.Compact(compact, []byte(s)); err != nil {
+		return "", fmt.Errorf("could not compact: %w", err)
+	}
+	return compact.String(), nil
 }
 
 // resolveAccount returns the account seed (canonical string form, e.g. "SA...")
@@ -214,13 +334,20 @@ func pgckSecretsConf(seed, workerPass string, oidc oidcConfig) string {
 		User:   url.UserPassword(workerUser, workerPass),
 		Host:   fmt.Sprintf("127.0.0.1:%d", natsCorePort),
 	}
-	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
-pgck.nats_account_seed = '%s'
-pgck.nats_url = '%s'
-pgck.oidc_jwks = '%s'
-pgck.oidc_issuer = '%s'
-pgck.oidc_audience = '%s'
-`, sqlQuote(seed), sqlQuote(u.String()), sqlQuote(oidc.jwks), sqlQuote(oidc.issuer), sqlQuote(oidc.audience))
+	b := &strings.Builder{}
+	fmt.Fprintf(b, "# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.\n")
+	fmt.Fprintf(b, "pgck.nats_account_seed = '%s'\n", sqlQuote(seed))
+	fmt.Fprintf(b, "pgck.nats_url = '%s'\n", sqlQuote(u.String()))
+	// Omitted entirely when the document could not be resolved — never a URL and
+	// never a partial value. An absent GUC degrades to the anonymous tier; a
+	// present-but-unusable one would combine with strict admittance to refuse
+	// every connection on the instance.
+	if oidc.jwks != "" {
+		fmt.Fprintf(b, "pgck.oidc_jwks = '%s'\n", sqlQuote(oidc.jwks))
+	}
+	fmt.Fprintf(b, "pgck.oidc_issuer = '%s'\n", sqlQuote(oidc.issuer))
+	fmt.Fprintf(b, "pgck.oidc_audience = '%s'\n", sqlQuote(oidc.audience))
+	return b.String()
 }
 
 // anonPgckConf renders the no-realm fragment: an anonymous nats_url and NO
