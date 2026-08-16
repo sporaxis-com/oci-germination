@@ -28,12 +28,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.22-pg18-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.31-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.22-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.31-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.22.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.31.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -41,12 +41,19 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.24-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.71-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.24.sql; \
-  test -s /work/ontology/task.ttl; \
-  test -s /work/ontology/goal.ttl
+  test -s /work/share/extension/pgck--0.4.71.sql; \
+  # CKP v3.11 RESTRUCTURED the shipped ontology: the flat v3.9 set (task.ttl,
+  # goal.ttl) is GONE, replaced by a versioned tree — core plus the wave: and
+  # lex: modules a kernel adopts. Asserting the real paths is what makes this
+  # a consulted pin rather than a decorative one; the old assertion would have
+  # failed the build, which is the gate working. init.sql still reads the v3.9
+  # paths and must be re-derived before this base ships into ck-allinone.
+  test -s /work/ontology/v3.11/core.ttl; \
+  test -s /work/ontology/v3.11/modules/wave.ttl; \
+  test -s /work/ontology/v3.11/modules/lexicon.ttl
 
 
 FROM nats:2.14.2-scratch AS nats_source

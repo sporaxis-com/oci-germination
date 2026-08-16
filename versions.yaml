@@ -21,11 +21,13 @@
 # consumable and MUST NOT be pinned (PROVENANCE.md rule 7).
 
 components:
-  # Latest consumable upstream pins (verified pullable + attested 2026-06-13).
-  pgrdf:      "0.6.22"         # latest published release (styk-tv/pgrdf); attested head. 0.6.14 = out-of-the-box at-scale staged ingest (T1–T5 GUCs); 0.6.16+ adds carve_graph. .so/GUC-only — NO schema change + NO base/SONAME move across 0.6.6→0.6.17 (still postgres:17.4-bookworm).
-  pgck:       "0.4.24"         # latest published release (styk-tv/pgck); install-from-zero. 0.4.24: server-derived dispatch identity end-to-end — the -nats build answers the NATS auth-callout ($SYS.REQ.USER.AUTH), binds the broker-enforced verified <sub> to ckp.requester before ckp.dispatch, and owns the in-extension inbound dispatch (F1-inbound, hop 4) — so the Go ociger-pgck-relay is deleted (double-dispatch otherwise). New GUC pgck.nats_account_seed. Closes pgCK#10.
-  pgck_native: "pgck 0.4.24"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
-  cklib:      "1.5.5"          # dispatch-only client + typed-edge forms (TE-10) + G5a gov-door + create() target_kernel pass-through fix (1.5.1 stripped it → Task seal failed under v0.7.20's real enforcement); latest published release. Requires pgCK >= 0.4.13.
+  # Latest consumable upstream pins. Each verified pullable at the EXACT oras tag
+  # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
+  # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
+  pgrdf:      "0.6.31"         # published 2026-08-16 (styk-tv/pgRDF v0.6.31). NB the dev rig at capture time still mounted 0.6.25; 0.6.31 pinned on direction.
+  pgck:       "0.4.71"         # published 2026-08-16 (styk-tv/pgck v0.4.71) — the version the curated dev substrate runs (Cargo.toml + control + tag all 0.4.71). Crosses CKP v3.9 → v3.11 from our last pin (0.4.24): 0.4.64 refuses an unattributed write rather than minting it, 0.4.65 adds sealed proof obligations, 0.4.66 plural proofs. Adoption moves to a sealed core#Adoption INSTANCE — init.sql's ckp.adopt_kernel_ttl path and the smoke's v3.9 assertions must be re-derived, NOT pin-flipped.
+  pgck_native: "pgck 0.4.71"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  cklib:      "1.5.10"         # published 2026-08-11 (ConceptKernel/CK.Lib.Js v1.5.10) — the version pgck.localhost serves from /cklib/. Adds tokenProvider (#14 Mode A: app-owned bearer forwarded into CONNECT, never validated client-side). Smoke ⑤± byte-set contract is pinned to the 1.5.5 file list and must be re-checked against this set.
   nats:       "2.14.2"
   postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
@@ -34,7 +36,7 @@ components:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.2"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats) — v0.2.2 drops the bookworm Go builder (golang:1.24-trixie)
+  pg18-pgrdf-pgck-nats-micro: "v0.2.3"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.31 + pgCK 0.4.71-nats). v0.2.3 = the 0.6.31/0.4.71 wave; v0.2.2 dropped the bookworm Go builder (golang:1.24-trixie).
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

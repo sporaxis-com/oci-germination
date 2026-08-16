@@ -2,7 +2,7 @@ spec_version: 0.4
 name: bundle-pg18-pgrdf-pgck-nats-micro
 role: prod
 never_prod: false
-description: PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners
+description: PostgreSQL 18 (trixie) micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners
 
 # Hand-crafted Dockerfile: pgRDF consumed as an ORAS-pulled artifact.
 # Generator currently only emits the older curl-from-GH-releases pattern;
@@ -11,15 +11,19 @@ skip_render: true
 
 image:
   registry: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
-  pg_major: 17
-  base_image: postgres:17-bookworm
+  pg_major: 18
+  # The postgres binaries/share are COPYed from this stage (Dockerfile
+  # `FROM postgres:18-trixie AS postgres_source`); the shipped image is scratch.
+  # These four lines read as authoritative and were bound to nothing until the
+  # strict loader landed — they declared pg17/bookworm for a pg18/trixie build.
+  base_image: postgres:18-trixie
   final_image: scratch
   runtime_profile: micro
 extensions:
   pgrdf:
-    version: 0.6.19
+    version: 0.6.31
   pgck:
-    version: 0.4.20
+    version: 0.4.71
 platforms:
   - linux/amd64
   - linux/arm64

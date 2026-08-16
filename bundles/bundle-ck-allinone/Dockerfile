@@ -5,9 +5,9 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.2
+ARG PG_BASE_VERSION=v0.2.3
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.5.5
+ARG CKLIB_VERSION=1.5.10
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
@@ -17,26 +17,28 @@ ARG BUNDLE_VERSION=dev
 # "amd64 and arm64 came from one commit" is enforced, not asserted.
 ARG GIT_SHA=unknown
 
-# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS) ───
-# v0.2.1 bumps pgCK 0.4.23-nats → 0.4.24-nats. 0.4.24's -nats build owns the
-# in-extension INBOUND DISPATCH (F1-inbound, hop 4): it reads the broker-enforced
-# verified identity from the subject and sets ckp.requester before ckp.dispatch,
-# and answers the NATS auth-callout. That fully supersedes the Go
-# ociger-pgck-relay's inbound bridge — so the relay is DELETED at v0.7.30
-# (keeping it would double-dispatch every inbound action). Base still on
-# postgres:18-trixie (glibc 2.41; pgRDF 0.6.20 arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.2 AS pg_base
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.31 + pgCK 0.4.71-nats + NATS) ───
+# v0.2.3 carries the 0.6.31 / 0.4.71 wave — the components the curated pgck.localhost
+# substrate runs. 0.4.71 crosses CKP v3.9 → v3.11 from the 0.4.24 this bundle last
+# shipped: the artifact's ontology is now a versioned tree (core + the wave:/lex:
+# modules a kernel ADOPTS via a sealed core#Adoption instance), and the flat
+# task.ttl/goal.ttl the v3.9 demo loop read are GONE. The -nats build still owns the
+# in-extension inbound dispatch and the auth-callout, so the Go relay stays deleted.
+# Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.3 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.5.5 — the dispatch-only client, verified TYPED-SEALED live against the
-# v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop).
-# Ships EXACTLY: LICENSE, README.md, ck.js (the L2 dispatch facade —
-# CK/ConceptKernel/ckOn, the instance.*/kernel.* op→verb table, the
-# v1.5.5 entry point), ck-client.js (vendored transport, grammar-agnostic
-# result.kernel.<K>.> subscription), ck-store.js (the typed-instance cache),
-# vendor/{msgpack,nats.ws}.js. No index.html, no ck-page (the legacy
-# console is gone). The smoke ⑤± gate asserts this exact file set.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.5.5 AS cklib_source
+# 1.5.10 — the version pgck.localhost itself serves from /cklib/, so the browser
+# and the door run one library. Adds tokenProvider (#14 Mode A): the app owns the
+# bearer and cklib forwards it into the CONNECT frame, parsing claims for display
+# but never validating — admission stays the substrate's call.
+# Ships: LICENSE, README.md, ck.js (the L2 dispatch facade — CK/ConceptKernel/ckOn,
+# the instance.*/kernel.* op→verb table), ck-client.js (vendored transport,
+# grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance
+# cache), vendor/{msgpack,nats.ws}.js. No index.html.
+# ⚠ The smoke ⑤± gate asserts the 1.5.5 file set BYTE-FOR-BYTE — re-derive it
+# against this set before cutting, or the gate fails on a correct bundle.
+FROM ghcr.io/conceptkernel/ck-lib-js:1.5.10 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -102,7 +104,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.9 all-in-one minimal — PG18 + pgRDF 0.6.20 + pgCK 0.4.24-nats + NATS + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
+LABEL org.opencontainers.image.description="CKP v3.11 all-in-one minimal — PG18 (trixie) + pgRDF 0.6.31 + pgCK 0.4.71-nats + NATS + cklib 1.5.10, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"

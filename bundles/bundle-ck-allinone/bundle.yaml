@@ -15,7 +15,7 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 18
   base_image: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
-  base_image_version: v0.2.2
+  base_image_version: v0.2.3
   final_image: scratch
   runtime_profile: micro
 
@@ -25,11 +25,11 @@ extensions:
     source: https://www.postgresql.org/docs/18/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.6.22
+    version: 0.6.31
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.4.24
+    version: 0.4.71
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
     contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
@@ -46,7 +46,7 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.5.5
+    version: 1.5.10
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
     description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
@@ -75,6 +75,70 @@ components:
   # dispatch in-.so (F1-inbound, hop 4: ckp.requester from the broker-enforced
   # verified identity), the auth-callout responder, and the ckp.outbox drain —
   # so the Go bridge is deleted (keeping it would double-dispatch).
+
+runtime_inputs:
+  # Declared, typed inputs the operator delivers AT CONTAINER START. Nothing here
+  # is baked into the image, and nothing here is fetched by the container: this
+  # bundle performs no egress at boot. The generator validates this block; the
+  # smoke gate asserts the resulting GUC. See SPEC.OCI.BUNDLE §runtime_inputs.
+  oidc_jwks:
+    required: false            # absent → anonymous tier; the bundle still boots
+    form: document             # the JSON itself, NEVER a URL
+    media_type: application/jwk-set+json
+    delivery: [file, env]      # OCIGER_OIDC_JWKS_FILE (preferred) | OCIGER_OIDC_JWKS
+    env: OCIGER_OIDC_JWKS
+    file_env: OCIGER_OIDC_JWKS_FILE
+    consumed_by: ociger-ck-identity
+    placed_at: /run/ck-identity/pgck.conf   # as pgck.oidc_jwks, 0640, owned by postgres
+    never_baked: true
+    no_egress: true
+    description: >-
+      The realm's JWKS DOCUMENT. pgCK verifies bearers in-memory with no egress in
+      the live path, so a URL can never verify anything — it leaves token verify off
+      and every connection in the anonymous tier (og#29). ociger-ck-identity refuses a
+      URL by name, and on any failure OMITS pgck.oidc_jwks entirely rather than writing
+      a value that cannot verify: an absent GUC degrades to anonymous-but-alive, while
+      an unusable one combined with strict admittance would refuse every connection.
+    gate: >-
+      SELECT current_setting('pgck.oidc_jwks') begins with '{' and parses as a JWKS
+      with >=1 key; the boot log reads "token verify: ON". Negative: deliver a URL —
+      the GUC is absent, the container is alive, and the log names the refusal.
+  oidc_issuer:
+    required: false
+    form: scalar
+    env: OCIGER_OIDC_ISSUER
+    consumed_by: ociger-ck-identity
+    never_baked: true
+  oidc_audience:
+    required: false
+    form: scalar
+    env: OCIGER_OIDC_AUDIENCE
+    consumed_by: ociger-ck-identity
+    never_baked: true
+  nats_account_seed:
+    required: false            # absent → minted per boot (ephemeral, single-instance)
+    form: scalar
+    env: OCIGER_NATS_ACCOUNT_SEED
+    consumed_by: ociger-ck-identity
+    placed_at: /run/ck-identity/pgck.conf
+    never_baked: true
+    secret: true
+    description: >-
+      The admittance-signing account nkey seed. Holding it is authority to forge
+      verified identities, so it lives only in tmpfs and process memory. Supply it to
+      pin a stable issuer across boots or across replicas; omit it and each boot mints
+      its own, which is correct for a single instance and wrong for two.
+  ck_participant_password:
+    required: false            # absent → the role exists but cannot log in
+    form: scalar
+    env: OCIGER_CK_PARTICIPANT_PASSWORD
+    consumed_by: ociger-pg-launcher
+    never_baked: true
+    secret: true
+    description: >-
+      SCRAM password for ck_participant, the only externally-exposed role. MUST be set
+      before exposing the instance; without it the v3.9 role floor is present but the
+      role cannot authenticate.
 
 supervisor:
   binary: s6-overlay v3.2.3.0
