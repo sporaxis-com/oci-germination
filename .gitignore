@@ -62,3 +62,10 @@ examples/hello-kernel/.run-*
 /ociger-pg-launcher
 /ociger-supervisor
 /ociger-static-server
+
+# CK-org wave documents + specs — local exchange only, never public.
+# CKP.*.VISION-REQUIREMENTS-STATEMENT.md, SPEC.*, bench notes.
+CK*.md
+SPEC*.md
+# Exception: component engineering specs are tracked (pgRDF's form, CK-org 16.5).
+!specs/SPEC.oci-germination.*.md
