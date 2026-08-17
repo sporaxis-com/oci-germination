@@ -101,8 +101,16 @@ runtime_inputs:
       an unusable one combined with strict admittance would refuse every connection.
     gate: >-
       SELECT current_setting('pgck.oidc_jwks') begins with '{' and parses as a JWKS
-      with >=1 key; the boot log reads "token verify: ON". Negative: deliver a URL —
-      the GUC is absent, the container is alive, and the log names the refusal.
+      carrying at least one kty:OKP / crv:Ed25519 key; the boot log reads
+      "token verify: ON". ">=1 key" is NOT sufficient and this gate said so until
+      2026-08-17: pgCK's auth-callout verifies EdDSA only and keeps solely
+      OKP/Ed25519, so an RSA-only realm (e.g. Azure Entra, RS256) satisfied the old
+      wording, wrote the GUC, logged verify ON, and left every connection anonymous.
+      Negatives, each of which must leave the container ALIVE with the GUC absent and
+      the refusal named in the log: (a) deliver a URL, (b) deliver an RSA-only or
+      EC-only key set, (c) deliver kty:OKP with a curve other than Ed25519.
+      A mixed set carrying one Ed25519 key MUST be accepted — the bench realm ships
+      EdDSA + RS256 + RSA-OAEP, so rejecting the extras would be wrong.
   oidc_issuer:
     required: false
     form: scalar
