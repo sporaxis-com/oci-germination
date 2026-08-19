@@ -75,12 +75,12 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + NATS (4222) + NA
 
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
-| `base image` | base | `postgres:17-bookworm` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `17` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.19` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.19` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.20` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.20` | `self-report` | `—` | ? unprobed |
+| `base image` | base | `postgres:18-trixie` | `FROM` | gate-before-push | ✓ gated |
+| `postgresql` | engine | `18` | `server` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.32` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.32` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.76` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.76` | `self-report` | `—` | ? unprobed |
 
 ## Pin policy
 
