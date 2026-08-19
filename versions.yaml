@@ -24,10 +24,10 @@ components:
   # Latest consumable upstream pins. Each verified pullable at the EXACT oras tag
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
-  pgrdf:      "0.6.31"         # published 2026-08-16 (styk-tv/pgRDF v0.6.31). NB the dev rig at capture time still mounted 0.6.25; 0.6.31 pinned on direction.
-  pgck:       "0.4.71"         # published 2026-08-16 (styk-tv/pgck v0.4.71) — the version the curated dev substrate runs (Cargo.toml + control + tag all 0.4.71). Crosses CKP v3.9 → v3.11 from our last pin (0.4.24): 0.4.64 refuses an unattributed write rather than minting it, 0.4.65 adds sealed proof obligations, 0.4.66 plural proofs. Adoption moves to a sealed core#Adoption INSTANCE — init.sql's ckp.adopt_kernel_ttl path and the smoke's v3.9 assertions must be re-derived, NOT pin-flipped.
-  pgck_native: "pgck 0.4.71"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
-  cklib:      "1.5.10"         # published 2026-08-11 (ConceptKernel/CK.Lib.Js v1.5.10) — the version pgck.localhost serves from /cklib/. Adds tokenProvider (#14 Mode A: app-owned bearer forwarded into CONNECT, never validated client-side). Smoke ⑤± byte-set contract is pinned to the 1.5.5 file list and must be re-checked against this set.
+  pgrdf:      "0.6.32"         # published 2026-08-17 (styk-tv/pgRDF v0.6.32). Verified pullable + attested both arches (pgrdf-bundle:0.6.32-pg18-{amd64,arm64}), 2026-08-19.
+  pgck:       "0.4.76"         # published 2026-08-17 (styk-tv/pgck v0.4.76) — required so the concept kernel this repo recorded through can be served from an updated, attested container. Verified pullable + attested both arches (pgck:0.4.76-pg18-nats-{amd64,arm64}), 2026-08-19.
+  pgck_native: "pgck 0.4.76"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  cklib:      "1.5.12"         # published 2026-08-18 (ConceptKernel/CK.Lib.Js v1.5.12) — the version pgck.localhost serves from /cklib/. Verified pullable + attested, 2026-08-19. Smoke ⑤± byte-set contract is pinned to the 1.5.5 file list and must be re-checked against this set.
   nats:       "2.14.2"
   postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
@@ -36,7 +36,7 @@ components:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.3"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.31 + pgCK 0.4.71-nats). v0.2.3 = the 0.6.31/0.4.71 wave; v0.2.2 dropped the bookworm Go builder (golang:1.24-trixie).
+  pg18-pgrdf-pgck-nats-micro: "v0.2.4"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.32 + pgCK 0.4.76-nats). v0.2.4 = the 0.6.32/0.4.76 wave (built+smoked locally 2026-08-19); v0.2.3 was never actually cut — the prior pin was decorative, consulted by nothing, and would have failed FROM on first pull. v0.2.2 dropped the bookworm Go builder (golang:1.24-trixie).
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the
