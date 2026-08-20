@@ -1,12 +1,12 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:6c26918476ce75a66d074b81db92ce84212fbb1a2f95c3af3c96028967761a12",
+  "index_digest": "sha256:eaca3d679c8b999f30597eae80b5832df85dc61e5a582dcdaf8afda19dfe1056",
   "all_match": true,
   "layers": [
     {
       "layer": "base image",
       "kind": "base",
-      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.2",
+      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.5",
       "mapping": "FROM",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -18,7 +18,7 @@
       "expected": "18",
       "mapping": "server",
       "probe": "postgres",
-      "confirmed": "18.4 (Debian 18.4-1.pgdg13+1)",
+      "confirmed": "18.6 (Debian 18.6-1.pgdg13+2)",
       "verdict": "✓"
     },
     {
@@ -33,37 +33,37 @@
     {
       "layer": "pgrdf",
       "kind": "extension",
-      "expected": "0.6.22",
+      "expected": "0.6.33",
       "mapping": "CREATE EXTENSION",
       "probe": "pgrdf_ext",
-      "confirmed": "0.6.22",
+      "confirmed": "0.6.33",
       "verdict": "✓"
     },
     {
       "layer": "pgrdf.version()",
       "kind": "native",
-      "expected": "0.6.22",
+      "expected": "0.6.33",
       "mapping": "self-report",
       "probe": "pgrdf_fn",
-      "confirmed": "0.6.22",
+      "confirmed": "0.6.33",
       "verdict": "✓"
     },
     {
       "layer": "pgck",
       "kind": "extension",
-      "expected": "0.4.24",
+      "expected": "0.4.77",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "0.4.24",
+      "confirmed": "0.4.77",
       "verdict": "✓"
     },
     {
       "layer": "pgck.version()",
       "kind": "native",
-      "expected": "0.4.24",
+      "expected": "0.4.77",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "pgck 0.4.24",
+      "confirmed": "pgck 0.4.77",
       "verdict": "✓"
     },
     {
@@ -87,7 +87,7 @@
     {
       "layer": "cklib",
       "kind": "component",
-      "expected": "1.5.5",
+      "expected": "1.5.12",
       "mapping": "/app/cklib",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.32",
-  "confirmed_at": "2026-07-25T13:45:13Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.34",
+  "confirmed_at": "2026-08-20T15:59:42Z"
 }
