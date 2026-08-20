@@ -380,8 +380,8 @@ echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + FAIL-CLOSED refusal (
 # holds on a virgin substrate"); a governed ok:true here would be the OLD #46
 # vacuous-allowance escape, shipping an anonymous write path.
 # What this gate still proves POSITIVELY: the in-extension inbound dispatch is
-# alive end-to-end — PUB input.kernel.pgck.action.<verb> → a typed
-# result.kernel.pgck.<verb> reply — and the reply is a real refusal, not the
+# alive end-to-end — PUB input.kernel.demo.action.<verb> → a typed
+# result.kernel.demo.<verb> reply — and the reply is a real refusal, not the
 # 4-arg CI-A-2 stub ("verb not governed yet") and not a relation-missing crash
 # (the v0.7.14 escape class). The GOVERNED-SEAL positive proof moved to ⑤g,
 # where an ATTRIBUTED participant seals a v3.11-root type through the door.
@@ -390,8 +390,8 @@ DISP_OUT=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
 import { WebSocket } from "ws";
 const url = "ws://'"$CONTAINER_NAME"':9222";
 const verb = "task.create";
-const inSubj = "input.kernel.pgck.action." + verb;
-const outSubj = "result.kernel.pgck." + verb;
+const inSubj = "input.kernel.demo.action." + verb;
+const outSubj = "result.kernel.demo." + verb;
 const ws = new WebSocket(url);
 const t = setTimeout(() => { console.log("FAIL timeout"); process.exit(2); }, 8000);
 ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
@@ -449,7 +449,7 @@ echo "[ck-allinone] ✓ §B4 dispatch bridge GOVERNED seal round-trip ($DISP_OUT
 echo "[ck-allinone] ⑤d2 §B4b forge-deny — a client CANNOT publish a governed *.sealed event"
 # v0.7.30 INTERIM mitigation (pending the auth-callout wiring, og#19). An
 # anonymous connection may still publish to input.*; without this deny a client
-# could PUB input.kernel.pgck.action.Task.sealed and forge a sealed fact (+ by:
+# could PUB input.kernel.demo.action.Task.sealed and forge a sealed fact (+ by:
 # header). nats-server.conf maps the anon connection to a deny of that exact
 # pattern. SUPERSEDED once pgck.nats_account_seed is delivered — the auth-callout
 # anon tier is subscribe-only (no publish at all), a strictly stronger deny.
@@ -465,7 +465,7 @@ let s = false;
 ws.on("message", (d) => { const x = d.toString();
   if (x.startsWith("INFO ") && !s) { s = true;
     const p = "{\"forged\":true}";
-    ws.send("PUB input.kernel.pgck.action.Task.sealed " + p.length + "\r\n" + p + "\r\n"); }
+    ws.send("PUB input.kernel.demo.action.Task.sealed " + p.length + "\r\n" + p + "\r\n"); }
   else if (x.startsWith("-ERR") && /Permissions Violation/.test(x)) { clearTimeout(t); console.log("DENIED"); process.exit(0); } });
 EOF
   node /w/f.mjs' 2>&1 | tail -1)
@@ -473,7 +473,7 @@ if [[ "$FORGE_OUT" != "DENIED" ]]; then
   echo "✗ §B4b forge-deny FAILED — client could forge a *.sealed event: $FORGE_OUT" >&2
   exit 1
 fi
-echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.pgck.action.*.sealed)"
+echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.demo.action.*.sealed)"
 
 echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advances the kernel epoch (CKP v3.9 §5)"
 # The adoption-critical path: a participant (not superuser) governs a type
@@ -515,7 +515,7 @@ if [[ "$EPOCH_AFTER" -le "$EPOCH_BEFORE" ]]; then
 fi
 echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
 
-echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.pgck.<class>.sealed (NO host bridge)"
+echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.demo.<class>.sealed (NO host bridge)"
 # v0.7.18+ : every seal enqueues a ckp.outbox row; pgCK's in-.so native drain
 # publishes it onto event.kernel.<K>.<class>.sealed. This gate proves the
 # bundle moves sealed events onto NATS BY ITSELF — the regression class
@@ -573,7 +573,7 @@ DRAIN_OK=$(docker wait "$PROBE_NAME" >/dev/null 2>&1; docker logs "$PROBE_NAME" 
 docker rm -f "$PROBE_NAME" >/dev/null 2>&1 || true
 if [[ "$DRAIN_OK" != OK* ]]; then
   echo "✗ native outbox drain failed: $DRAIN_OK"
-  echo "   (a seal did not emit an event on event.kernel.pgck.* — pgCK's in-.so drain isn't running)"
+  echo "   (a seal did not emit an event on event.kernel.demo.* — pgCK's in-.so drain isn't running)"
   docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck|nats|drain' | tail -15
   exit 1
 fi

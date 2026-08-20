@@ -310,12 +310,41 @@ func TestPgckSecretsConf_WritesJWKSDocumentWhenUsable(t *testing.T) {
 	if !strings.Contains(out, "pgck.oidc_jwks = '"+goodJWKS+"'") {
 		t.Fatalf("the document must be written verbatim, got:\n%s", out)
 	}
-	if !strings.Contains(out, "pgck.kernels = 'pgck'") {
-		t.Fatalf("the canonical lowercase kernel pin must be written (0.4.77 refuses the compiled-in 'pgCK' default), got:\n%s", out)
+	// Both planes, same kernel: the seal lands where the wire serves. When these
+	// diverged, a verified dispatch was refused "type not admitted" against a
+	// bare-core kernel while the adopted surface sat elsewhere.
+	if !strings.Contains(out, "ckp.project = 'demo'") || !strings.Contains(out, "pgck.kernels = 'demo'") {
+		t.Fatalf("both kernel pins must be written and must name the same kernel, got:\n%s", out)
 	}
-	// header + kernels + seed + nats_url + jwks + issuer + audience
-	if got := strings.Count(out, "\n"); got != 7 {
-		t.Fatalf("expected 7 lines (header + 6 settings), got %d:\n%s", got, out)
+	// header + project + kernels + seed + nats_url + jwks + issuer + audience
+	if got := strings.Count(out, "\n"); got != 8 {
+		t.Fatalf("expected 8 lines (header + 7 settings), got %d:\n%s", got, out)
+	}
+}
+
+// The two kernel-naming planes must agree in BOTH modes, and every generated
+// subject must use that same kernel. Divergence is silent and expensive: the
+// wire serves one kernel, seals land in another, and a verified dispatch is
+// refused "type not admitted" while the adopted surface sits out of reach.
+func TestKernelPinsAgreeAcrossPlanesAndModes(t *testing.T) {
+	kernel := "demo"
+	for _, tc := range []struct {
+		mode string
+		conf string
+	}{
+		{"realm", pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"})},
+		{"anon", anonPgckConf()},
+	} {
+		for _, want := range []string{"ckp.project = '" + kernel + "'", "pgck.kernels = '" + kernel + "'"} {
+			if !strings.Contains(tc.conf, want) {
+				t.Fatalf("%s mode: missing %q in:\n%s", tc.mode, want, tc.conf)
+			}
+		}
+	}
+	// The anon publish-deny guards the kernel actually served; a stale segment
+	// here denies a subject nobody publishes, so the forge-deny guards nothing.
+	if !strings.Contains(anonNatsServerConf(), "input.kernel."+kernel+".action.*.sealed") {
+		t.Fatalf("anon publish-deny must guard the served kernel %q:\n%s", kernel, anonNatsServerConf())
 	}
 }
 

@@ -6,7 +6,7 @@
 # auth-callout end-to-end over WSS — no external IdP. Mirrors pgCK's
 # scripts/dev-callout-e2e.sh (SPEC.SECURITY §7), asserting:
 #
-#   A  valid token → dispatch on input.kernel.pgck.id.<sub>.action.task.create
+#   A  valid token → dispatch on input.kernel.demo.id.<sub>.action.task.create
 #                    → result ok:true AND the sealed event carries the verified
 #                      identity (urn:ckp:participant:<sub>)  [hops 4→6]
 #   B  no token    → anonymous: cannot publish input.*  (subscribe-only)
@@ -17,8 +17,8 @@
 set -euo pipefail
 
 IMAGE="${1:-ociger-ck-allinone:v0.7.30-local}"
-NET="ckcallout-net"
-C="ckcallout-verify"
+NET="og-ckcallout-net"
+C="og-ckcallout-verify"
 ISS="https://realm.test/"
 AUD="ck-allinone"
 SUB="alice-e2e"
@@ -102,8 +102,14 @@ function run(token, subj, payload, collectMs) {
           ? 'CONNECT {"verbose":false,"pedantic":false,"protocol":1,"headers":true,"auth_token":"' + token + '"}\r\n'
           : 'CONNECT {"verbose":false,"pedantic":false,"protocol":1,"headers":true}\r\n';
         ws.send(c);
-        ws.send("SUB result.kernel.pgck.> 1\r\n");
-        ws.send("SUB event.kernel.pgck.> 2\r\n");
+        // EXACTLY the two subjects the callout grants per listed kernel —
+        // sub_allow is result.kernel.<K>.> and event.kernel.<K>.>, so a wider
+        // "event.>" is refused with a Permissions Violation and A2 would then
+        // never hear the seal it asserts (measured 2026-08-20). This works
+        // only because ckp.project and pgck.kernels name the SAME kernel;
+        // see kernelPins in cmd/ociger-ck-identity.
+        ws.send("SUB result.kernel.demo.> 1\r\n");
+        ws.send("SUB event.kernel.demo.> 2\r\n");
         if (payload) setTimeout(() => ws.send("PUB " + subj + " " + payload.length + "\r\n" + payload + "\r\n"), 400);
       }
       if (x.includes("Permissions Violation") || x.includes("Authorization Violation")) denied = true;
@@ -113,13 +119,19 @@ function run(token, subj, payload, collectMs) {
 }
 (async () => {
   const out = {};
-  const bad    = await run(TOKV, "input.kernel.pgck.id.someone-else.action.task.create", JSON.stringify({task:{target_kernel:"demo",title:"must-not-seal"}}), 4500);
-  const ok     = await run(TOKV, "input.kernel.pgck.id." + SUB + ".action.task.create", JSON.stringify({task:{target_kernel:"demo",title:"verified-ok"}}), 6500);
-  const anon   = await run("",   "input.kernel.pgck.id." + SUB + ".action.task.create", JSON.stringify({task:{target_kernel:"demo",title:"anon"}}), 4000);
-  const forged = await run(TOKF, "input.kernel.pgck.id." + SUB + ".action.task.create", JSON.stringify({task:{target_kernel:"demo",title:"forged"}}), 4000);
+  // 0.4.77: task.create REFUSES on a kernel-less fresh install (fail-closed,
+  // by design — the bundle smoke asserts that refusal). The identity proof
+  // therefore seals a complete wave#Finding (adopted at boot) instead: the
+  // verified bearer's sub becomes the requester at the trusted ingress, so
+  // the seal must land ok:true and the sealed event must carry the identity.
+  const fin = (label) => JSON.stringify({type:"https://conceptkernel.org/ontology/v3.11/wave#Finding",label:label,reason:"verify-callout identity probe",findingState:"open"});
+  const bad    = await run(TOKV, "input.kernel.demo.id.someone-else.action.instance.create", fin("must-not-seal"), 4500);
+  const ok     = await run(TOKV, "input.kernel.demo.id." + SUB + ".action.instance.create", fin("verified-ok"), 6500);
+  const anon   = await run("",   "input.kernel.demo.id." + SUB + ".action.instance.create", fin("anon"), 4000);
+  const forged = await run(TOKF, "input.kernel.demo.id." + SUB + ".action.instance.create", fin("forged"), 4000);
   out.A_ok_true        = /"ok"\s*:\s*true/.test(ok.buf);
   out.A_sealed_by      = ok.buf.includes("urn:ckp:participant:" + SUB);
-  out.D_foreign_sealed = bad.buf.includes("must-not-seal") && /Task\.sealed/.test(bad.buf);
+  out.D_foreign_sealed = bad.buf.includes("must-not-seal") && /Finding\.sealed/.test(bad.buf);
   out.B_anon_denied    = anon.denied || !/"ok"\s*:\s*true/.test(anon.buf);
   out.C_forged_denied  = forged.denied || !/"ok"\s*:\s*true/.test(forged.buf);
   process.stdout.write(JSON.stringify(out));
