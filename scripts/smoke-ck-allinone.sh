@@ -86,7 +86,25 @@ if [[ -z "$PGRDF_INSTALLED" || -z "$PGCK_INSTALLED" || -z "$PGCRYPTO" ]]; then
   exit 1
 fi
 
-# §A5: pgck.nats_url GUC was baked into postgresql.conf by ociger-pg-launcher
+# §A5: the boot-provisioned pgck.conf is ACTUALLY CONSULTED by postgres.
+#
+# This check used to assert only that pgck.nats_url contained "nats://" — which
+# pgCK's COMPILED DEFAULT (nats://127.0.0.1:4222) already satisfies. It passed
+# whether or not the include was read, so it proved nothing and hid a live
+# defect for exactly as long as it existed: with a bind-mounted PGDATA the
+# launcher drops postgres to the mount's owner, the 0640 pgck.conf owned by 999
+# becomes unreadable, include_if_exists SKIPS IT SILENTLY, and every pgck.* GUC
+# reverts to a default — no account seed, no oidc_*, callout off. Asserting
+# `source` instead of the value is what makes this gate able to fail.
+NATS_URL_SOURCE=$($PSQL -c "SELECT source FROM pg_settings WHERE name='pgck.nats_url';" 2>&1 | tr -d ' ')
+if [[ "$NATS_URL_SOURCE" != "configurationfile" ]]; then
+  echo "✗ §A5 pgck.conf NOT CONSULTED: pgck.nats_url source='$NATS_URL_SOURCE' (expect 'configuration file')"
+  echo "   → postgres cannot read /run/ck-identity/pgck.conf, so the account seed and oidc_* are"
+  echo "     silently absent and the identity plane is OFF. Check the conf's owner against the uid"
+  echo "     postgres actually runs as (bind-mounted PGDATA changes it)."
+  docker exec "$CONTAINER_NAME" /bin/busybox ls -ln /run/ck-identity/pgck.conf 2>&1 | head -2
+  exit 1
+fi
 NATS_URL=$($PSQL -c "SHOW pgck.nats_url;" 2>&1 | head -1)
 if [[ "$NATS_URL" != *"nats://"* ]]; then
   echo "✗ §A5 pgck.nats_url GUC not set ($NATS_URL)"
@@ -301,7 +319,7 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ②d two-Adoption pin ledger armed at FIRST BOOT (the 0.6.33/0.4.77 init contract)"
+echo "[ck-allinone] ②d two-Adoption pin ledger armed at FIRST BOOT (the 0.6.33/0.4.78 init contract)"
 # v3.11 contract: init.sql runs CALL ckp.boot() then seals TWO governed
 # core#Adoption instances (wave + lexicon) whose sourceDigest is computed from
 # the artifact-shipped module TTLs. This gate is the CONSUMER half of pgCK's
@@ -356,6 +374,52 @@ for D in "$OCIGER_WAVE_SHA256" "$OCIGER_LEXICON_SHA256"; do
   fi
 done
 echo "[ck-allinone] ✓ pin ledger armed: 2 module graphs, adoption_pins at install, fleet.adoptions clean, sealed sourceDigests match versions.yaml"
+
+echo "[ck-allinone] ②d2 kernel planes AGREE — the wire serves the kernel the seals land in"
+# The v0.7.33 burn, made unrepeatable. This bundle names its kernel twice:
+#   ckp.project   — where a seal lands (the resolver ckp.dispatch itself calls)
+#   pgck.kernels  — what the wire serves; the auth-callout mints permissions
+#                   per listed kernel as input.kernel.<K>.id.<sub>.action.>,
+#                   event.kernel.<K>.> and result.kernel.<K>.>
+# When those disagreed, a verified client dispatched into a DIFFERENT kernel
+# carrying a bare core surface (seal refused "type not admitted") while the
+# adopted surface sat elsewhere emitting events on a subject nobody could
+# subscribe to. Nothing failed loudly; A1/A2 just went quiet.
+#
+# pgCK 0.4.78 fixes the upstream default and gates it with s70, but their own
+# caveat is that the GUC is nats-client-gated — so the claim only truly bites
+# in a -nats deployment. THIS bundle is that deployment, which is why the
+# assertion belongs here and not only upstream. Asked for by pgCK, 2026-08-20.
+#
+# Canonical by ckp._project()'s OWN answer, never a copy of its rules.
+PLANE_SEAL=$($PSQL -c "SELECT ckp._project();" 2>&1 | tr -d ' ')
+PLANE_WIRE=$($PSQL -c "SHOW pgck.kernels;" 2>&1 | tr -d ' ')
+if [[ -z "$PLANE_SEAL" || -z "$PLANE_WIRE" ]]; then
+  echo "✗ could not read both kernel planes (seal='$PLANE_SEAL' wire='$PLANE_WIRE')"
+  exit 1
+fi
+if [[ "$PLANE_WIRE" != "$PLANE_SEAL" ]]; then
+  echo "✗ KERNEL PLANES DISAGREE: the wire serves '$PLANE_WIRE' but seals land in '$PLANE_SEAL'"
+  echo "   → a verified dispatch reaches a kernel whose surface has no adoptions and is refused"
+  echo "     'type not admitted', while sealed events ride event.kernel.$PLANE_SEAL.> where no"
+  echo "     client holds a subscribe grant. Pin both in ociger-ck-identity (kernelPins)."
+  exit 1
+fi
+# Canonical form: lowercase, one transport segment. A wrong-case segment
+# matches nothing and is INDISTINGUISHABLE from never having been configured.
+if [[ ! "$PLANE_WIRE" =~ ^[a-z0-9-]+$ ]]; then
+  echo "✗ kernel name '$PLANE_WIRE' is not canonical (lowercase, dashes optional, one segment)"
+  exit 1
+fi
+# Negative control: prove the equality above is a real comparison and not two
+# reads of one empty/erroring value agreeing vacuously — the plane must be a
+# kernel the substrate actually serves, so a governed read on it must answer.
+PLANE_LIVE=$($PSQL_PART -c "SELECT ckp.dispatch('fleet.adoptions','{}'::jsonb)->>'ok';" 2>&1 | tr -d ' ')
+if [[ "$PLANE_LIVE" != "true" ]]; then
+  echo "✗ kernel planes agree on '$PLANE_WIRE' but that kernel does not answer a governed read (ok=$PLANE_LIVE) — the agreement is vacuous"
+  exit 1
+fi
+echo "[ck-allinone] ✓ kernel planes agree: wire=seal='$PLANE_WIRE' (canonical, and it answers a governed read)"
 
 echo "[ck-allinone] ②e v3.9 floor — ck_participant reaches NOTHING beyond ckp.dispatch"
 # The Critical Isolation contract (SPEC.CKP.v3.9 §7 / P8): participant
@@ -632,32 +696,75 @@ echo "[ck-allinone] ⑧ privilege gate — exposed longruns NON-root + seed not 
 # the image); parses on the host. Asserts nats-server + busybox httpd do NOT run
 # as uid 0, and that the account-seed file is 0640 owned by postgres(999) so the
 # dropped-to-non-root services cannot read it.
+# NOTE the explicit /bin/busybox prefix. This image ships busybox as a SINGLE
+# STATIC BINARY WITH NO APPLET SYMLINKS, so a bare `cat` is not on PATH — it
+# fails, $comm and $cmd come back EMPTY for every process, and both R1/R2
+# assertions below ($1=="nats-server", $3 ~ /httpd/) can never match. awk's
+# `END{exit !f}` then reports "no violation found" and the gate passes having
+# tested NOTHING. Measured 2026-08-20: every row read `|<uid>|`, uid-only.
+# A privilege gate that cannot fail is worse than no gate — it is a claim.
 PROC=$(docker exec "$CONTAINER_NAME" /bin/sh -c '
 for p in /proc/[0-9]*; do
   [ -r "$p/comm" ] || continue
-  comm=$(cat "$p/comm" 2>/dev/null)
+  comm=$(/bin/busybox cat "$p/comm" 2>/dev/null)
   uid=""
   while read k v _rest; do [ "$k" = "Uid:" ] && { uid=$v; break; }; done < "$p/status" 2>/dev/null
-  cmd=$(cat "$p/cmdline" 2>/dev/null)
+  cmd=$(/bin/busybox tr "\0" " " < "$p/cmdline" 2>/dev/null)
   echo "$comm|$uid|$cmd"
 done' 2>/dev/null)
+# Non-vacuity control: the parse must actually yield named processes, or every
+# assertion built on it is silently inert (the defect this gate just had).
+PROC_NAMED=$(echo "$PROC" | awk -F"|" '$1 != "" {n++} END{print n+0}')
+if [[ "$PROC_NAMED" -lt 3 ]]; then
+  echo "✗ privilege gate is INERT: only $PROC_NAMED named processes parsed from /proc — the R1/R2 checks below would pass without testing anything"
+  echo "$PROC" | head -5
+  exit 1
+fi
 if echo "$PROC" | awk -F"|" '$1=="nats-server" && $2=="0"{f=1} END{exit !f}'; then
   echo "✗ nats-server runs as ROOT (uid 0) — R1 regression"; echo "$PROC" | grep "^nats-server"; exit 1
 fi
-if echo "$PROC" | awk -F"|" '$3 ~ /httpd/ && $2=="0"{f=1} END{exit !f}'; then
+# s6-supervise LEGITIMATELY runs as root and carries the supervised service's
+# name in its own cmdline, so it must be excluded or R2 fails on the supervisor
+# instead of the service. (Invisible until the parse above was repaired — with
+# empty comm/cmd this matched nothing either way.)
+if echo "$PROC" | awk -F"|" '$1 != "s6-supervise" && $3 ~ /httpd/ && $2=="0"{f=1} END{exit !f}'; then
   echo "✗ busybox httpd runs as ROOT (uid 0) — R2 regression"; echo "$PROC" | grep "httpd" | head -1; exit 1
 fi
+# R1/R2 are negative assertions — prove the subjects were actually present, or
+# "no root service found" just means "no service found".
+for svc in nats-server httpd; do
+  if ! echo "$PROC" | awk -F"|" -v s="$svc" '$1 != "s6-supervise" && ($1==s || $3 ~ s){f=1} END{exit !f}'; then
+    echo "✗ privilege gate INERT for $svc: no such process parsed, so its non-root assertion tested nothing"; exit 1
+  fi
+done
 SEED=$(docker exec "$CONTAINER_NAME" /bin/busybox ls -ln /run/ck-identity/pgck.conf 2>/dev/null)
 SPERM=$(echo "$SEED" | awk '{print $1}'); SUID=$(echo "$SEED" | awk '{print $3}')
 if [[ -n "$SEED" ]]; then
   if [[ "$(printf '%s' "$SPERM" | cut -c8)" == "r" ]]; then
     echo "✗ seed file pgck.conf is world/other-readable ($SPERM) — R3 regression"; exit 1
   fi
-  if [[ "$SUID" != "999" ]]; then
-    echo "✗ seed file pgck.conf not owned by postgres(999): uid=$SUID — R3 regression"; exit 1
+  # R3 is "only postgres can read the seed" — NOT "the owner is literally 999".
+  # Those coincide only when PGDATA is chownable. With a bind mount the launcher
+  # drops postgres to the mount's owner, and asserting 999 would demand a file
+  # postgres CANNOT READ — which is the defect measured 2026-08-20 (silent
+  # include skip → no seed → callout off), not the hardening. So compare the
+  # owner against the uid postgres is ACTUALLY running as, and separately prove
+  # the dropped services are excluded.
+  PG_UID=$(echo "$PROC" | awk -F"|" '$1=="postgres"{print $2; exit}')
+  if [[ -z "$PG_UID" ]]; then
+    echo "✗ could not read the running postgres uid from /proc — cannot judge seed ownership"; exit 1
   fi
+  if [[ "$SUID" != "$PG_UID" ]]; then
+    echo "✗ seed file pgck.conf owned by uid=$SUID but postgres runs as uid=$PG_UID — postgres cannot read its own config include; every pgck.* GUC silently falls back to a default (no account seed, callout OFF)"; exit 1
+  fi
+  for svc in nats-server httpd; do
+    SVC_UID=$(echo "$PROC" | awk -F"|" -v s="$svc" '$1==s || $3 ~ s {print $2; exit}')
+    if [[ -n "$SVC_UID" && "$SVC_UID" == "$SUID" ]]; then
+      echo "✗ seed file pgck.conf is owned by the $svc uid ($SVC_UID) — the dropped service can read the NATS account seed (R3 regression)"; exit 1
+    fi
+  done
 fi
-echo "[ck-allinone] ✓ nats-server + httpd NON-root; seed pgck.conf ${SPERM:-<none>} owner ${SUID:-?} (postgres-only)"
+echo "[ck-allinone] ✓ nats-server + httpd NON-root; seed pgck.conf ${SPERM:-<none>} owner ${SUID:-?} == postgres uid ${PG_UID:-?}, not readable by nats/httpd"
 
 echo ""
 echo "════════════════════════════════════════════════════════════"

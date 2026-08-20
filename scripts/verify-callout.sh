@@ -62,11 +62,24 @@ TOKF="$(printf '%s' "$FIX" | python3 -c 'import sys,json;print(json.load(sys.std
 echo "[verify-callout] test realm minted (issuer=$ISS aud=$AUD sub=$SUB)"
 
 # ── 2. Boot the bundle with the realm (callout ACTIVE) ──
+#
+# WITH A BIND-MOUNTED PGDATA, deliberately. This proof used to run on the
+# container's own filesystem, where PGDATA is chownable to postgres(999) — so it
+# never exercised the shape operators actually deploy. A bind mount is owned by
+# the host user, the launcher's chown fails, and postgres drops to THAT uid;
+# until the launcher learned to hand pgck.conf to the same identity, postgres
+# could not read its own include and the ENTIRE identity plane (account seed,
+# oidc_*) was silently absent while these five assertions still passed on the
+# unmounted path. A proof that cannot see the deployment it certifies is
+# decorative; this mount is what makes A/B/C/D bite. Measured 2026-08-20.
+DATA_DIR=".artifacts/og-ckcallout-verify/pgdata"
+rm -rf "$DATA_DIR"; mkdir -p "$DATA_DIR"
 docker network create "$NET" >/dev/null
 docker run -d --name "$C" --network "$NET" \
   -e OCIGER_OIDC_JWKS="$JWKS" \
   -e OCIGER_OIDC_ISSUER="$ISS" \
   -e OCIGER_OIDC_AUDIENCE="$AUD" \
+  -v "$PWD/$DATA_DIR:/var/lib/postgresql/data" \
   "$IMAGE" >/dev/null
 echo "[verify-callout] booting…"
 

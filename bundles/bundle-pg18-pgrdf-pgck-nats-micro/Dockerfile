@@ -41,16 +41,16 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.77-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.78-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.77.sql; \
+  test -s /work/share/extension/pgck--0.4.78.sql; \
   # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
   # modules a kernel adopts through a sealed core#Adoption naming each module's
   # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
   # digests below are LOAD-BEARING: they must equal versions.yaml `modules:`
   # (the smoke pin-ledger gate compares what sealed against that same source).
-  # Measured from pgck:0.4.77-pg18-nats-{amd64,arm64} 2026-08-20, byte-identical
+  # Re-measured unchanged on pgck:0.4.78-pg18-nats-{amd64,arm64} 2026-08-20, byte-identical
   # across arches; a mismatch here means upstream shipped different bytes than
   # we pinned, and the build MUST die rather than seal an unvouched digest.
   test -s /work/ontology/v3.11/core.ttl; \

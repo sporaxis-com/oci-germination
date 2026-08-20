@@ -46,6 +46,28 @@ func main() {
 	must(os.Chown(socketDir, runUID, runGID))
 	must(launcher.EnsureIdentityFiles("/etc/passwd", "/etc/group", runUID, runGID))
 
+	// Hand the boot-provisioned pgck.conf to the identity postgres will ACTUALLY
+	// run as. ociger-ck-identity writes it 0640 owned by postgres(999) so the
+	// dropped-to-non-root nats/httpd users cannot read the NATS account seed
+	// (v0.7.31 hardening) — but when PGDATA is a bind mount we cannot chown, so
+	// SelectIdentity drops us to the mount's owner instead of 999. Postgres then
+	// cannot read its own include, `include_if_exists` skips it in SILENCE, and
+	// EVERY pgck GUC falls back to a default: no account seed (the auth-callout
+	// responder never starts), no oidc_* (token verify off), and pgck.kernels
+	// reverts to the upstream default while seals still land in ckp.project's —
+	// the exact wire/seal split that burned v0.7.33, arrived at by a different
+	// road. Measured 2026-08-20: bind-mounted PGDATA owned by 501, conf owned by
+	// 999, every pgck.* row reading source=default.
+	//
+	// Only the launcher can fix this: it is the one component that knows runUID,
+	// and it runs after the ck-identity oneshot and before postgres. Mode stays
+	// 0640 — this widens the reader to postgres, never to nats/httpd.
+	if pgckConf := getenv("OCIGER_PGCK_CONF", "/run/ck-identity/pgck.conf"); pgckConf != "" {
+		if _, err := os.Stat(pgckConf); err == nil {
+			must(os.Chown(pgckConf, runUID, runGID))
+		}
+	}
+
 	if _, err := os.Stat(filepath.Join(pgData, "PG_VERSION")); os.IsNotExist(err) {
 		runAsPostgres(
 			runUID,
