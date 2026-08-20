@@ -39,10 +39,29 @@ CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
 -- (the #18 regression v0.7.20 was cut to fix).
 --
 -- Under v3.11 a module reaches a surface ONLY through a sealed ckp:Adoption
--- naming its digest, so there is deliberately no demo-shape import here: the
--- shipped layout is loaded, and adoption is a sealed act, not a boot-time side
--- effect.
+-- naming its digest — so after boot, seal exactly those Adoptions.
 CALL ckp.boot();
+
+-- The two-Adoption init contract (pgRDF 0.6.33 + pgCK 0.4.77, the first pair
+-- where this works on fresh installs with zero workarounds). Mirrors pgCK's
+-- own fresh-install gate step (3): load each shipped module graph, then seal
+-- a governed core#Adoption whose sourceDigest is computed FROM THE BYTES THE
+-- ARTIFACT SHIPS (pgcrypto digest of pg_read_file) — never a carried constant.
+-- The pinned expected values live in versions.yaml `modules:`; the base image
+-- build refuses artifacts whose bytes differ, and the bundle smoke pin-ledger
+-- gate compares what actually SEALED against that same pin. Requires pgCK
+-- 0.4.77: before it, ckp.adoption_pins existed only via bootstrap_kernel(),
+-- so the SECOND Adoption died mid-recomposition on every fresh install.
+--
+-- The requester is DECLARED via set_config('ckp.requester', ...) in the same
+-- statement — 0.4.64+ refuses unattributed seals, and at SQL level the GUC is
+-- the sanctioned way to declare identity (the cryptographic floor is the door;
+-- this file runs superuser at initdb, which was always full trust). Every
+-- statement is one physical line: `postgres --single` splits on bare newlines.
+SELECT pgrdf.load_turtle('/ontology/v3.11/modules/wave.ttl', pgrdf.add_graph('urn:ckp:module:wave'), NULL, false);
+SELECT pgrdf.load_turtle('/ontology/v3.11/modules/lexicon.ttl', pgrdf.add_graph('urn:ckp:module:lexicon'), NULL, false);
+SELECT ckp.dispatch('instance.create', jsonb_build_object('type','https://conceptkernel.org/ontology/v3.11/core#Adoption','adopts','urn:ckp:module:wave','intoProject','urn:ckp:project:demo','intoEpoch',0,'sourceDigest',encode(digest(convert_to(pg_read_file('/ontology/v3.11/modules/wave.ttl'),'UTF8'),'sha256'),'hex'))) FROM (SELECT set_config('ckp.requester','ociger-ck-allinone-init',true)) _id;
+SELECT ckp.dispatch('instance.create', jsonb_build_object('type','https://conceptkernel.org/ontology/v3.11/core#Adoption','adopts','urn:ckp:module:lexicon','intoProject','urn:ckp:project:demo','intoEpoch',0,'sourceDigest',encode(digest(convert_to(pg_read_file('/ontology/v3.11/modules/lexicon.ttl'),'UTF8'),'sha256'),'hex'))) FROM (SELECT set_config('ckp.requester','ociger-ck-allinone-init',true)) _id;
 
 -- Native outbox drain role (v0.7.18+). Every seal enqueues an event into
 -- ckp.outbox; pgCK's in-kernel nats-client bgworker that drains it onto NATS

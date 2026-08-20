@@ -50,6 +50,21 @@ jobs:
       - name: Lint pgRDF preload contract
         run: bash scripts/lint-pgrdf-preload.sh
 
+      # A pin is consulted or it is decorative: verify the SLSA attestation of
+      # every upstream artifact the Dockerfile oras-pulls, at the exact tags
+      # versions.yaml declares, BEFORE building from them. Exit codes are the
+      # gate — never piped (a piped gate reports the pipe's status, not gh's).
+      - name: Verify upstream artifact attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source scripts/lib/versions.sh
+          for arch in amd64 arm64; do
+            gh attestation verify "oci://ghcr.io/styk-tv/pgrdf-bundle:${OCIGER_PGRDF_VERSION}-pg18-${arch}" -R styk-tv/pgRDF
+            gh attestation verify "oci://ghcr.io/styk-tv/pgck:${OCIGER_PGCK_VERSION}-pg18-nats-${arch}" -R styk-tv/pgck
+          done
+
       - name: Build native all-in-one NATS micro image
         run: bash scripts/build-pg18-pgrdf-pgck-nats-micro.sh
 
@@ -108,7 +123,7 @@ jobs:
             --file bundles/bundle-pg18-pgrdf-pgck-nats-micro/Dockerfile \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=${{ steps.meta.outputs.tag }}" \
-            --label "org.opencontainers.image.description=PostgreSQL 17 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners" \
+            --label "org.opencontainers.image.description=PostgreSQL 18 micro runtime with pgRDF, pgCK, and colocated NATS core and websocket listeners" \
             --tag "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" \
             --tag "${{ steps.meta.outputs.image }}:latest" \
             --provenance=false \

@@ -28,12 +28,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.32-pg18-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.33-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.32-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.33-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.32.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.33.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -41,19 +41,22 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.76-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.77-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.76.sql; \
-  # CKP v3.11 RESTRUCTURED the shipped ontology: the flat v3.9 set (task.ttl,
-  # goal.ttl) is GONE, replaced by a versioned tree — core plus the wave: and
-  # lex: modules a kernel adopts. Asserting the real paths is what makes this
-  # a consulted pin rather than a decorative one; the old assertion would have
-  # failed the build, which is the gate working. init.sql still reads the v3.9
-  # paths and must be re-derived before this base ships into ck-allinone.
+  test -s /work/share/extension/pgck--0.4.77.sql; \
+  # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
+  # modules a kernel adopts through a sealed core#Adoption naming each module's
+  # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
+  # digests below are LOAD-BEARING: they must equal versions.yaml `modules:`
+  # (the smoke pin-ledger gate compares what sealed against that same source).
+  # Measured from pgck:0.4.77-pg18-nats-{amd64,arm64} 2026-08-20, byte-identical
+  # across arches; a mismatch here means upstream shipped different bytes than
+  # we pinned, and the build MUST die rather than seal an unvouched digest.
   test -s /work/ontology/v3.11/core.ttl; \
-  test -s /work/ontology/v3.11/modules/wave.ttl; \
-  test -s /work/ontology/v3.11/modules/lexicon.ttl
+  echo "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d  /work/ontology/v3.11/core.ttl" | sha256sum -c -; \
+  echo "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b  /work/ontology/v3.11/modules/wave.ttl" | sha256sum -c -; \
+  echo "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -
 
 
 FROM nats:2.14.2-scratch AS nats_source

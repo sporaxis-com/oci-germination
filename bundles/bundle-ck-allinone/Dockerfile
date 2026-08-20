@@ -5,7 +5,7 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.4
+ARG PG_BASE_VERSION=v0.2.5
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.5.12
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
@@ -17,15 +17,18 @@ ARG BUNDLE_VERSION=dev
 # "amd64 and arm64 came from one commit" is enforced, not asserted.
 ARG GIT_SHA=unknown
 
-# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.32 + pgCK 0.4.76-nats + NATS) ───
-# v0.2.4 carries the 0.6.32 / 0.4.76 wave — required so the concept kernel this repo
-# records through can be served from an updated, attested container. pgCK 0.4.72-0.4.76
-# add severity-aware SHACL warnings, fix the authority-chain reader (0.4.74/0.4.75),
-# and add per-graph inferred-vs-asserted reporting (0.4.76) — no ontology layout or
-# SQL-filename convention change from the 0.4.71 wave. The -nats build still owns the
-# in-extension inbound dispatch and the auth-callout, so the Go relay stays deleted.
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.33 + pgCK 0.4.77-nats + NATS) ───
+# v0.2.5 carries the 0.6.33 / 0.4.77 wave — the pair the two-Adoption init contract
+# needs on fresh installs: pgRDF 0.6.33 fixes the refused-Adoption shmem poison
+# (refuse→retry now seals with no pgrdf.shmem_reset()), and pgCK 0.4.77 creates
+# ckp.adoption_pins at CREATE EXTENSION (previously bootstrap_kernel/migration-only,
+# so the SECOND Adoption died mid-recomposition on every fresh install). Both halves
+# verified working together on the shipped, attested artifacts 2026-08-20 (pgCK's
+# fresh-install gate: boot 27 shapes → two governed Adoptions → fleet.adoptions
+# answers → 42 composed). The -nats build still owns the in-extension inbound
+# dispatch and the auth-callout, so the Go relay stays deleted.
 # Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.4 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.5 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.12 — the version pgck.localhost itself serves from /cklib/, so the browser
@@ -36,8 +39,8 @@ FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.4 AS pg_base
 # the instance.*/kernel.* op→verb table), ck-client.js (vendored transport,
 # grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance
 # cache), vendor/{msgpack,nats.ws}.js. No index.html.
-# ⚠ The smoke ⑤± gate asserts the 1.5.5 file set BYTE-FOR-BYTE — re-derive it
-# against this set before cutting, or the gate fails on a correct bundle.
+# The smoke ⑤± gate asserts this file set BYTE-FOR-BYTE; re-measured against
+# 1.5.12 on 2026-08-20 — identical 7-file set, the 1.5.5-era list still holds.
 FROM ghcr.io/conceptkernel/ck-lib-js:1.5.12 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
@@ -104,7 +107,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.11 all-in-one minimal — PG18 (trixie) + pgRDF 0.6.32 + pgCK 0.4.76-nats + NATS + cklib 1.5.12, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
+LABEL org.opencontainers.image.description="CKP v3.11 all-in-one minimal — PG18 (trixie) + pgRDF 0.6.33 + pgCK 0.4.77-nats + NATS + cklib 1.5.12, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"

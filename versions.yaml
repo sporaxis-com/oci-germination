@@ -24,19 +24,31 @@ components:
   # Latest consumable upstream pins. Each verified pullable at the EXACT oras tag
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
-  pgrdf:      "0.6.32"         # published 2026-08-17 (styk-tv/pgRDF v0.6.32). Verified pullable + attested both arches (pgrdf-bundle:0.6.32-pg18-{amd64,arm64}), 2026-08-19.
-  pgck:       "0.4.76"         # published 2026-08-17 (styk-tv/pgck v0.4.76) — required so the concept kernel this repo recorded through can be served from an updated, attested container. Verified pullable + attested both arches (pgck:0.4.76-pg18-nats-{amd64,arm64}), 2026-08-19.
-  pgck_native: "pgck 0.4.76"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
-  cklib:      "1.5.12"         # published 2026-08-18 (ConceptKernel/CK.Lib.Js v1.5.12) — the version pgck.localhost serves from /cklib/. Verified pullable + attested, 2026-08-19. Smoke ⑤± byte-set contract is pinned to the 1.5.5 file list and must be re-checked against this set.
+  pgrdf:      "0.6.33"         # published 2026-08-20 (styk-tv/pgRDF v0.6.33) — the Adoption refuse→retry shmem-poison fix. gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.33-pg18-{amd64,arm64}), 2026-08-20.
+  pgck:       "0.4.77"         # published 2026-08-20 (styk-tv/pgck v0.4.77) — adoption_pins created at CREATE EXTENSION (install-completeness), unblocking the two-Adoption init contract on fresh installs. gh attestation verify exit 0 both arches (pgck:0.4.77-pg18-nats-{amd64,arm64}), 2026-08-20.
+  pgck_native: "pgck 0.4.77"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  cklib:      "1.5.12"         # published 2026-08-18 (ConceptKernel/CK.Lib.Js v1.5.12) — the version pgck.localhost serves from /cklib/. Verified pullable + attested, 2026-08-19. Smoke ⑤± byte-set re-measured against 1.5.12 on 2026-08-20: identical 7-file set (LICENSE README.md ck.js ck-client.js ck-store.js vendor/{msgpack,nats.ws}.js) — the 1.5.5-era list still holds.
   nats:       "2.14.2"
   postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
   busybox:    "1.36.1-musl"
 
+modules:
+  # sha256 of the ontology module TTLs the pgck artifact ships at
+  # /ontology/v3.11/modules/ — the sourceDigest each governed Adoption in
+  # ck-allinone's init.sql seals, and the value the smoke pin-ledger gate
+  # COMPARES against what actually sealed (a pin is consulted or it is
+  # decorative). Measured from pgck:0.4.77-pg18-nats-{amd64,arm64} on
+  # 2026-08-20; byte-identical across arches. Re-measure on every pgck bump —
+  # a byte digest is per-artifact, never carried forward.
+  wave_sha256:    "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b"
+  lexicon_sha256: "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329"
+  core_sha256:    "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d"   # the v3.11 root; equals the root digest wave-v3.12's Statement names for v3.11 targets.
+
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.4"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.32 + pgCK 0.4.76-nats). v0.2.4 = the 0.6.32/0.4.76 wave (built+smoked locally 2026-08-19); v0.2.3 was never actually cut — the prior pin was decorative, consulted by nothing, and would have failed FROM on first pull. v0.2.2 dropped the bookworm Go builder (golang:1.24-trixie).
+  pg18-pgrdf-pgck-nats-micro: "v0.2.5"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.33 + pgCK 0.4.77-nats). v0.2.5 = the 0.6.33/0.4.77 wave: shmem-poison fix + install-complete adoption_pins, the pair the two-Adoption init contract needs. v0.2.4 = the 0.6.32/0.4.76 wave (built+smoked locally 2026-08-19); v0.2.3 was never actually cut — that pin was decorative, consulted by nothing.
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

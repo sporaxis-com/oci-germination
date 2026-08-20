@@ -310,9 +310,12 @@ func TestPgckSecretsConf_WritesJWKSDocumentWhenUsable(t *testing.T) {
 	if !strings.Contains(out, "pgck.oidc_jwks = '"+goodJWKS+"'") {
 		t.Fatalf("the document must be written verbatim, got:\n%s", out)
 	}
-	// header + seed + nats_url + jwks + issuer + audience
-	if got := strings.Count(out, "\n"); got != 6 {
-		t.Fatalf("expected 6 lines (header + 5 settings), got %d:\n%s", got, out)
+	if !strings.Contains(out, "pgck.kernels = 'pgck'") {
+		t.Fatalf("the canonical lowercase kernel pin must be written (0.4.77 refuses the compiled-in 'pgCK' default), got:\n%s", out)
+	}
+	// header + kernels + seed + nats_url + jwks + issuer + audience
+	if got := strings.Count(out, "\n"); got != 7 {
+		t.Fatalf("expected 7 lines (header + 6 settings), got %d:\n%s", got, out)
 	}
 }
 

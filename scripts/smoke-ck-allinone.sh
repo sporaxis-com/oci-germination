@@ -301,19 +301,61 @@ if [[ "$WSS_OK" != "OK" ]]; then
 fi
 echo "[ck-allinone] ✓ WSS round-trip OK over :9222"
 
-echo "[ck-allinone] ②d 'demo' CK loop armed at FIRST BOOT (init.sql adopt_kernel_ttl from artifact-shipped /ontology)"
-# v0.7.20+ : init.sql seals the demo's Task/Goal type shapes into urn:ckp:demo/kernel/ck via
-# pgCK 0.4.14's ckp.adopt_kernel_ttl (× 2, task.ttl + goal.ttl from the /ontology the pgCK
-# artifact ships). The smoke asserts the arming HAPPENED at boot — no smoke-side CALL — so the
-# gate proves the bundle dispatches out of the box with zero manual steps, the pgCK s34 posture.
-# (Pre-0.7.20 used import_module → …/kernel/board, which left /ck empty — see ⑤g for the gate.)
-DEMO_KERNEL_BOOTED=$($PSQL -c "SELECT (SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri LIKE 'urn:ckp:demo%') > 0;" 2>&1 | tr -d ' ')
-if [[ "$DEMO_KERNEL_BOOTED" != "t" ]]; then
-  echo "✗ demo CK loop not armed at first boot — init.sql adopt_kernel_ttl didn't run or /ontology TTLs missing from pg_base"
-  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'import_module|ontology|ERROR' | head -5
+echo "[ck-allinone] ②d two-Adoption pin ledger armed at FIRST BOOT (the 0.6.33/0.4.77 init contract)"
+# v3.11 contract: init.sql runs CALL ckp.boot() then seals TWO governed
+# core#Adoption instances (wave + lexicon) whose sourceDigest is computed from
+# the artifact-shipped module TTLs. This gate is the CONSUMER half of pgCK's
+# own fresh-install gate (3): it must (a) find both module graphs loaded,
+# (b) find ckp.adoption_pins existing at install (the 0.4.76 defect: it was
+# bootstrap/migration-only, so the SECOND Adoption died on every fresh
+# install — and the old gate passed anyway because it never sealed two), and
+# (c) hear fleet.adoptions ANSWER as ck_participant, carrying BOTH digests
+# versions.yaml pins. (c) is what makes the versions.yaml `modules:` pin
+# CONSULTED rather than decorative: what actually sealed at boot is compared
+# byte-for-byte against the declared expectation.
+PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:18-trixie psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
+MOD_GRAPHS=$($PSQL -c "SELECT COUNT(*) FROM pgrdf._pgrdf_graphs WHERE iri IN ('urn:ckp:module:wave','urn:ckp:module:lexicon');" 2>&1 | tr -d ' ')
+if [[ "$MOD_GRAPHS" != "2" ]]; then
+  echo "✗ module graphs not loaded at first boot (found $MOD_GRAPHS of 2) — init.sql load_turtle didn't run or /ontology/v3.11/modules/* missing from pg_base"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'ontology|load_turtle|ERROR' | head -5
   exit 1
 fi
-echo "[ck-allinone] ✓ demo board armed at first boot (graphs present, no smoke-side CALL needed)"
+PINS_TABLE=$($PSQL -c "SELECT (to_regclass('ckp.adoption_pins') IS NOT NULL)::text;" 2>&1 | tr -d ' ')
+if [[ "$PINS_TABLE" != "true" ]]; then
+  echo "✗ ckp.adoption_pins missing after CREATE EXTENSION — the pin ledger is still bootstrap/migration-only (pre-0.4.77 defect shape)"
+  exit 1
+fi
+# Composition health: fleet.adoptions answers, both modules listed, zero
+# malformed (its own malformed:true class = an Adoption whose adopts IRI names
+# no non-empty graph — a judged Adoption composing NOTHING).
+FLEET_OUT=$($PSQL_PART -c "SELECT ckp.dispatch('fleet.adoptions','{}'::jsonb)::text;" 2>&1)
+if [[ "$FLEET_OUT" != *'"ok": true'* && "$FLEET_OUT" != *'"ok":true'* ]]; then
+  echo "✗ fleet.adoptions did not answer ok:true on a fresh install: ${FLEET_OUT:0:240}"
+  exit 1
+fi
+for M in "urn:ckp:module:wave" "urn:ckp:module:lexicon"; do
+  if [[ "$FLEET_OUT" != *"$M"* ]]; then
+    echo "✗ fleet.adoptions does not list $M: ${FLEET_OUT:0:400}"
+    exit 1
+  fi
+done
+if [[ "$FLEET_OUT" != *'"malformedCount": 0'* && "$FLEET_OUT" != *'"malformedCount":0'* ]]; then
+  echo "✗ fleet.adoptions reports malformed adoptions (an Adoption composing NOTHING): ${FLEET_OUT:0:400}"
+  exit 1
+fi
+# The consulted pin: fleet.adoptions does NOT render sourceDigest (it shows
+# structuralPin), so the byte-digest comparison reads the sealed Adoption
+# instances through the door. Each must carry EXACTLY the digest versions.yaml
+# declares for its module — this is where a carried pin becomes a consulted one.
+ADOPT_ROWS=$($PSQL_PART -c "SELECT ckp.dispatch('instance.query','{\"type\":\"https://conceptkernel.org/ontology/v3.11/core#Adoption\"}'::jsonb)::text;" 2>&1)
+for D in "$OCIGER_WAVE_SHA256" "$OCIGER_LEXICON_SHA256"; do
+  if [[ "$ADOPT_ROWS" != *"$D"* ]]; then
+    echo "✗ pin NOT consulted: no sealed Adoption carries versions.yaml digest $D"
+    echo "   instance.query Adoption: ${ADOPT_ROWS:0:400}"
+    exit 1
+  fi
+done
+echo "[ck-allinone] ✓ pin ledger armed: 2 module graphs, adoption_pins at install, fleet.adoptions clean, sealed sourceDigests match versions.yaml"
 
 echo "[ck-allinone] ②e v3.9 floor — ck_participant reaches NOTHING beyond ckp.dispatch"
 # The Critical Isolation contract (SPEC.CKP.v3.9 §7 / P8): participant
@@ -329,39 +371,27 @@ if [[ "$PART_PGRDF" != "f" ]]; then
 fi
 echo "[ck-allinone] ✓ floor intact: ck_participant has no pgrdf reach"
 
-echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + GOVERNED seal (semantic pass: ok=true + proof_digest)"
-# v0.7.14+ : the round-trip asserts not just envelope shape but envelope
-# SEMANTICS — the reply must be `ok:true` with a proof_digest, proving the
-# dispatch actually called the GOVERNED 2-arg `ckp.dispatch(verb, payload)`
-# that runs the per-verb seal handlers in pgCK 0.4.x.
-# v0.7.30: the inbound dispatch is now pgCK 0.4.24-nats IN-EXTENSION (the Go
-# relay is deleted). The wire contract is unchanged — PUB input.kernel.pgCK.
-# action.<verb> → reply on result.kernel.pgCK.<verb> — but the reply is now
-# emitted by pgCK, not the relay; confirm the {ok,proof_digest,id} envelope
-# shape against 0.4.24 at (unfrozen) build time. This is the gate
-# that would have caught the v0.7.11..v0.7.13 escape — those cuts called
-# the 4-arg CI-A-2 stub by mistake, which returns `{"ok":false,"error":
-# "verb not governed yet (CI-B): <verb>",…}` for EVERY verb. CK.Lib.Js's
-# verify-v150 trapped the regression on v0.7.13; this assertion makes the
-# trap automatic on every future release.
-#
-# Why this gate is necessary and not redundant with the shape check above
-# it (kept for the parse-error catch): the shape check passes any typed
-# envelope; only a semantic check that asserts `ok===true` distinguishes
-# "the dispatch reached pg + got a typed reply" from "the dispatch reached pg +
-# got a typed reply that proves the seal happened."
-#
-# Payload structure for the smoke fixture:
-#   {"task": {"target_kernel": "smoke", "title": "smoke check"}}
-# matches the per-verb seal handler in pgck--0.4.x.sql's `task.create` /
-# `instance.create` branches (kernel + title are the only required fields).
+echo "[ck-allinone] ⑤d §B4 dispatch bridge round-trip + FAIL-CLOSED refusal (typed reply, no anonymous seal)"
+# 0.4.77 contract REVERSAL of the old semantic pass: this bundle boots with
+# NO kernel loaded (boot + two module Adoptions only), and 0.4.64+ refuses
+# unattributed seals — so an anonymous task.create arriving over the NATS
+# bridge must be REFUSED, cleanly, with a typed reply. pgCK's own fresh-install
+# gate asserts exactly this ("board verb refused with no kernel loaded — R2
+# holds on a virgin substrate"); a governed ok:true here would be the OLD #46
+# vacuous-allowance escape, shipping an anonymous write path.
+# What this gate still proves POSITIVELY: the in-extension inbound dispatch is
+# alive end-to-end — PUB input.kernel.pgck.action.<verb> → a typed
+# result.kernel.pgck.<verb> reply — and the reply is a real refusal, not the
+# 4-arg CI-A-2 stub ("verb not governed yet") and not a relation-missing crash
+# (the v0.7.14 escape class). The GOVERNED-SEAL positive proof moved to ⑤g,
+# where an ATTRIBUTED participant seals a v3.11-root type through the door.
 DISP_OUT=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
   cat > /probe.mjs <<EOF
 import { WebSocket } from "ws";
 const url = "ws://'"$CONTAINER_NAME"':9222";
 const verb = "task.create";
-const inSubj = "input.kernel.pgCK.action." + verb;
-const outSubj = "result.kernel.pgCK." + verb;
+const inSubj = "input.kernel.pgck.action." + verb;
+const outSubj = "result.kernel.pgck." + verb;
 const ws = new WebSocket(url);
 const t = setTimeout(() => { console.log("FAIL timeout"); process.exit(2); }, 8000);
 ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
@@ -388,16 +418,20 @@ ws.on("message", (data) => {
       process.exit(10);
     }
     if (/does not exist/.test(String(env.error||""))) {
-      console.log("FAIL relation-missing — init.sql bootstrap (CALL ckp.bootstrap_kernel + role-floor grants) did not run; this is the v0.7.14 escape class. body=" + body.slice(0,240));
+      console.log("FAIL relation-missing — init.sql bootstrap did not run; this is the v0.7.14 escape class. body=" + body.slice(0,240));
       process.exit(12);
     }
-    if (env.ok === true && env.proof_digest && String(env.id||"").startsWith("task-")) {
-      console.log("OK ok=true id=" + env.id + " proof_digest=" + env.proof_digest.slice(0,12));
+    if (env.ok === true) {
+      console.log("FAIL anonymous-seal-ACCEPTED — an unattributed board verb sealed on a kernel-less fresh install (fail-closed breached). body=" + body.slice(0,240));
+      process.exit(13);
+    }
+    if (env.ok === false) {
+      console.log("OK refused-fail-closed error=" + String(env.error||"").slice(0,120));
       ws.close();
       process.exit(0);
     }
-    console.log("FAIL seal-did-not-complete body=" + body.slice(0,240));
-    process.exit(13);
+    console.log("FAIL untyped-reply body=" + body.slice(0,240));
+    process.exit(14);
   }
 });
 ws.on("error", (e) => { console.log("FAIL ws-error:" + e.message); process.exit(7); });
@@ -415,7 +449,7 @@ echo "[ck-allinone] ✓ §B4 dispatch bridge GOVERNED seal round-trip ($DISP_OUT
 echo "[ck-allinone] ⑤d2 §B4b forge-deny — a client CANNOT publish a governed *.sealed event"
 # v0.7.30 INTERIM mitigation (pending the auth-callout wiring, og#19). An
 # anonymous connection may still publish to input.*; without this deny a client
-# could PUB input.kernel.pgCK.action.Task.sealed and forge a sealed fact (+ by:
+# could PUB input.kernel.pgck.action.Task.sealed and forge a sealed fact (+ by:
 # header). nats-server.conf maps the anon connection to a deny of that exact
 # pattern. SUPERSEDED once pgck.nats_account_seed is delivered — the auth-callout
 # anon tier is subscribe-only (no publish at all), a strictly stronger deny.
@@ -431,7 +465,7 @@ let s = false;
 ws.on("message", (d) => { const x = d.toString();
   if (x.startsWith("INFO ") && !s) { s = true;
     const p = "{\"forged\":true}";
-    ws.send("PUB input.kernel.pgCK.action.Task.sealed " + p.length + "\r\n" + p + "\r\n"); }
+    ws.send("PUB input.kernel.pgck.action.Task.sealed " + p.length + "\r\n" + p + "\r\n"); }
   else if (x.startsWith("-ERR") && /Permissions Violation/.test(x)) { clearTimeout(t); console.log("DENIED"); process.exit(0); } });
 EOF
   node /w/f.mjs' 2>&1 | tail -1)
@@ -439,7 +473,7 @@ if [[ "$FORGE_OUT" != "DENIED" ]]; then
   echo "✗ §B4b forge-deny FAILED — client could forge a *.sealed event: $FORGE_OUT" >&2
   exit 1
 fi
-echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.pgCK.action.*.sealed)"
+echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.pgck.action.*.sealed)"
 
 echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advances the kernel epoch (CKP v3.9 §5)"
 # The adoption-critical path: a participant (not superuser) governs a type
@@ -450,24 +484,25 @@ echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advance
 # ProposalShape gate, the quorum count, or the apply cascade regresses,
 # this fails before a release ships.
 # Payload contract (pgCK 0.4.5+, verified live on 0.4.13): add_property
-# requires detail.targetClass + detail.path as IRIs. The 0.4.2-era
-# detail.property (no targetClass) no longer translates — apply raises
-# op_translate_failed "add_property: targetClass must be an IRI, got <NULL>".
-PSQL_PART="docker run --rm --network $NETWORK_NAME -e PGPASSWORD=smoke-participant postgres:18-trixie psql -h $CONTAINER_NAME -U ck_participant -d postgres -At -v ON_ERROR_STOP=1"
+# requires detail.targetClass + detail.path as IRIs — v3.11 IRIs now; the old
+# v3.8 core#Task target names a type the v3.11 root retired outright.
+# 0.4.64+: every dispatch DECLARES its requester via set_config('ckp.requester',
+# …) in the same statement — unattributed seals refuse (that refusal is gate
+# ⑤d's business; this gate exercises the attributed path).
 EPOCH_BEFORE=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
-GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.8/core#Task\",\"path\":\"https://conceptkernel.org/ontology/v3.8/core#smokeProp\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text;" 2>&1)
+GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.11/core#Supersession\",\"path\":\"https://conceptkernel.org/ontology/v3.11/core#smokeProp\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
 GOV_IRI=$(echo "$GOV_PROPOSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)
 if [[ -z "$GOV_IRI" ]]; then
   echo "✗ governance propose failed: $GOV_PROPOSE"
   exit 1
 fi
-GOV_VOTE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.vote', '{\"about\":\"$GOV_IRI\",\"value\":\"approve\"}'::jsonb)::text;" 2>&1)
+GOV_VOTE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.vote', '{\"about\":\"$GOV_IRI\",\"value\":\"approve\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
 GOV_QUORUM=$(echo "$GOV_VOTE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('quorum_met',False))" 2>/dev/null)
 if [[ "$GOV_QUORUM" != "True" ]]; then
   echo "✗ governance vote failed or quorum not met: $GOV_VOTE"
   exit 1
 fi
-GOV_APPLY=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.apply', '{\"about\":\"$GOV_IRI\"}'::jsonb)::text;" 2>&1)
+GOV_APPLY=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.apply', '{\"about\":\"$GOV_IRI\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
 GOV_STATE=$(echo "$GOV_APPLY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null)
 EPOCH_AFTER=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
 if [[ "$GOV_STATE" != "applied" ]]; then
@@ -480,34 +515,38 @@ if [[ "$EPOCH_AFTER" -le "$EPOCH_BEFORE" ]]; then
 fi
 echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
 
-echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.pgCK.<class>.sealed (NO host bridge)"
+echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.pgck.<class>.sealed (NO host bridge)"
 # v0.7.18+ : every seal enqueues a ckp.outbox row; pgCK's in-.so native drain
-# publishes it onto event.kernel.pgCK.<class>.sealed. This gate proves the
+# publishes it onto event.kernel.<K>.<class>.sealed. This gate proves the
 # bundle moves sealed events onto NATS BY ITSELF — the regression class
 # CK.Lib.Js's no-native-outbox-drain NOTIFY surfaced (their verify only passed
-# with a stray host-side dev drain). v0.7.30: the drain is owned by pgCK
-# 0.4.24-nats in-process (was 0.4.23-nats; the Go relay never drained). The
-# probe subscribes to event.kernel.pgCK.> first, triggers a seal, and asserts
-# an event lands — with no drain process anywhere but inside the container.
-DRAIN_OK=$(docker run --rm --network "$NETWORK_NAME" node:20-slim sh -c '
+# with a stray host-side dev drain).
+# 0.4.77 rework: the old trigger (anonymous task.create over WSS) now REFUSES
+# by design (⑤d), so a refusal would never reach the outbox. The trigger is
+# now an ATTRIBUTED participant seal of a complete wave#Finding (adopted at
+# boot; requires label + reason + findingState) fired via SQL while a detached
+# subscriber listens on event.>. NOT core#Supersession: gate ⑤e's applied
+# governance change adds a required smokeProp to that class, and the applied
+# constraint is ENFORCED — a bare Supersession refuses after ⑤e (measured;
+# the refusal is ⑤e's proof working, not a defect). Subscribe-first ordering
+# is preserved by the two-phase start: the probe prints SUBSCRIBED, the host
+# waits for it, then seals.
+PROBE_NAME="$CONTAINER_NAME-drainprobe"
+docker rm -f "$PROBE_NAME" >/dev/null 2>&1 || true
+docker run -d --name "$PROBE_NAME" --network "$NETWORK_NAME" node:20-slim sh -c '
   cat > /probe.mjs <<EOF
 import { WebSocket } from "ws";
 const ws = new WebSocket("ws://'"$CONTAINER_NAME"':9222");
-const evtSubj = "event.kernel.pgCK.>";
-const inSubj  = "input.kernel.pgCK.action.task.create";
 let subscribed = false;
-const t = setTimeout(() => { console.log("FAIL no-event-in-8s"); process.exit(2); }, 8000);
+const t = setTimeout(() => { console.log("FAIL no-event-in-30s"); process.exit(2); }, 30000);
 ws.on("open", () => ws.send("CONNECT {\"verbose\":false,\"pedantic\":false,\"protocol\":1}\r\n"));
 ws.on("message", (data) => {
   const txt = data.toString();
   if (txt.startsWith("INFO ")) {
-    ws.send("SUB " + evtSubj + " 1\r\n");
+    ws.send("SUB event.> 1\r\n");
     subscribed = true;
-    setTimeout(() => {
-      const payload = JSON.stringify({task:{target_kernel:"demo",title:"drain-probe"}});
-      ws.send("PUB " + inSubj + " " + payload.length + "\r\n" + payload + "\r\n");
-    }, 300);
-  } else if (subscribed && txt.includes("MSG event.kernel.pgCK.")) {
+    console.log("SUBSCRIBED");
+  } else if (subscribed && txt.includes("MSG event.")) {
     clearTimeout(t);
     const subj = txt.split("\r\n")[0].split(" ")[1];
     console.log("OK " + subj);
@@ -519,34 +558,55 @@ ws.on("error", (e) => { console.log("FAIL ws-error:" + e.message); process.exit(
 EOF
   cd /tmp && npm install --silent --no-save ws@8 >/dev/null 2>&1
   node --input-type=module < /probe.mjs
-' 2>&1 | tail -1)
+' >/dev/null
+for i in $(seq 1 20); do
+  docker logs "$PROBE_NAME" 2>/dev/null | grep -q SUBSCRIBED && break
+  sleep 1
+done
+SEAL_TRIGGER=$($PSQL_PART -c "SELECT ckp.dispatch('instance.create','{\"type\":\"https://conceptkernel.org/ontology/v3.11/wave#Finding\",\"label\":\"smoke drain probe\",\"reason\":\"ck-allinone smoke: trigger seal for the native outbox drain gate\",\"findingState\":\"open\"}'::jsonb)->>'ok' FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1 | tr -d ' ')
+if [[ "$SEAL_TRIGGER" != "true" ]]; then
+  docker rm -f "$PROBE_NAME" >/dev/null 2>&1 || true
+  echo "✗ drain-probe trigger seal refused/errored (ok=$SEAL_TRIGGER) — attributed participant instance.create of a complete wave#Finding must seal"
+  exit 1
+fi
+DRAIN_OK=$(docker wait "$PROBE_NAME" >/dev/null 2>&1; docker logs "$PROBE_NAME" 2>&1 | tail -1)
+docker rm -f "$PROBE_NAME" >/dev/null 2>&1 || true
 if [[ "$DRAIN_OK" != OK* ]]; then
   echo "✗ native outbox drain failed: $DRAIN_OK"
-  echo "   (a seal did not emit an event on event.kernel.pgCK.* — pgCK's in-.so drain isn't running)"
+  echo "   (a seal did not emit an event on event.kernel.pgck.* — pgCK's in-.so drain isn't running)"
   docker logs "$CONTAINER_NAME" 2>&1 | grep -iE 'pgck|nats|drain' | tail -15
   exit 1
 fi
 echo "[ck-allinone] ✓ native drain OK — seal → $DRAIN_OK (no host bridge)"
 
-echo "[ck-allinone] ⑤g typed-edge enforcement is NON-VACUOUS (#18 — type shapes in /ck; gate rejects incomplete)"
-# Pre-v0.7.20 the demo's Task/Goal shapes were sealed into urn:ckp:demo/kernel/board, but pgCK's
-# typed-edge ops + ckp.seal READ urn:ckp:demo/kernel/ck — so /ck was empty and every T1–T5 gate
-# no-opped (ok:true enforcing nothing; the silent-pass CK.Lib.Js verify-v160 + a downstream spike caught).
-# v0.7.20 wires init.sql to pgCK 0.4.14's ckp.adopt_kernel_ttl, sealing task.ttl + goal.ttl into /ck.
-# Assert (a) the type shapes ARE in /ck (the gate graph), and (b) a typed instance.create missing a
-# required prop is REJECTED through the dispatch door as ck_participant (the s49 contract — silently
-# ACCEPTED when vacuous). This is the gate that would have caught #18 before it shipped.
-SH_CK=$($PSQL -c "SELECT count(*) FROM pgrdf.sparql('PREFIX sh: <http://www.w3.org/ns/shacl#> SELECT ?c WHERE { GRAPH <urn:ckp:demo/kernel/ck> { ?s sh:targetClass ?c } }') j;" 2>&1 | tr -d ' ')
-if ! [[ "$SH_CK" =~ ^[0-9]+$ ]] || [[ "$SH_CK" -lt 2 ]]; then
-  echo "✗ typed-edge VACUOUS: $SH_CK sh:targetClass in urn:ckp:demo/kernel/ck (expect ≥2: Task+Goal) — init.sql adopt_kernel_ttl didn't populate the gate graph (the #18 regression)"
+echo "[ck-allinone] ⑤g typed-edge enforcement is NON-VACUOUS on the ADOPTED surface (#18 class, v3.11 form)"
+# The #18 lesson, re-derived for v3.11: a presence check can mask a wrong-graph
+# silent pass, so this gate asserts BEHAVIOR through the door as ck_participant.
+# The two init.sql Adoptions composed wave/lexicon into the surface (the
+# fresh-install walk measures 42 NodeShapes = 27 core + 11 wave + 4 lexicon);
+# if the composition silently failed, (b) would MINT instead of refuse and (c)
+# would refuse instead of seal — either way this gate fails.
+# (a) shape floor: >=42 NodeShapes present across graphs after boot+adoptions.
+# (b) an INCOMPLETE wave#Finding (FindingShape requires label + reason +
+#     findingState) must be REFUSED — the adopted module's shapes JUDGE.
+# (c) a COMPLETE wave#Finding must SEAL with a proof_digest — the positive
+#     governed-seal proof that ⑤d used to carry (attributed, so it seals).
+SH_ALL=$($PSQL -c "SELECT count(*) FROM pgrdf.sparql('PREFIX sh: <http://www.w3.org/ns/shacl#> SELECT ?s WHERE { GRAPH ?g { ?s a sh:NodeShape } }') j;" 2>&1 | tr -d ' ')
+if ! [[ "$SH_ALL" =~ ^[0-9]+$ ]] || [[ "$SH_ALL" -lt 42 ]]; then
+  echo "✗ shape floor broken: $SH_ALL NodeShapes across graphs (expect >=42 = 27 core + 11 wave + 4 lexicon) — boot or the two Adoptions did not compose"
   exit 1
 fi
-TE_OK=$($PSQL_PART -c "SELECT ckp.dispatch('instance.create','{\"type\":\"https://conceptkernel.org/ontology/v3.8/core#Task\"}'::jsonb)->>'ok';" 2>&1 | tr -d ' ')
-if [[ "$TE_OK" != "false" ]]; then
-  echo "✗ typed-edge gate VACUOUS: a Task instance.create missing required props returned ok=$TE_OK (expect false/rejected) — the /ck shape gate is no-opping (the #18 silent-pass)"
+TE_INCOMPLETE=$($PSQL_PART -c "SELECT ckp.dispatch('instance.create','{\"type\":\"https://conceptkernel.org/ontology/v3.11/wave#Finding\",\"label\":\"smoke incomplete\"}'::jsonb)->>'ok' FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1 | tr -d ' ')
+if [[ "$TE_INCOMPLETE" != "false" ]]; then
+  echo "✗ typed-edge gate VACUOUS: an incomplete wave#Finding returned ok=$TE_INCOMPLETE (expect false) — the adopted shapes are not judging (the #18 silent-pass, adoption form)"
   exit 1
 fi
-echo "[ck-allinone] ✓ typed-edge non-vacuous ($SH_CK type shapes in /ck; incomplete Task create REJECTED at the door)"
+TE_COMPLETE=$($PSQL_PART -c "SELECT (d->>'ok') || ':' || COALESCE(substr(d->>'proof_digest',1,12),'NO-PROOF') FROM (SELECT ckp.dispatch('instance.create','{\"type\":\"https://conceptkernel.org/ontology/v3.11/wave#Finding\",\"label\":\"smoke governed seal\",\"reason\":\"ck-allinone smoke: attributed participant seal through the door on a fresh install\",\"findingState\":\"open\"}'::jsonb) AS d FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id) _;" 2>&1 | tr -d ' ')
+if [[ "$TE_COMPLETE" != true:* ]] || [[ "$TE_COMPLETE" == *NO-PROOF* ]]; then
+  echo "✗ governed seal failed: complete wave#Finding returned $TE_COMPLETE (expect true:<proof_digest>)"
+  exit 1
+fi
+echo "[ck-allinone] ✓ typed-edge non-vacuous on adopted surface ($SH_ALL NodeShapes; incomplete Finding REFUSED; complete Finding SEALED $TE_COMPLETE)"
 
 echo "[ck-allinone] ⑥ NO Python / FastAPI / uvicorn anywhere"
 PY_HITS=$(docker exec "$CONTAINER_NAME" /bin/busybox find / \

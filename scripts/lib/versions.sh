@@ -19,4 +19,10 @@ OCIGER_PGCK_VERSION="$(_ver_val pgck)"
 OCIGER_PGCK_NATIVE="$(_ver_val pgck_native)"
 OCIGER_CKLIB_VERSION="$(_ver_val cklib)"
 OCIGER_NATS_VERSION="$(_ver_val nats)"
-export OCIGER_PGRDF_VERSION OCIGER_PGCK_VERSION OCIGER_PGCK_NATIVE OCIGER_CKLIB_VERSION OCIGER_NATS_VERSION
+# Ontology module byte-digests (versions.yaml `modules:`) — what the pgck
+# artifact ships at /ontology/v3.11/, what init.sql's Adoptions seal, and what
+# the ck-allinone smoke pin-ledger gate compares against the sealed rows.
+OCIGER_WAVE_SHA256="$(_ver_val wave_sha256)"
+OCIGER_LEXICON_SHA256="$(_ver_val lexicon_sha256)"
+OCIGER_CORE_SHA256="$(_ver_val core_sha256)"
+export OCIGER_PGRDF_VERSION OCIGER_PGCK_VERSION OCIGER_PGCK_NATIVE OCIGER_CKLIB_VERSION OCIGER_NATS_VERSION OCIGER_WAVE_SHA256 OCIGER_LEXICON_SHA256 OCIGER_CORE_SHA256
