@@ -21,21 +21,28 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pgrdf;
 CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
 
--- Arm the 'demo' project's CK loop: seal the Task + Goal type shapes into
--- urn:ckp:demo/kernel/ck — the graph pgCK's typed-edge ops + seal gate READ —
--- via pgCK 0.4.14's authorized, file-mount-free writer ckp.adopt_kernel_ttl.
--- Replaces the pre-0.4.14 ckp.import_module, which sealed shapes into
--- …/kernel/board — a DIFFERENT graph the typed ops never read — leaving every
--- T1–T5 gate vacuous (ok:true enforcing nothing). pgCK NOTIFY
--- import-module-typed-op-graph-split: RESOLVED in 0.4.14. adopt_kernel_ttl is
--- operator-level (first boot), NOT a ckp.dispatch verb, so ck_participant still
--- cannot write /ck (the v3.9 Critical Isolation floor holds). init.sql runs via
--- `postgres --single`, so we read the artifact-shipped TTL with pg_read_file
--- (pgCK's documented psql `\set … cat` form is psql-only; pg_read_file is the
--- postgres --single equivalent).
-CALL ckp.bootstrap_kernel();
-SELECT ckp.adopt_kernel_ttl(pg_read_file('/ontology/task.ttl'), 'demo');
-SELECT ckp.adopt_kernel_ttl(pg_read_file('/ontology/goal.ttl'), 'demo');
+-- Arm the kernel from the artifact-shipped v3.11 ontology layout.
+--
+-- ckp.boot() IS the documented arming step — pgCK's own fresh-install contract
+-- (scripts/smoke-s34-fresh-install.sh, "(2b) the documented arming step: boot +
+-- module import from /ontology") runs exactly this on a virgin cluster. It is
+-- operator-level at first boot, NOT a ckp.dispatch verb, so ck_participant still
+-- cannot write /ck and the Critical Isolation floor holds.
+--
+-- REPLACES the v3.9-era pair `CALL ckp.bootstrap_kernel()` + two
+-- ckp.adopt_kernel_ttl(pg_read_file('/ontology/{task,goal}.ttl'), 'demo') calls.
+-- Both TTLs are GONE from the artifact: CKP v3.11 restructured /ontology into a
+-- versioned tree (v3.11/core.ttl + v3.11/modules/{wave,lexicon}.ttl), and pgCK
+-- 0.4.40 RETIRED the ckp:Task / ckp:Goal board pair outright — they do not exist
+-- in the v3.11 root. Reading those paths would now fail on a missing file, so
+-- first boot would arm nothing and every typed-edge gate would go vacuous again
+-- (the #18 regression v0.7.20 was cut to fix).
+--
+-- Under v3.11 a module reaches a surface ONLY through a sealed ckp:Adoption
+-- naming its digest, so there is deliberately no demo-shape import here: the
+-- shipped layout is loaded, and adoption is a sealed act, not a boot-time side
+-- effect.
+CALL ckp.boot();
 
 -- Native outbox drain role (v0.7.18+). Every seal enqueues an event into
 -- ckp.outbox; pgCK's in-kernel nats-client bgworker that drains it onto NATS
@@ -47,10 +54,10 @@ SELECT ckp.adopt_kernel_ttl(pg_read_file('/ontology/goal.ttl'), 'demo');
 -- connects from inside the container over 127.0.0.1 (the launcher's pg_hba
 -- catch-all trusts local connections); it needs no password and is not
 -- exposed — only ck_participant is the externally-scram'd role.
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ck_drainer') THEN
-    CREATE ROLE ck_drainer LOGIN;
-  END IF;
-END $$;
+-- One line, no embedded newlines: `postgres --single` terminates a command on
+-- a bare newline (not just `;`), so a multi-line DO $$ ... $$ block here gets
+-- split mid-body and fails with "unterminated dollar-quoted string" — measured
+-- 2026-08-19 smoking this file through the real launcher path.
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ck_drainer') THEN CREATE ROLE ck_drainer LOGIN; END IF; END $$;
 GRANT USAGE ON SCHEMA ckp TO ck_drainer;
 GRANT SELECT, DELETE ON ckp.outbox TO ck_drainer;
