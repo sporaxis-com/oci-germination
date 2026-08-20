@@ -43,14 +43,14 @@ import version_composition as vc  # noqa: E402
 BUNDLES = [
     (
         "ociger-ck-allinone",
-        "CKP v3.9 all-in-one (the default)",
-        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.",
+        "CKP v3.11 all-in-one (the default)",
+        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.",
         "bundles/bundle-ck-allinone",
     ),
     (
         "ociger-pg18-pgrdf-pgck-nats-micro",
         "pg18 base — pgRDF + pgCK-nats + NATS (scratch)",
-        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK 0.4.24-nats + NATS (4222) + NATS WSS (9222). Scratch base, both arches built consistently on trixie. The canonical base `ck-allinone` builds `FROM`.",
+        "PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + NATS (4222) + NATS WSS (9222). Scratch base, both arches built consistently on trixie. The canonical base `ck-allinone` builds `FROM`.",
         "bundles/bundle-pg18-pgrdf-pgck-nats-micro",
     ),
 ]
@@ -361,7 +361,7 @@ def main() -> int:
 
 # oci-germination — latest published artifacts
 
-The active **CKP v3.9** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/{owner}/packages?repo_name=oci-germination).
+The active **CKP v3.11** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/{owner}/packages?repo_name=oci-germination).
 
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
