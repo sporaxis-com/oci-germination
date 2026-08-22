@@ -25,8 +25,8 @@ components:
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
   pgrdf:      "0.6.33"         # published 2026-08-20 (styk-tv/pgRDF v0.6.33) — the Adoption refuse→retry shmem-poison fix. gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.33-pg18-{amd64,arm64}), 2026-08-20.
-  pgck:       "0.4.78"         # published 2026-08-20 (styk-tv/pgck v0.4.78) — pgck.kernels defaults to the canonical lowercase 'pgck', fixed in all three places it was written (GUC default, callout-policy cache fallback, unit fixture); gated by their s70_kernel_planes_agree, which fails on 0.4.77 and passes here. Carries 0.4.77's install-complete adoption_pins. gh attestation verify exit 0 both arches (pgck:0.4.78-pg18-nats-{amd64,arm64}), 2026-08-20.
-  pgck_native: "pgck 0.4.78"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  pgck:       "0.4.80"         # published 2026-08-22 (styk-tv/pgck v0.4.80). Two behaviour changes land together: 0.4.79 STOPS INVENTING A KERNEL (with none named the resolver returns no project instead of borrowing 'demo'; core-only is a real state where reads answer and sealing refuses naming M2) and 0.4.80 MINTS A PER-INSTALL LEDGER KEY into ckp.config (32 bytes) instead of every deployment signing with the literal 'pgck-localhost'; ckp.config is dump-flagged so the key travels with the facts it signs. A FRESH container mints and works; an IN-PLACE upgrade of an existing volume has no key row and refuses to seal until one is named (the migration deliberately substitutes nothing). gh attestation verify exit 0 both arches (pgck:0.4.80-pg18-nats-{amd64,arm64}), 2026-08-22.
+  pgck_native: "pgck 0.4.80"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
   cklib:      "1.5.12"         # published 2026-08-18 (ConceptKernel/CK.Lib.Js v1.5.12) — the version pgck.localhost serves from /cklib/. Verified pullable + attested, 2026-08-19. Smoke ⑤± byte-set re-measured against 1.5.12 on 2026-08-20: identical 7-file set (LICENSE README.md ck.js ck-client.js ck-store.js vendor/{msgpack,nats.ws}.js) — the 1.5.5-era list still holds.
   nats:       "2.14.2"
   postgres:   "18-trixie"
@@ -39,7 +39,7 @@ modules:
   # ck-allinone's init.sql seals, and the value the smoke pin-ledger gate
   # COMPARES against what actually sealed (a pin is consulted or it is
   # decorative). Measured from pgck:0.4.77-pg18-nats-{amd64,arm64} on
-  # 2026-08-20 and RE-MEASURED unchanged on 0.4.78; byte-identical across arches.
+  # 2026-08-20 and RE-MEASURED unchanged on 0.4.78 and 0.4.80; byte-identical across arches.
   # Re-measure on every pgck bump —
   # a byte digest is per-artifact, never carried forward.
   wave_sha256:    "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b"
@@ -49,7 +49,7 @@ modules:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.6"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.33 + pgCK 0.4.78-nats). v0.2.6 = 0.4.78, which makes pgck.kernels default canonical so the wire and seal planes agree upstream too (this bundle pins both explicitly regardless — see kernelPins). v0.2.5 = the 0.6.33/0.4.77 wave: shmem-poison fix + install-complete adoption_pins, the pair the two-Adoption init contract needs. v0.2.4 = the 0.6.32/0.4.76 wave (built+smoked locally 2026-08-19); v0.2.3 was never actually cut — that pin was decorative, consulted by nothing.
+  pg18-pgrdf-pgck-nats-micro: "v0.2.7"   # the ck-allinone base (pg18/trixie + pgRDF 0.6.33 + pgCK 0.4.80-nats). v0.2.7 = the 0.4.79/0.4.80 pair (no invented kernel + per-install ledger key). v0.2.6 = 0.4.78 (canonical pgck.kernels default). v0.2.5 = the 0.6.33/0.4.77 wave. v0.2.4 = the 0.6.32/0.4.76 wave; v0.2.3 was never cut — that pin was decorative, consulted by nothing.
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

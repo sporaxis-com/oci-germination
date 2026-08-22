@@ -348,6 +348,69 @@ func TestKernelPinsAgreeAcrossPlanesAndModes(t *testing.T) {
 	}
 }
 
+// The kernel set is CONFIGURABLE, and the project is a member by construction.
+// A hardcoded single kernel left every germinated kernel unreachable until an
+// operator hand-edited a GUC — pgCK hit that twice in one day and asked for the
+// set to travel with ckp.project.
+func TestKernelPinsFromConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		project, kernels string
+		wantProject      string
+		wantSet          string
+	}{
+		{"defaults", "", "", "demo", "demo"},
+		{"project only", "ckdev", "", "ckdev", "ckdev"},
+		{"set adds kernels, project stays first", "demo", "pgck,ckdev", "demo", "demo,pgck,ckdev"},
+		{"project auto-joins a set that omits it", "demo", "pgck", "demo", "demo,pgck"},
+		{"duplicates collapse, order preserved", "demo", "pgck,demo,pgck", "demo", "demo,pgck"},
+		{"whitespace tolerated", "demo", " pgck , ckdev ", "demo", "demo,pgck,ckdev"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := kernelPins(tc.project, tc.kernels)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			wantProject := "ckp.project = '" + tc.wantProject + "'"
+			wantSet := "pgck.kernels = '" + tc.wantSet + "'"
+			if !strings.Contains(got, wantProject) || !strings.Contains(got, wantSet) {
+				t.Fatalf("want %q and %q, got:\n%s", wantProject, wantSet, got)
+			}
+			// The invariant that burned v0.7.33: the seal plane must be one of
+			// the served kernels, whatever the operator asked for.
+			members := strings.Split(strings.TrimSuffix(strings.SplitN(got, "pgck.kernels = '", 2)[1], "'\n"), ",")
+			found := false
+			for _, m := range members {
+				if m == tc.wantProject {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("project %q is not a member of the served set %v", tc.wantProject, members)
+			}
+		})
+	}
+}
+
+// A bad kernel name must FAIL LOUDLY, never degrade to a default: a bundle
+// serving a kernel nobody meant, and refusing the one they did, is the silent
+// failure this whole pin exists to prevent.
+func TestKernelPinsRefusesNonCanonical(t *testing.T) {
+	for _, tc := range []struct{ name, project, kernels string }{
+		{"uppercase project", "pgCK", ""},
+		{"dotted project", "ck.dev", ""},
+		{"uppercase in set", "demo", "pgCK"},
+		{"slash in set", "demo", "a/b"},
+		{"space inside name", "demo", "two words"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := kernelPins(tc.project, tc.kernels); err == nil {
+				t.Fatalf("expected a refusal for project=%q kernels=%q", tc.project, tc.kernels)
+			}
+		})
+	}
+}
+
 // A URL keeps the bundle in REALM mode (responder up, verify off) rather than
 // dropping to ANONYMOUS mode, which would also disable the responder.
 func TestResolveOIDC_URLStaysRealmButOmitsJWKS(t *testing.T) {

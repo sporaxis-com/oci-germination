@@ -394,21 +394,44 @@ echo "[ck-allinone] ②d2 kernel planes AGREE — the wire serves the kernel the
 # Canonical by ckp._project()'s OWN answer, never a copy of its rules.
 PLANE_SEAL=$($PSQL -c "SELECT ckp._project();" 2>&1 | tr -d ' ')
 PLANE_WIRE=$($PSQL -c "SHOW pgck.kernels;" 2>&1 | tr -d ' ')
-if [[ -z "$PLANE_SEAL" || -z "$PLANE_WIRE" ]]; then
-  echo "✗ could not read both kernel planes (seal='$PLANE_SEAL' wire='$PLANE_WIRE')"
+# pgCK 0.4.79 STOPPED INVENTING A KERNEL: with none named the resolver returns
+# NO project rather than borrowing 'demo'. Core-only is a legitimate state
+# (reads and instance.validate answer; sealing refuses naming M2) — but it is
+# NOT this bundle's state, because kernelPins writes ckp.project explicitly.
+# An empty answer here therefore means our conf did not reach postgres at all,
+# which §A5 catches from the other side. Assert it rather than compare "" == "".
+if [[ -z "$PLANE_SEAL" ]]; then
+  echo "✗ NO PROJECT NAMED: ckp._project() is empty, so this store is core-only and CANNOT SEAL (0.4.79 no-invented-kernel)."
+  echo "   → ckp.project never reached postgres; see §A5 (is /run/ck-identity/pgck.conf readable by the uid postgres runs as?)"
   exit 1
 fi
-if [[ "$PLANE_WIRE" != "$PLANE_SEAL" ]]; then
-  echo "✗ KERNEL PLANES DISAGREE: the wire serves '$PLANE_WIRE' but seals land in '$PLANE_SEAL'"
+if [[ -z "$PLANE_WIRE" ]]; then
+  echo "✗ NO KERNELS SERVED: pgck.kernels is empty — the wire admits nothing"
+  exit 1
+fi
+# MEMBERSHIP, not equality: pgck.kernels is a SET (the callout mints grants per
+# listed kernel) while ckp.project is the single kernel a seal lands in. The
+# invariant is that the seal plane is one of the served kernels. Equality was
+# only ever the one-kernel special case, and hardcoding it is what left a
+# germinated kernel unreachable until someone edited a GUC (pgCK, 2026-08-22).
+PLANE_MEMBER=""
+IFS=',' read -ra WIRE_SET <<< "$PLANE_WIRE"
+for k in "${WIRE_SET[@]}"; do
+  # Canonical form: lowercase, dashes optional, ONE transport segment. A
+  # wrong-case segment matches nothing on the wire and is INDISTINGUISHABLE
+  # from never having been configured.
+  if [[ ! "$k" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+    echo "✗ served kernel '$k' is not canonical (lowercase, dashes optional, one segment) — it matches nothing on the wire"
+    exit 1
+  fi
+  [[ "$k" == "$PLANE_SEAL" ]] && PLANE_MEMBER="$k"
+done
+if [[ -z "$PLANE_MEMBER" ]]; then
+  echo "✗ KERNEL PLANES DISAGREE: the wire serves [$PLANE_WIRE] but seals land in '$PLANE_SEAL', which is NOT among them"
   echo "   → a verified dispatch reaches a kernel whose surface has no adoptions and is refused"
   echo "     'type not admitted', while sealed events ride event.kernel.$PLANE_SEAL.> where no"
-  echo "     client holds a subscribe grant. Pin both in ociger-ck-identity (kernelPins)."
-  exit 1
-fi
-# Canonical form: lowercase, one transport segment. A wrong-case segment
-# matches nothing and is INDISTINGUISHABLE from never having been configured.
-if [[ ! "$PLANE_WIRE" =~ ^[a-z0-9-]+$ ]]; then
-  echo "✗ kernel name '$PLANE_WIRE' is not canonical (lowercase, dashes optional, one segment)"
+  echo "     client holds a subscribe grant. Both planes come from ociger-ck-identity"
+  echo "     (OCIGER_CK_PROJECT / OCIGER_CK_KERNELS); the project is always a member by construction."
   exit 1
 fi
 # Negative control: prove the equality above is a real comparison and not two
@@ -419,7 +442,40 @@ if [[ "$PLANE_LIVE" != "true" ]]; then
   echo "✗ kernel planes agree on '$PLANE_WIRE' but that kernel does not answer a governed read (ok=$PLANE_LIVE) — the agreement is vacuous"
   exit 1
 fi
-echo "[ck-allinone] ✓ kernel planes agree: wire=seal='$PLANE_WIRE' (canonical, and it answers a governed read)"
+echo "[ck-allinone] ✓ kernel planes agree: seals land in '$PLANE_SEAL', served set [$PLANE_WIRE] (canonical, member, and it answers a governed read)"
+
+echo "[ck-allinone] ②d3 ledger identity key is MINTED PER INSTALL and travels with the facts it signs (0.4.80)"
+# Before 0.4.80 every deployment signed its ledger with the literal
+# 'pgck-localhost' — one shared key across every install, so a proof chain from
+# one box verified on another and attributed nothing. 0.4.80 mints 32 bytes into
+# ckp.config at install instead. Measured 2026-08-22 on this base: two fresh
+# containers produced DISTINCT 64-hex keys, so the mint is real and not simply a
+# new hardcoded constant. This gate is what keeps it that way — a regression to
+# any shared literal would still "work" everywhere, which is exactly why it
+# needs an assertion rather than a reading.
+IDKEY=$($PSQL -c "SELECT v FROM ckp.config WHERE k='identity_key';" 2>&1 | tr -d ' ')
+if [[ -z "$IDKEY" ]]; then
+  echo "✗ no ckp.config identity_key on a FRESH install — the ledger has no key of its own and sealing will refuse (0.4.80)"
+  echo "   → a fresh container must MINT one; only in-place upgrades of pre-0.4.80 volumes need an operator to name it"
+  exit 1
+fi
+if [[ "$IDKEY" == "pgck-localhost" ]]; then
+  echo "✗ ledger identity_key is the pre-0.4.80 SHARED LITERAL 'pgck-localhost' — every install would sign with the same key and a proof chain would attribute nothing"
+  exit 1
+fi
+if [[ ! "$IDKEY" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "✗ ledger identity_key is not 32 bytes of hex (got ${#IDKEY} chars) — not the minted form"
+  exit 1
+fi
+# The key must travel with the facts it signs: ckp.config is dump-flagged, so a
+# pg_dump restore carries the ledger AND the key that makes it verifiable.
+# Without the flag a restore returns the facts and loses their key — silently.
+IDKEY_DUMPED=$($PSQL -c "SELECT (SELECT count(*)>0 FROM pg_extension e, unnest(e.extconfig) c WHERE e.extname='pgck' AND c='ckp.config'::regclass)::text;" 2>&1 | tr -d ' ')
+if [[ "$IDKEY_DUMPED" != "true" ]]; then
+  echo "✗ ckp.config is NOT dump-flagged — a pg_dump restore would return the ledger and LOSE the key that signs it"
+  exit 1
+fi
+echo "[ck-allinone] ✓ ledger key minted per install (${IDKEY:0:12}…, 32 bytes, not the shared literal) and dump-flagged"
 
 echo "[ck-allinone] ②e v3.9 floor — ck_participant reaches NOTHING beyond ckp.dispatch"
 # The Critical Isolation contract (SPEC.CKP.v3.9 §7 / P8): participant
