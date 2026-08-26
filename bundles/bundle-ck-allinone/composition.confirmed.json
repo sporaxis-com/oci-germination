@@ -1,12 +1,12 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:f0d2817812e234286206ee83d16af6364bb1679d364b82add2ba1ab5e1e04da8",
+  "index_digest": "sha256:8bc987fc7f291b91e0867b28ba32134c6f78cc5d0bd5678f04fbacaf979b6cef",
   "all_match": true,
   "layers": [
     {
       "layer": "base image",
       "kind": "base",
-      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.8",
+      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.9",
       "mapping": "FROM",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -33,37 +33,37 @@
     {
       "layer": "pgrdf",
       "kind": "extension",
-      "expected": "0.6.33",
+      "expected": "0.6.34",
       "mapping": "CREATE EXTENSION",
       "probe": "pgrdf_ext",
-      "confirmed": "0.6.33",
+      "confirmed": "0.6.34",
       "verdict": "✓"
     },
     {
       "layer": "pgrdf.version()",
       "kind": "native",
-      "expected": "0.6.33",
+      "expected": "0.6.34",
       "mapping": "self-report",
       "probe": "pgrdf_fn",
-      "confirmed": "0.6.33",
+      "confirmed": "0.6.34",
       "verdict": "✓"
     },
     {
       "layer": "pgck",
       "kind": "extension",
-      "expected": "0.4.81",
+      "expected": "0.4.82",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "0.4.81",
+      "confirmed": "0.4.82",
       "verdict": "✓"
     },
     {
       "layer": "pgck.version()",
       "kind": "native",
-      "expected": "0.4.81",
+      "expected": "0.4.82",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "pgck 0.4.81",
+      "confirmed": "pgck 0.4.82",
       "verdict": "✓"
     },
     {
@@ -87,7 +87,7 @@
     {
       "layer": "cklib",
       "kind": "component",
-      "expected": "1.5.12",
+      "expected": "1.5.13",
       "mapping": "/app/cklib",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.37",
-  "confirmed_at": "2026-08-22T02:59:54Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.38",
+  "confirmed_at": "2026-08-26T10:27:26Z"
 }
