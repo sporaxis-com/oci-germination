@@ -28,12 +28,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.33-pg18-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.34-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.33-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.34-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.33.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.34.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -41,22 +41,29 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.81-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.82-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.81.sql; \
+  test -s /work/share/extension/pgck--0.4.82.sql; \
   # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
   # modules a kernel adopts through a sealed core#Adoption naming each module's
   # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
   # digests below are LOAD-BEARING: they must equal versions.yaml `modules:`
   # (the smoke pin-ledger gate compares what sealed against that same source).
-  # Re-measured unchanged on pgck:0.4.81-pg18-nats-{amd64,arm64} 2026-08-22, byte-identical
-  # across arches; a mismatch here means upstream shipped different bytes than
-  # we pinned, and the build MUST die rather than seal an unvouched digest.
-  test -s /work/ontology/v3.11/core.ttl; \
+  # 0.4.82 ships BOTH trees: v3.11 (core/wave/lexicon byte-stable since 0.4.77,
+  # plus the NEW recon module) and v3.12 FINAL (boot's default root; core =
+  # RC2 bytes promoted unchanged, operator ruling 2026-08-26; no lexicon).
+  # All seven measured from pgck:0.4.82-pg18-nats-{amd64,arm64} 2026-08-26,
+  # byte-identical across arches; a mismatch here means upstream shipped
+  # different bytes than we pinned, and the build MUST die rather than seal
+  # or ground an unvouched root.
   echo "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d  /work/ontology/v3.11/core.ttl" | sha256sum -c -; \
   echo "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b  /work/ontology/v3.11/modules/wave.ttl" | sha256sum -c -; \
-  echo "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -
+  echo "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -; \
+  echo "b2b11f1b76e22f7bfac10be3eba7b5104ff0d5d0a1d92147ec3dc392f1475d7d  /work/ontology/v3.11/modules/recon.ttl" | sha256sum -c -; \
+  echo "7de02b35fd1fbc2ecfd32e6e53162704be2791a2d41280102849ddb605eb9297  /work/ontology/v3.12/core.ttl" | sha256sum -c -; \
+  echo "ad887db28c6e0ea04c7cbd835c40dc5441f073be988475a9634c76e9131db727  /work/ontology/v3.12/modules/wave.ttl" | sha256sum -c -; \
+  echo "6a7c199e7ad19580b5e975624d15a9d4823e20dee9946cd20600b04c509100ea  /work/ontology/v3.12/modules/recon.ttl" | sha256sum -c -
 
 
 FROM nats:2.14.2-scratch AS nats_source
