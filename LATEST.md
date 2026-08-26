@@ -77,10 +77,10 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + NATS (4222) 
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `postgres:18-trixie` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `18` | `server` | `—` | ? unprobed |
-| `pgrdf` | extension | `0.6.33` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgrdf.version()` | native | `0.6.33` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.81` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.81` | `self-report` | `—` | ? unprobed |
+| `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgrdf.version()` | native | `0.6.34` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.82` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.82` | `self-report` | `—` | ? unprobed |
 
 ## Pin policy
 
