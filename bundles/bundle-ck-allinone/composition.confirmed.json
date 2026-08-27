@@ -1,6 +1,6 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:e777ae39bc9071368320a9c1506e7ff8df7412641f93c32a2b9474c2419fd75e",
+  "index_digest": "sha256:3155f877de703482344e7372277aea0aaa83af6fa5fb2e6b6a0a28285f3039c1",
   "all_match": true,
   "layers": [
     {
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.39",
-  "confirmed_at": "2026-08-27T09:46:52Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.40",
+  "confirmed_at": "2026-08-27T10:07:51Z"
 }

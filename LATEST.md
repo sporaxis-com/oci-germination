@@ -13,27 +13,27 @@ The active **CKP v3.11** wave: the `ociger-ck-allinone` all-in-one and the `ocig
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
 
-## ociger-ck-allinone — `v0.7.39`
+## ociger-ck-allinone — `v0.7.40`
 
 PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:61394acc32002a7709cd13b2d09fa428ef2694d2ef0676afd7a84dd634e736cc`  | 2026-08-27 09:45:39 |
-| arm64 | `sha256:a70f0e7a6a86ada38537ee6ef790444766bf47af4ab2b527755123175c59c8a0`  | 2026-08-27 09:45:39 |
+| amd64 | `sha256:3f73cb10515d77dc008efb9fa346db781402d1d70422f0c20fe985a55c436f82`  | 2026-08-27 10:06:46 |
+| arm64 | `sha256:92d04d31ce3a0e9b72ccb529ebcf99927546e73455c84fb442343f7c9f580253`  | 2026-08-27 10:06:46 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.39`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.40`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:e777ae39bc9071368320a9c1506e7ff8df7412641f93c32a2b9474c2419fd75e`                                                         |
+| Index digest       | `sha256:3155f877de703482344e7372277aea0aaa83af6fa5fb2e6b6a0a28285f3039c1`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-**Version composition** — **test-confirmed** against this digest at `2026-08-27T09:46:52Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
+**Version composition** — **test-confirmed** against this digest at `2026-08-27T10:07:51Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
 
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
