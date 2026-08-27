@@ -16,7 +16,7 @@
 <p class="meta">Reserved surface for the web2 demo — the dispatch-only client front-end against CKP v3.9 Critical Isolation. Currently a stub.</p>
 <div class="panel">
   <p>This surface is mounted under busybox httpd at <code>/web2/</code>. Once the CK.Lib.Js v1.5.0 line lands (dispatch-only L2 facade), the next ck-allinone cut will ship the web2 demo content here directly.</p>
-  <p>In the meantime, the dispatch wire is already alive end-to-end: the in-tree <code>ociger-pgck-relay</code> bridges <code>input.kernel.&lt;K&gt;.action.&lt;verb&gt;</code> (NATS WSS) to <code>ckp.dispatch</code> in Postgres and publishes the typed reply on <code>result.kernel.&lt;K&gt;.&lt;verb&gt;</code> (preserves Trace-Id). The landing page at <a href="/">/</a> confirms the round-trip; the bridge handles the dispatch.</p>
+  <p>In the meantime, the dispatch wire is already alive end-to-end: pgCK's <code>-nats</code> build owns the inbound dispatch <em>in-extension</em>, taking <code>input.kernel.&lt;K&gt;.action.&lt;verb&gt;</code> (NATS over WSS &mdash; the one data plane) and publishing the typed reply on <code>result.kernel.&lt;K&gt;.&lt;verb&gt;</code> with your Trace-Id echoed. Writes use the id-form <code>input.kernel.&lt;K&gt;.id.&lt;sub&gt;.action.&lt;verb&gt;</code>; the bare grammar refuses a write as unattributed. The landing page at <a href="/">/</a> confirms the round-trip.</p>
   <p>See also: <a href="/cklib/">/cklib/</a> (CK.Lib.Js bundle — what the demo will consume), <a href="/wss/">/wss/</a> (NATS WSS endpoint routing info).</p>
 </div>
 </body>

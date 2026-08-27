@@ -18,15 +18,17 @@ ARG BUNDLE_VERSION=dev
 ARG GIT_SHA=unknown
 
 # ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.87-nats + NATS) ───
-# v0.2.5 carries the 0.6.33 / 0.4.77 wave — the pair the two-Adoption init contract
-# needs on fresh installs: pgRDF 0.6.34 fixes the refused-Adoption shmem poison
-# (refuse→retry now seals with no pgrdf.shmem_reset()), and pgCK 0.4.77 creates
-# ckp.adoption_pins at CREATE EXTENSION (previously bootstrap_kernel/migration-only,
-# so the SECOND Adoption died mid-recomposition on every fresh install). Both halves
-# verified working together on the shipped, attested artifacts 2026-08-20 (pgCK's
-# fresh-install gate: boot 27 shapes → two governed Adoptions → fleet.adoptions
-# answers → 42 composed). The -nats build still owns the in-extension inbound
-# dispatch and the auth-callout, so the Go relay stays deleted.
+# v0.2.10 carries pgRDF 0.6.34 + pgCK 0.4.87-nats. pgCK 0.4.82 made v3.12 FINAL
+# ckp.boot()'s default root on both install roads, and the artifact ships BOTH
+# trees (v3.11 core/wave/lexicon/recon + v3.12 core/wave/recon) — the micro base
+# pins all seven by digest, so a byte that moved upstream stops the build instead
+# of grounding an unvouched root. 0.4.83-0.4.87 add the typed refusal registry
+# (~52 codes via surface.refusals), ckp._stamped (the four write stamps declared,
+# camelCase), and module_not_adopted as a typed refusal. 0.4.87 also changed the
+# v3.11 lexicon bytes, which the init contract's Adoption cites. pgRDF 0.6.34 is
+# the vacuity-refusal release: validating against an empty graph now refuses
+# rather than conforming vacuously. The -nats build still owns the in-extension
+# inbound dispatch and the auth-callout, so the Go relay stays deleted.
 # Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
 FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.10 AS pg_base
 
@@ -40,7 +42,7 @@ FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.10 AS pg_base
 # grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance
 # cache), vendor/{msgpack,nats.ws}.js. No index.html.
 # The smoke ⑤± gate asserts this file set BYTE-FOR-BYTE; re-measured against
-# 1.5.12 on 2026-08-20 — identical 7-file set, the 1.5.5-era list still holds.
+# 1.5.15 on 2026-08-27 — identical 7-file set, the 1.5.5-era list still holds.
 FROM ghcr.io/conceptkernel/ck-lib-js:1.5.15 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
@@ -107,7 +109,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.11 all-in-one minimal — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.87-nats + NATS + cklib 1.5.15, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
+LABEL org.opencontainers.image.description="CKP all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.87-nats + NATS + cklib 1.5.15, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
@@ -145,21 +147,32 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # carried for v0.7.14..v0.7.16 is retired.
 
 # Serve that same tree over HTTP at /ontology/ (busybox httpd's root is /app,
-# so a symlink is what puts it in the document root). Endorsed by CK.Lib.Js
-# PASS-4: their `door-confirm` gate confirms WHICH LAW a door runs from two
-# halves — a wire shape count and the SERVED ontology bytes matching the served
-# .sha256 sidecar. Until now the file half returned 404 against every
-# ck-allinone, so the root could only be confirmed with shell access; this makes
-# any deployment self-describing to any consumer, which is the whole point of
-# shipping an attested ontology.
+# so a symlink is what puts it in the document root).
+#
+# THIS IS OUR OWN PACKAGING-TRANSPARENCY CHOICE, NOT A CLIENT REQUIREMENT.
+# SPEC.CK-DOOR.v1.5.15 §3 (operator ruling 2026-08-27) is explicit: NO /ontology
+# HTTP mount is required, law confirmation is WIRE-NATIVE
+# (`surface.grounding → structuralDigest`), and nothing may add ontology mounts
+# ON CKLIB'S ACCOUNT — their packaging check is opt-in via CK_ONTOLOGY. An
+# earlier revision of this comment justified the route by their door-confirm
+# gate; that was exactly the dependency §3 excludes, and it is withdrawn.
+#
+# What it IS for: this bundle ships a digest-gated ontology, and serving it lets
+# an operator read what THIS deployment actually booted from without shell
+# access. It is offered, never depended on. Anything that must PROVE which law
+# a door runs asks the wire.
 #
 # A SYMLINK, not a copy, on purpose: what is served is byte-identical to what
 # ckp.boot() and init.sql actually read at /ontology. A copy could drift from
 # the live path, and a bench that mounts its own ontology there (ckone does)
 # would then be served bytes the kernel is not using — a confident wrong answer,
-# the failure mode this repo hunts. The sidecars ride along: the artifact
-# already ships core.ttl.wave-3.12.sha256 = 7de02b35…, the exact name
-# door-confirm looks for first.
+# the failure mode this repo hunts.
+#
+# NO SIDECARS: the pgck artifact ships .ttl files ONLY. An earlier revision of
+# this comment claimed we ship core.ttl.wave-3.12.sha256 — that was WRONG, read
+# through a bench's :ro repo mount over /ontology rather than from the artifact,
+# and it is withdrawn. Sidecars live in the pgCK repo; a deployment has none to
+# serve unless pgCK packages them.
 # /bin/busybox explicitly: this stage inherits pg_base, which has /bin/sh but no
 # coreutils — a bare `ln` is not found (same applet-symlink absence the smoke's
 # /proc parse hit on 2026-08-20).

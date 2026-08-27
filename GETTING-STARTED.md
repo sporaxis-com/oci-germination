@@ -71,11 +71,30 @@ In one sentence: **today you get a governed, sealed, consensus-evolvable workflo
 
 ## 3. The hello-kernel journey (every command verified)
 
-There are two ways to talk to the substrate. Apps use the **NATS door**; operators and scripts can also use a **direct SQL connection** as the participant role. Both reach the same single function.
+> **⚠ THIS SECTION IS BEING REWRITTEN (2026-08-27) — read the contract first.**
+> The commands below predate the current surface and **must not be copied as the
+> adopter journey**. Two corrections, both load-bearing:
+>
+> 1. **There is ONE data plane: `/wss`** (WebSocket → NATS), per
+>    `SPEC.CK-DOOR.v1.5.15` §1. Direct SQL is **not a door** — it is an operator
+>    and debugging aside. A write over SQL carries no verified identity
+>    (`ckp.requester` is empty), and since pgCK 0.4.64 an unattributed write is
+>    **refused**, so the psql examples below do not seal as written. The four
+>    stamps (`createdBy`, `sealedAtEpoch`, `producedBy`, `conformsToShape`) come
+>    from the `/wss` path.
+> 2. **The verbs shown are retired.** `task.create` / `instances.list` /
+>    `kernel.create` belong to the v3.9-era board pair, retired in pgCK 0.4.40.
+>    Today: `kernel.germinate {project, projectKind, label}` is act one (never
+>    guessed — `projectKind` is required), and facts are `instance.create` with
+>    an **absolute type IRI**.
+>
+> Use §3b (the door) and the current client contract in
+> `SPEC.CK-OPERATIONS` shipped with CK.Lib.Js. This section will be replaced
+> with measured, runnable examples against the current surface.
 
-### 3a. Direct, as the participant role
+### 3a. Direct SQL — an operator aside, NOT the app path
 
-The bundle creates two Postgres roles automatically: `ck_substrate` (owns everything, never logs in) and `ck_participant` (the role apps connect as — it can call `ckp.dispatch` and nothing else). The password is the one you passed in `OCIGER_CK_PARTICIPANT_PASSWORD`.
+The bundle creates two Postgres roles automatically: `ck_substrate` (owns everything, never logs in) and `ck_participant` (the role that can call `ckp.dispatch` and nothing else — the role floor, not an invitation to use SQL as a door). The password is the one you passed in `OCIGER_CK_PARTICIPANT_PASSWORD`.
 
 ```sh
 # A psql one-liner via a throwaway client container on the same host:
@@ -101,9 +120,20 @@ psql -h localhost -U ck_participant -d postgres -tA -c \
 # → {"id":"task-…","ok":true,"verified":true}
 ```
 
-### 3b. Over the NATS door (the real app path)
+### 3b. Over the door — the ONE data plane
 
-Apps publish the four-tuple to `input.kernel.<K>.action.<verb>` over NATS (WebSocket on `:9222`) and read the typed reply on `result.kernel.<K>.<verb>`. The bundle's in-image relay bridges that to `ckp.dispatch` and preserves your `Trace-Id`. A browser does this with the bundled client at `/cklib/ck-client.js`; a CLI does it with `nats`:
+Apps publish to `input.kernel.<K>.action.<verb>` over NATS (WebSocket on `:9222`, or `/wss` behind a gateway) and read the typed reply on `result.kernel.<K>.<verb>`, `Trace-Id` echoed. **Writes use the id-form** `input.kernel.<K>.id.<sub>.action.<verb>` — the bare grammar refuses a write as unattributed, and that refusal is correct.
+
+Since v0.7.30 there is **no Go relay**: pgCK's `-nats` build owns the inbound dispatch in-extension. (Earlier revisions of this page described an `ociger-pgck-relay` bridge; that component was deleted and nothing replaced it on the wire.)
+
+**Identity posture is per deployment, and the two postures fail in opposite directions** — measured on this bundle:
+
+| deployment | no token | with token |
+|---|---|---|
+| callout OFF (default, no `OCIGER_OIDC_*`) | connect and write; `claimSub` carries your segment — **claimed, never verified** | **refused at CONNECT** (`Authorization Violation`) |
+| callout ON (`OCIGER_OIDC_*` set) | grants are deployment policy — may be **no access at all**, so a read can simply time out | write seals; the broker **enforces** your id segment |
+
+A browser does this with the bundled client at `/cklib/ck.js` (same origin as `/wss`); a CLI does it with `nats`:
 
 ```
 PUB  input.kernel.mygame.action.kernel.create   {"name":"mygame"}

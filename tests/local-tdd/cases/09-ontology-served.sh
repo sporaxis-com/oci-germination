@@ -2,10 +2,13 @@
 # GREEN always (v0.7.40+): the ontology tree is SERVED over HTTP, and the bytes
 # served are the bytes the kernel boots from.
 #
-# Why this is a gate and not a nicety: CK.Lib.Js's `door-confirm` establishes
-# WHICH LAW a door runs from the served ontology digest. Before v0.7.40 that
-# returned 404 against every ck-allinone, so a deployment could only be
-# identified with shell access. This case is what keeps the answer available.
+# Why this is a gate and not a nicety: this bundle ships a digest-gated ontology
+# and OFFERS it over HTTP so an operator can read what THIS deployment booted
+# from without shell access. It is offered, never depended on —
+# SPEC.CK-DOOR.v1.5.15 §3 rules that no /ontology mount is required and that law
+# confirmation is WIRE-NATIVE (`surface.grounding → structuralDigest`). Nothing
+# here may be justified on a client's account; an earlier revision of this
+# comment was, and is withdrawn.
 #
 # It asserts SAMENESS, not a constant: served bytes == /ontology bytes == the
 # versions.yaml v3.12 pin. A copy that drifted from the live path would still
