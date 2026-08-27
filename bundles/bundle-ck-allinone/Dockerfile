@@ -144,6 +144,27 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
+# Serve that same tree over HTTP at /ontology/ (busybox httpd's root is /app,
+# so a symlink is what puts it in the document root). Endorsed by CK.Lib.Js
+# PASS-4: their `door-confirm` gate confirms WHICH LAW a door runs from two
+# halves — a wire shape count and the SERVED ontology bytes matching the served
+# .sha256 sidecar. Until now the file half returned 404 against every
+# ck-allinone, so the root could only be confirmed with shell access; this makes
+# any deployment self-describing to any consumer, which is the whole point of
+# shipping an attested ontology.
+#
+# A SYMLINK, not a copy, on purpose: what is served is byte-identical to what
+# ckp.boot() and init.sql actually read at /ontology. A copy could drift from
+# the live path, and a bench that mounts its own ontology there (ckone does)
+# would then be served bytes the kernel is not using — a confident wrong answer,
+# the failure mode this repo hunts. The sidecars ride along: the artifact
+# already ships core.ttl.wave-3.12.sha256 = 7de02b35…, the exact name
+# door-confirm looks for first.
+# /bin/busybox explicitly: this stage inherits pg_base, which has /bin/sh but no
+# coreutils — a bare `ln` is not found (same applet-symlink absence the smoke's
+# /proc parse hit on 2026-08-20).
+RUN /bin/busybox ln -s /ontology /app/ontology
+
 # (v0.7.30) No Go relay COPY — pgCK 0.4.24-nats owns inbound dispatch in-.so.
 
 # Boot-time auth-callout provisioner (the ck-identity s6 oneshot runs it before
