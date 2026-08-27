@@ -16,7 +16,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 FILTER="${1:-}"
 
-IMAGE="${OG_TDD_IMAGE:-ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.37}"
+IMAGE="${OG_TDD_IMAGE:-ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.38}"
 export OG_TDD_CONTAINER="${OG_TDD_CONTAINER:-og-tdd}"
 export OG_TDD_NETWORK="${OG_TDD_NETWORK:-og-tdd-net}"
 DATA_DIR="$ROOT/.artifacts/og-tdd/pgdata"

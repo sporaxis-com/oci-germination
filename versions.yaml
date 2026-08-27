@@ -25,9 +25,9 @@ components:
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
   pgrdf:      "0.6.34"         # published 2026-08-26 (styk-tv/pgRDF v0.6.34) — the vacuity-refusal release (a validation against an empty/unseeded graph now REFUSES instead of returning conforms:true; it root-caused pgck#134 as a consumer defect). gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.34-pg18-{amd64,arm64}), 2026-08-26.
-  pgck:       "0.4.82"         # published 2026-08-26 (styk-tv/pgck v0.4.82) — v3.12 FINAL becomes ckp.boot()'s default on both install roads (fresh + warm); ontology tree now ships v3.11 (core/wave/lexicon byte-stable + NEW recon module) AND v3.12 final (core 7de02b35… = RC2 bytes promoted unchanged, operator ruling 2026-08-26; modules wave + recon, no lexicon). Their release note names us: container-unpacked ontologies are stale by construction until oci-germination re-cuts. gh attestation verify exit 0 both arches (pgck:0.4.82-pg18-nats-{amd64,arm64}), 2026-08-26.
-  pgck_native: "pgck 0.4.82"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
-  cklib:      "1.5.13"         # published 2026-08-26 (ConceptKernel/CK.Lib.Js v1.5.13). gh attestation verify exit 0 + byte-verified here: same 7-file set as 1.5.12 (smoke ⑤± list stands); ck.js 9f39c263… / ck-client.js aa661514… match the release handoff exactly.
+  pgck:       "0.4.87"         # published 2026-08-27 (styk-tv/pgck v0.4.87) — the refusal-registry line: 0.4.83 typed refusals ({ok:false,refused:true,sqlstate,error,hint}, ~52 codes readable via surface.refusals), 0.4.84 ckp._stamped makes the four write stamps a DECLARED camelCase part of every reply, 0.4.86 module_not_adopted as a typed refusal with a teaching hint. CHANGES v3.11 lexicon.ttl bytes (ce9f20f4… → 5def86ba…); core/wave/recon and the whole v3.12 tree byte-stable. gh attestation verify exit 0 both arches (pgck:0.4.87-pg18-nats-{amd64,arm64}), 2026-08-27.
+  pgck_native: "pgck 0.4.87"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  cklib:      "1.5.15"         # published 2026-08-27 (ConceptKernel/CK.Lib.Js v1.5.15) — retires the snake_case stamp shim now that pgck 0.4.84 declares them camelCase; refuses dispatchMode v3.9 at construction; claimSub carries the id-form subject on anonymous shells. gh attestation verify exit 0; ck.js self-reports VERSION 1.5.15; same 7-file set as 1.5.12/1.5.13, so the smoke ⑤± byte-set list stands (re-measured 2026-08-27).
   nats:       "2.14.2"
   postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
@@ -43,7 +43,7 @@ modules:
   # Re-measure on every pgck bump —
   # a byte digest is per-artifact, never carried forward.
   wave_sha256:    "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b"
-  lexicon_sha256: "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329"
+  lexicon_sha256: "5def86bacfe3d2a8a6a85e9c81f8f9d77c3cfeee72509a360b2b00433d3cf21c"   # CHANGED by pgck 0.4.87 (was ce9f20f4… through 0.4.82). Load-bearing: init.sql seals an Adoption citing these bytes.
   recon_sha256:   "b2b11f1b76e22f7bfac10be3eba7b5104ff0d5d0a1d92147ec3dc392f1475d7d"   # NEW in 0.4.82's v3.11 tree; measured 2026-08-26, byte-identical across arches.
   # v3.12 FINAL tree (0.4.82; boot's default root). No lexicon module in v3.12.
   v312_core_sha256:  "7de02b35fd1fbc2ecfd32e6e53162704be2791a2d41280102849ddb605eb9297"   # RC2 bytes promoted unchanged to FINAL (operator ruling 2026-08-26); NOT RC1's f36961d1….
@@ -54,7 +54,7 @@ modules:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.9"   # STAGED, not cut: the 0.6.34/0.4.82 wave (v3.12 FINAL boot default + vacuity refusal). Held until the cklib update lands — the release rides as one coordinated re-cut. v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
+  pg18-pgrdf-pgck-nats-micro: "v0.2.10"  # the ck-allinone base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.87-nats). v0.2.10 = the 0.4.87 refusal-registry line (+ changed v3.11 lexicon bytes). v0.2.9 = 0.6.34/0.4.82 (v3.12 FINAL). v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

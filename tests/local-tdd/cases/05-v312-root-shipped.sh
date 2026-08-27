@@ -9,7 +9,7 @@
 #        is worse than a stale one.
 source "$(dirname "$0")/../lib.sh"
 
-V312_CORE_SHA="7de02b35fd1fbc2ecfd32e6e53162704be2791a2d41280102849ddb605eb9297"
+V312_CORE_SHA="$OCIGER_V312_CORE_SHA256"   # from versions.yaml — one source, never a second copy
 GOT="$(INIMG "/bin/busybox sha256sum /ontology/v3.12/core.ttl 2>/dev/null" | awk '{print $1}')"
 [ -z "$GOT" ] && RED "no /ontology/v3.12/core.ttl — image predates the v3.12 re-cut"
 [ "$GOT" = "$V312_CORE_SHA" ] && GREEN "v3.12 FINAL core shipped (7de02b35…)"

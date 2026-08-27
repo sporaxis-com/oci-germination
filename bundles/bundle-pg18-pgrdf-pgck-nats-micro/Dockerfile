@@ -41,10 +41,10 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.82-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.87-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.82.sql; \
+  test -s /work/share/extension/pgck--0.4.87.sql; \
   # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
   # modules a kernel adopts through a sealed core#Adoption naming each module's
   # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
@@ -53,13 +53,13 @@ RUN set -eux; \
   # 0.4.82 ships BOTH trees: v3.11 (core/wave/lexicon byte-stable since 0.4.77,
   # plus the NEW recon module) and v3.12 FINAL (boot's default root; core =
   # RC2 bytes promoted unchanged, operator ruling 2026-08-26; no lexicon).
-  # All seven measured from pgck:0.4.82-pg18-nats-{amd64,arm64} 2026-08-26,
+  # All seven measured from pgck:0.4.87-pg18-nats-{amd64,arm64} 2026-08-27,
   # byte-identical across arches; a mismatch here means upstream shipped
   # different bytes than we pinned, and the build MUST die rather than seal
   # or ground an unvouched root.
   echo "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d  /work/ontology/v3.11/core.ttl" | sha256sum -c -; \
   echo "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b  /work/ontology/v3.11/modules/wave.ttl" | sha256sum -c -; \
-  echo "ce9f20f4dc43b79b704a1266ca69956890b006564824c051d44eb31cc90b0329  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -; \
+  echo "5def86bacfe3d2a8a6a85e9c81f8f9d77c3cfeee72509a360b2b00433d3cf21c  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -; \
   echo "b2b11f1b76e22f7bfac10be3eba7b5104ff0d5d0a1d92147ec3dc392f1475d7d  /work/ontology/v3.11/modules/recon.ttl" | sha256sum -c -; \
   echo "7de02b35fd1fbc2ecfd32e6e53162704be2791a2d41280102849ddb605eb9297  /work/ontology/v3.12/core.ttl" | sha256sum -c -; \
   echo "ad887db28c6e0ea04c7cbd835c40dc5441f073be988475a9634c76e9131db727  /work/ontology/v3.12/modules/wave.ttl" | sha256sum -c -; \
