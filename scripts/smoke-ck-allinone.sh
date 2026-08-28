@@ -26,7 +26,9 @@ EXPECTED_PGCK_NATIVE="${PGCK_EXPECTED_NATIVE_VERSION:-$OCIGER_PGCK_NATIVE}"
 # bundle, nothing more, nothing less. Bump together with CKLIB_VERSION in
 # the Dockerfile. v1.5.0 adds ck.js (the L2 dispatch facade / entry point)
 # and ck-store.js (the typed-instance cache); still no index.html/ck-page.
-EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE README.md ck.js ck-client.js ck-store.js vendor/msgpack.js vendor/nats.ws.js}"
+# v1.6.1 DROPS README.md from the shipped image (measured 2026-08-29) — six
+# files, not seven.
+EXPECTED_CKLIB_FILES="${CKLIB_EXPECTED_FILES:-LICENSE ck.js ck-client.js ck-store.js vendor/msgpack.js vendor/nats.ws.js}"
 
 echo "════════════════════════════════════════════════════════════"
 echo "[ck-allinone] CKP v3.8 All-in-One (Delta) Smoke Test"

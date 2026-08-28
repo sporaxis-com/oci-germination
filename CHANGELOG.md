@@ -4,7 +4,7 @@ Release history for the two bundles this repo currently cuts under the
 **CKP v3.9 Critical Isolation Alpha** track:
 
 - `ociger-ck-allinone` — the consumer-facing all-in-one (`ghcr.io/sporaxis-com/ociger-ck-allinone`)
-- `ociger-pg17-pgrdf-pgck-nats-micro` — the pg base it consumes (`ghcr.io/sporaxis-com/ociger-pg17-pgrdf-pgck-nats-micro`)
+- `ociger-pg18-pgrdf-pgck-nats-micro` — the pg base it consumes (`ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro`); pg17 retired at the pg18 move (og#9)
 
 ## Format
 
@@ -32,6 +32,11 @@ See [PROVENANCE.md](./PROVENANCE.md) §Release attempt policy for the rules that
 ---
 
 ## ociger-ck-allinone
+
+### v0.7.41 — pgCK 0.4.88 + cklib 1.6.1; retract /ontology HTTP-serving
+- **Tried:** two changes bundled into one cut. (1) Component roll-forward: base `pg18-pgrdf-pgck-nats-micro` v0.2.10 → **v0.2.11** (pgCK 0.4.87 → **0.4.88** — germinate_kernel now derives + stamps `ckp:transportSegment` itself rather than accepting a caller-supplied value, and the wave-3.12-pass-1 root adds that property to `ckp:KernelShape` at `MinCount(1)`; this changes `/ontology/v3.12/core.ttl` bytes, `7de02b35… → 97f97cb2…` — v3.11 and v3.12 wave/recon are byte-stable), and cklib 1.5.15 → **1.6.1** (CK.Lib.Js's "determinism release": refusals throw verbatim instead of returning `[]`/`null`, `kernel` required at construction with unknown options refused by name, retired options (`dispatchMode`/`claimSub`/`stateEndpoint`/`dictVersion`/`topicDefs`) refused, id-form is the only publish; the shipped npm-package file set **drops `README.md`** — six files, not seven). (2) **Retracts v0.7.40's `/app/ontology` HTTP symlink** (`e33094f`): that route was added on the justification that CK.Lib.Js's `door-confirm` gate needed a served ontology file to confirm which law a door runs — SPEC.CK-DOOR.v1.5.15 §3 (operator ruling 2026-08-27) explicitly excludes exactly this dependency ("NO `/ontology` HTTP mount is required… nothing may add ontology mounts on cklib's account"), so the justification cited the thing §3 forbids. `bundles/bundle-ck-allinone/Dockerfile`'s `RUN ln -s /ontology /app/ontology` is removed; `/ontology` itself stays on disk (init.sql still reads it at boot) but is no longer reachable over HTTP — no route, no folder, no empty directory.
+- **Tested:** full local `preflight-local.sh` GREEN (2026-08-29) — drift gate clean; `go test`/`gofmt` clean; base `pg18-pgrdf-pgck-nats-micro` built + 10-check smoke green (pgrdf=0.6.34, pgck 0.4.88 self-reported both as extversion and native); ck-allinone built + full smoke green (cklib byte-set gate confirms the six-file set exactly: `LICENSE ck-client.js ck-store.js ck.js vendor/msgpack.js vendor/nats.ws.js`; §B4 dispatch bridge, forge-deny, governance plane, native outbox drain, 96-NodeShape typed-edge enforcement, non-root privilege gate all pass); `verify-callout.sh` all 5 cases pass (verified/anon-denied/forged-denied/foreign-denied); `tests/local-tdd` three-state suite **9/9 GREEN**, including new/inverted case `09-ontology-not-served` (HTTP 404, no `/app/ontology`, on-disk `/ontology/v3.12/core.ttl` intact and matching the new pin) and `05-v312-root-shipped` (now correctly reporting the live `97f97cb2…` pin — its GREEN message previously hardcoded the prior `7de02b35…` digest as a literal string, which would have kept printing a stale digest after this exact bump; fixed to interpolate the live `versions.yaml` value).
+- **Verdict:** *pending CI attestation* — cut = push this commit → tag `pg18-pgrdf-pgck-nats-micro-v0.2.11` (base-first) → CI build/smoke/attest → tag `release-ck-allinone-v0.7.41` → CI build/smoke/attest → confirm both via `gh attestation verify` → `update-latest-md.yml` advances LATEST.md.
 
 ### v0.7.32 — re-cut of v0.7.31 (parity-gate implementation bug, artifact was correct)
 - **Tried:** identical content to v0.7.31 (pgRDF 0.6.22 + build-integrity + security hardening — see below). v0.7.31's CI **failed on two bugs in the cross-arch parity gate itself, not the artifact**: (1) `docker create --platform` for both arches off the same index digest → `cannot overwrite digest`; (2) the revision label was read via `docker buildx imagetools inspect --format '{{.Config.Labels}}'`, which doesn't expose `.Config`. The real gates had already passed (smoke ✓, verify-callout ✓) and the image built + pushed — but attest was skipped, so **v0.7.31 is a burned tag** (an unattested image reached GHCR + `:latest`; corrected when v0.7.32 attests). Fixes: resolve each arch's **own manifest digest** from the index and `docker create` by that (no `--platform` conflict); read the revision via `docker image inspect` after the create pulls it.
@@ -178,7 +183,19 @@ v0.7.0 … v0.7.7 + the v0.6.x line predate this changelog. See `git tag` histor
 
 ---
 
-## ociger-pg17-pgrdf-pgck-nats-micro (pg_base)
+## ociger-pg18-pgrdf-pgck-nats-micro (pg_base)
+
+*Tracking resumes here at v0.2.11. The pg18 line (v0.2.1…v0.2.10, cut 2026-07-19 through*
+*2026-08-27 across the pg18/trixie move) was never logged in this file — an honest gap, not*
+*backfilled; see `git tag` for the raw history. versions.yaml's `bases:` comment carries a*
+*short per-version summary of what each of those tags changed.*
+
+### v0.2.11 — 2026-08-29 — pgCK 0.4.87 → 0.4.88 (transportSegment root revision)
+- **Tried:** roll pgCK forward to 0.4.88. `ckp.germinate_kernel` now derives + stamps `ckp:transportSegment` itself instead of accepting (and ignoring) a caller-supplied one; the wave-3.12-pass-1 ontology root makes that property `MinCount(1)` on `ckp:KernelShape`, closing a window where a `ckp:Kernel` sealed with no segment passed germination but was then refused by its own composed-surface gate. This changes shipped bytes at `/ontology/v3.12/core.ttl` (`7de02b35fd1fbc2e… → 97f97cb22baa6e7…`); pgRDF (0.6.34, unchanged), v3.11 (core/wave/lexicon/recon) and v3.12 wave/recon are byte-stable through this bump — re-measured via `oras pull` against both arch tags, byte-identical.
+- **Tested:** local `preflight-local.sh` (2026-08-29) — drift gate clean, base built + its own smoke green (pg ready, pgrdf 0.6.34 + pgck 0.4.88 installed and version-matched, pgcrypto installed, NATS core + WSS up). Downstream: ck-allinone built `FROM` this candidate locally (tag-only, pre-publish) and passed its full smoke + `tests/local-tdd` (9/9 GREEN) — see the `ociger-ck-allinone` v0.7.41 entry above for that detail.
+- **Verdict:** *pending CI attestation* — first bundle in the cut order (`scripts/cut-plan.sh`): publishes before `ck-allinone` FROMs it.
+
+## ociger-pg17-pgrdf-pgck-nats-micro (pg_base) — RETIRED at the pg18 move (og#9)
 
 ### v0.1.11 — 2026-06-11 — SHIPPED (note: retried under same tag — see policy note)
 - **Tried:** patch wave bringing pgRDF 0.5.42 → 0.5.43 + pgCK 0.4.0 → 0.4.1.

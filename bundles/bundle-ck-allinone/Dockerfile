@@ -30,7 +30,7 @@ ARG GIT_SHA=unknown
 # rather than conforming vacuously. The -nats build still owns the in-extension
 # inbound dispatch and the auth-callout, so the Go relay stays deleted.
 # Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.10 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.11 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.5.15 — the version pgck.localhost itself serves from /cklib/, so the browser
@@ -43,7 +43,7 @@ FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.10 AS pg_base
 # cache), vendor/{msgpack,nats.ws}.js. No index.html.
 # The smoke ⑤± gate asserts this file set BYTE-FOR-BYTE; re-measured against
 # 1.5.15 on 2026-08-27 — identical 7-file set, the 1.5.5-era list still holds.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.5.15 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.6.1 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -146,37 +146,14 @@ COPY bundles/bundle-ck-allinone/init.sql /etc/ck-allinone/init.sql
 # with the extension artifact — canonical source). The vendor copy this bundle
 # carried for v0.7.14..v0.7.16 is retired.
 
-# Serve that same tree over HTTP at /ontology/ (busybox httpd's root is /app,
-# so a symlink is what puts it in the document root).
-#
-# THIS IS OUR OWN PACKAGING-TRANSPARENCY CHOICE, NOT A CLIENT REQUIREMENT.
-# SPEC.CK-DOOR.v1.5.15 §3 (operator ruling 2026-08-27) is explicit: NO /ontology
-# HTTP mount is required, law confirmation is WIRE-NATIVE
-# (`surface.grounding → structuralDigest`), and nothing may add ontology mounts
-# ON CKLIB'S ACCOUNT — their packaging check is opt-in via CK_ONTOLOGY. An
-# earlier revision of this comment justified the route by their door-confirm
-# gate; that was exactly the dependency §3 excludes, and it is withdrawn.
-#
-# What it IS for: this bundle ships a digest-gated ontology, and serving it lets
-# an operator read what THIS deployment actually booted from without shell
-# access. It is offered, never depended on. Anything that must PROVE which law
-# a door runs asks the wire.
-#
-# A SYMLINK, not a copy, on purpose: what is served is byte-identical to what
-# ckp.boot() and init.sql actually read at /ontology. A copy could drift from
-# the live path, and a bench that mounts its own ontology there (ckone does)
-# would then be served bytes the kernel is not using — a confident wrong answer,
-# the failure mode this repo hunts.
-#
-# NO SIDECARS: the pgck artifact ships .ttl files ONLY. An earlier revision of
-# this comment claimed we ship core.ttl.wave-3.12.sha256 — that was WRONG, read
-# through a bench's :ro repo mount over /ontology rather than from the artifact,
-# and it is withdrawn. Sidecars live in the pgCK repo; a deployment has none to
-# serve unless pgCK packages them.
-# /bin/busybox explicitly: this stage inherits pg_base, which has /bin/sh but no
-# coreutils — a bare `ln` is not found (same applet-symlink absence the smoke's
-# /proc parse hit on 2026-08-20).
-RUN /bin/busybox ln -s /ontology /app/ontology
+# NOT SERVED OVER HTTP. /ontology stays on disk because ckp.boot() and
+# init.sql read it; it is NOT symlinked into /app (busybox httpd's docroot).
+# v0.7.40 shipped `ln -s /ontology /app/ontology` and it is REMOVED here:
+# SPEC.CK-DOOR.v1.5.15 §3 requires no /ontology HTTP mount, law confirmation
+# is wire-native (`surface.grounding -> structuralDigest`), and the route was
+# added on cklib's account, which §3 excludes. The web root carries no
+# ontology entry at all - no folder, no empty dir, 404 on every path.
+# Operator ruling 2026-08-28. Gated by tests/local-tdd/cases/09-ontology-not-served.sh.
 
 # (v0.7.30) No Go relay COPY — pgCK 0.4.24-nats owns inbound dispatch in-.so.
 
