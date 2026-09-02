@@ -8,7 +8,7 @@
 
 # oci-germination — latest published artifacts
 
-The active **CKP v3.11** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/sporaxis-com/packages?repo_name=oci-germination).
+The active **CKP v3.12** wave: the `ociger-ck-allinone` all-in-one and the `ociger-pg18-pgrdf-pgck-nats-micro` base it builds `FROM`. The image ships both the v3.11 and v3.12 FINAL ontology trees; `ckp.boot()` grounds on the v3.12 root, while `init.sql`'s two module Adoptions still cite the v3.11 `wave`/`lexicon` modules (v3.12 ships no `lexicon`). Both PostgreSQL 18 / trixie, multi-arch (`linux/amd64` + `linux/arm64`), anonymous public pull. This file tracks the attested head of each. The retired pg17 + core-pg17 matrix (frozen at the pg18 move — pgRDF/pgCK are pg18-only) stays published on GHCR but is no longer tracked here; see the [Repo packages view](https://github.com/orgs/sporaxis-com/packages?repo_name=oci-germination).
 
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
@@ -79,8 +79,8 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + NATS (4222) 
 | `postgresql` | engine | `18` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.34` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.88` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.88` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.109` | `self-report` | `—` | ? unprobed |
 
 ## Pin policy
 
