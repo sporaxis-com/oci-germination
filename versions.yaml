@@ -25,9 +25,9 @@ components:
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
   pgrdf:      "0.6.34"         # published 2026-08-26 (styk-tv/pgRDF v0.6.34) — the vacuity-refusal release (a validation against an empty/unseeded graph now REFUSES instead of returning conforms:true; it root-caused pgck#134 as a consumer defect). gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.34-pg18-{amd64,arm64}), 2026-08-26. Unchanged by this bump.
-  pgck:       "0.4.88"         # published 2026-08-29 (styk-tv/pgck v0.4.88) — germinate_kernel now derives+stamps ckp:transportSegment itself (a caller-supplied value is ignored); the wave-3.12-pass-1 root (97f97cb2…) adds transportSegment to ckp:KernelShape MinCount(1). CHANGES v3.12 core.ttl bytes (7de02b35… → 97f97cb2…); v3.11 (core/wave/lexicon/recon) and v3.12 wave/recon byte-stable. gh attestation verify exit 0 both arches (pgck:0.4.88-pg18-nats-{amd64,arm64}), 2026-08-29.
-  pgck_native: "pgck 0.4.88"   # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
-  cklib:      "1.6.1"          # published 2026-08-29 (ConceptKernel/CK.Lib.Js v1.6.1) — the determinism release: refusals THROW verbatim instead of returning []/null; kernel required at construction, unknown options throw; retired dispatchMode/claimSub/stateEndpoint/dictVersion/topicDefs refused by name; id-form is the only publish (no anonymous tier). Deletes send()/notify()/list()/ckOn/wireCkOn/./client alias/kernels.list adapter/instances.list fallback/saveState-loadState. Built against SPEC.CK-DOOR.v1.6.1. gh attestation verify exit 0; ck.js self-reports VERSION 1.6.1; shipped file set DROPS README.md (6 files, not 7) — smoke ⑤± byte-set list updated (measured 2026-08-29).
+  pgck:       "0.4.109"        # published 2026-09-02 (styk-tv/pgck v0.4.109) — a 21-version wave closing pgCK's own obligation ledger (C-1..C-17, D-1, E-1..E-5, L-8). Load-bearing for us: 0.4.91 rebuilds the engine ON pgRDF's surface rather than beside it; 0.4.94 requires a stored digest to CARRY ITS METHOD (D-1) and 0.4.101 puts D-1 + E-1 on the install floor — both touch the Adoption pin ledger init.sql seals; 0.4.97 makes an epoch record its surface; 0.4.100 reconciles the roster populations; 0.4.106 types the last 89 untyped refusal sites. CHANGES v3.12 core.ttl bytes (97f97cb2… → 2e90a651…); v3.11 (core/wave/lexicon/recon) and v3.12 wave/recon byte-stable. gh attestation verify exit 0 both arches, 2026-09-02.
+  pgck_native: "pgck 0.4.109"  # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
+  cklib:      "1.6.3"          # published 2026-09-02 (ConceptKernel/CK.Lib.Js v1.6.3) — follows the 1.6.1 determinism release. gh attestation verify exit 0; ck.js self-reports VERSION 1.6.3; SAME six-file set as 1.6.1 (README.md still absent), so the smoke ⑤± byte-set list is unchanged — re-measured 2026-09-02.
   nats:       "2.14.2"
   postgres:   "18-trixie"
   s6_overlay: "3.2.3.0"
@@ -46,7 +46,7 @@ modules:
   lexicon_sha256: "5def86bacfe3d2a8a6a85e9c81f8f9d77c3cfeee72509a360b2b00433d3cf21c"   # CHANGED by pgck 0.4.87 (was ce9f20f4… through 0.4.82). Load-bearing: init.sql seals an Adoption citing these bytes.
   recon_sha256:   "b2b11f1b76e22f7bfac10be3eba7b5104ff0d5d0a1d92147ec3dc392f1475d7d"   # NEW in 0.4.82's v3.11 tree; measured 2026-08-26, byte-identical across arches.
   # v3.12 FINAL tree (0.4.82; boot's default root). No lexicon module in v3.12.
-  v312_core_sha256:  "97f97cb22baa6e710bd088226728aef693c32ff33d0380105c4a9174f3f4857e"   # CHANGED by pgck 0.4.88 (was 7de02b35…) — wave-3.12-pass-1 adds ckp:transportSegment (MinCount 1) to ckp:KernelShape so germinate_kernel's stamped segment is declared law, not just PL/pgSQL behavior. Measured 2026-08-29 via oras pull, byte-identical across arches.
+  v312_core_sha256:  "2e90a6512c7aae567714be69b92b37af4393e8da8d65a05c047c5d51e1bed07b"   # CHANGED by pgck 0.4.109 (was 97f97cb2… in 0.4.88, 7de02b35… through 0.4.87). Measured 2026-09-02 via oras pull, byte-identical across arches.
   v312_wave_sha256:  "ad887db28c6e0ea04c7cbd835c40dc5441f073be988475a9634c76e9131db727"
   v312_recon_sha256: "6a7c199e7ad19580b5e975624d15a9d4823e20dee9946cd20600b04c509100ea"
   core_sha256:    "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d"   # the v3.11 root; equals the root digest wave-v3.12's Statement names for v3.11 targets.
@@ -54,7 +54,7 @@ modules:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.11"  # the ck-allinone base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.88-nats). v0.2.11 = the 0.4.88 transportSegment line (changed v3.12 core bytes). v0.2.10 = the 0.4.87 refusal-registry line (+ changed v3.11 lexicon bytes). v0.2.9 = 0.6.34/0.4.82 (v3.12 FINAL). v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
+  pg18-pgrdf-pgck-nats-micro: "v0.2.12"  # the ck-allinone base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.109-nats). v0.2.12 = the 0.4.109 ledger-closing wave (changed v3.12 core bytes). v0.2.11 = 0.4.88 transportSegment. v0.2.10 = 0.4.87 refusal-registry. v0.2.9 = 0.6.34/0.4.82 (v3.12 FINAL). v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the

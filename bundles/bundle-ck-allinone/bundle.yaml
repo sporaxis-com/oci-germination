@@ -1,6 +1,6 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.41
+version: v0.7.42
 role: prod
 never_prod: false
 description: "CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 18 (trixie, glibc 2.41) + pgRDF 0.6.20 + pgCK 0.4.24-pg18-nats + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python, no postgres client. The Go ociger-pgck-relay is DELETED: pgCK 0.4.24-nats owns the in-extension inbound dispatch (F1-inbound, hop 4 — ckp.requester from the broker-enforced verified identity), the NATS auth-callout responder, and the ckp.outbox drain in-process, activated by pgck.nats_url (+ pgck.nats_account_seed for the callout)."
@@ -15,7 +15,7 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 18
   base_image: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
-  base_image_version: v0.2.11
+  base_image_version: v0.2.12
   final_image: scratch
   runtime_profile: micro
 
@@ -29,10 +29,10 @@ extensions:
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:
-    version: 0.4.88
+    version: 0.4.109
     source: https://github.com/styk-tv/pgCK
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgck CASCADE;
-    contract: Critical Isolation Alpha (v3.9). CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
+    contract: CKP v3.12. CREATE EXTENSION pgck creates ck_substrate (NOLOGIN, owns ckp internals) + ck_participant (LOGIN-capable, holds only EXECUTE ckp.dispatch — the Critical Isolation role floor, SPEC.pgCK.v3.12.SECURITY R-5). External consumers connect as ck_participant; deploy MUST set OCIGER_CK_PARTICIPANT_PASSWORD before exposure.
 
 components:
   s6-overlay:
@@ -46,7 +46,7 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.6.1
+    version: 1.6.3
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
     description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).

@@ -597,45 +597,73 @@ if [[ "$FORGE_OUT" != "DENIED" ]]; then
 fi
 echo "[ck-allinone] ✓ §B4b forge-deny enforced (Permissions Violation on input.kernel.demo.action.*.sealed)"
 
-echo "[ck-allinone] ⑤e governance plane — propose → vote → apply advances the kernel epoch (CKP v3.9 §5)"
+echo "[ck-allinone] ⑤e governance plane — REHEARSAL vs DECISION (pgCK 0.4.98/0.4.99)"
 # The adoption-critical path: a participant (not superuser) governs a type
-# change in through the sealed door. Asserts the FULL lifecycle: Proposal
-# sealed {pending} → Vote sealed, quorum met → apply flips state to
-# {applied} and bumps the kernel epoch. This is the regression trap for
-# the v3.9 governance plane end-to-end — if any of registry routing, the
-# ProposalShape gate, the quorum count, or the apply cascade regresses,
-# this fails before a release ships.
-# Payload contract (pgCK 0.4.5+, verified live on 0.4.13): add_property
-# requires detail.targetClass + detail.path as IRIs — v3.11 IRIs now; the old
-# v3.8 core#Task target names a type the v3.11 root retired outright.
-# 0.4.64+: every dispatch DECLARES its requester via set_config('ckp.requester',
-# …) in the same statement — unattributed seals refuse (that refusal is gate
-# ⑤d's business; this gate exercises the attributed path).
+# change in through the sealed door. Asserts the FULL lifecycle twice, because
+# since pgCK 0.4.98/0.4.99 (C-1/L-8 "quorum means something", C-2 "a screen is
+# not a gate") those two paths are DELIBERATELY different and the difference is
+# the thing worth gating:
+#
+#   quorum 1 → applied, graph_changed, rehearsal:true,  epoch does NOT advance
+#   quorum 2 → applied, graph_changed, rehearsal:false, epoch DOES advance
+#             (two DISTINCT non-anonymous identities)
+#
+# Before 0.4.98 a quorum-1 apply advanced the epoch, and this gate asserted
+# exactly that. It is not a regression that it stopped: one identity acting as
+# proposer, voter and applier is a rehearsal, and an epoch is the record of a
+# DECISION. Measured on 0.4.109, 2026-09-02 — the reply carries the reason
+# verbatim in `quorumNote`, so both halves below are read from the substrate.
+# Payload contract (pgCK 0.4.5+): add_property requires detail.targetClass +
+# detail.path as IRIs — v3.11 IRIs; the old v3.8 core#Task names a retired type.
+# 0.4.64+: every dispatch DECLARES its requester via set_config('ckp.requester').
+gov_cycle() {  # $1 quorum  $2 prop-name  $3.. voter identities
+  local quorum="$1" prop="$2"; shift 2
+  local iri reply
+  reply=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":$quorum,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.11/core#Supersession\",\"path\":\"https://conceptkernel.org/ontology/v3.11/core#$prop\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text FROM (SELECT set_config('ckp.requester','$1-proposer',true)) _id;" 2>&1)
+  iri=$(echo "$reply" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)
+  [[ -z "$iri" ]] && { echo "✗ governance propose (quorum $quorum) failed: $reply" >&2; return 1; }
+  local who
+  for who in "$@"; do
+    reply=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.vote', '{\"about\":\"$iri\",\"value\":\"approve\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','$who',true)) _id;" 2>&1)
+  done
+  if [[ "$(echo "$reply" | python3 -c "import json,sys; print(json.load(sys.stdin).get('quorum_met',False))" 2>/dev/null)" != "True" ]]; then
+    echo "✗ governance quorum $quorum not met after $# vote(s): $reply" >&2; return 1
+  fi
+  $PSQL_PART -c "SELECT ckp.dispatch('kernel.apply', '{\"about\":\"$iri\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','$1-proposer',true)) _id;" 2>&1
+}
+
+# ── half 1: quorum 1 is a REHEARSAL — it applies, and it must NOT move the epoch
 EPOCH_BEFORE=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
-GOV_PROPOSE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.propose_change', '{\"op\":\"add_property\",\"requires_quorum\":1,\"detail\":{\"targetClass\":\"https://conceptkernel.org/ontology/v3.11/core#Supersession\",\"path\":\"https://conceptkernel.org/ontology/v3.11/core#smokeProp\",\"datatype\":\"xsd:string\",\"minCount\":1}}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
-GOV_IRI=$(echo "$GOV_PROPOSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('proposal_iri',''))" 2>/dev/null)
-if [[ -z "$GOV_IRI" ]]; then
-  echo "✗ governance propose failed: $GOV_PROPOSE"
-  exit 1
+GOV_REHEARSE=$(gov_cycle 1 smokeProp smoke-participant) || exit 1
+REH_STATE=$(echo "$GOV_REHEARSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null)
+REH_FLAG=$(echo "$GOV_REHEARSE"  | python3 -c "import json,sys; print(json.load(sys.stdin).get('rehearsal',''))" 2>/dev/null)
+EPOCH_MID=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
+if [[ "$REH_STATE" != "applied" ]]; then
+  echo "✗ quorum-1 governance did not apply: $GOV_REHEARSE"; exit 1
 fi
-GOV_VOTE=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.vote', '{\"about\":\"$GOV_IRI\",\"value\":\"approve\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
-GOV_QUORUM=$(echo "$GOV_VOTE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('quorum_met',False))" 2>/dev/null)
-if [[ "$GOV_QUORUM" != "True" ]]; then
-  echo "✗ governance vote failed or quorum not met: $GOV_VOTE"
-  exit 1
+if [[ "$REH_FLAG" != "True" ]]; then
+  echo "✗ quorum-1 apply is not marked rehearsal:true — a single identity acting alone MUST be labelled a rehearsal at every hop: $GOV_REHEARSE"; exit 1
 fi
-GOV_APPLY=$($PSQL_PART -c "SELECT ckp.dispatch('kernel.apply', '{\"about\":\"$GOV_IRI\"}'::jsonb)::text FROM (SELECT set_config('ckp.requester','smoke-participant',true)) _id;" 2>&1)
-GOV_STATE=$(echo "$GOV_APPLY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null)
+if [[ "$EPOCH_MID" -ne "$EPOCH_BEFORE" ]]; then
+  echo "✗ a REHEARSAL advanced the kernel epoch ($EPOCH_BEFORE → $EPOCH_MID) — quorum 1 is not a decision and must not be recorded as one"; exit 1
+fi
+echo "[ck-allinone] ✓ rehearsal: quorum-1 applied + rehearsal:true, epoch correctly held at $EPOCH_BEFORE"
+
+# ── half 2: quorum 2 by two DISTINCT identities is a DECISION — the epoch moves
+GOV_DECIDE=$(gov_cycle 2 smokeProp2 smoke-alice smoke-bob) || exit 1
+DEC_STATE=$(echo "$GOV_DECIDE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('state',''))" 2>/dev/null)
+DEC_FLAG=$(echo "$GOV_DECIDE"  | python3 -c "import json,sys; print(json.load(sys.stdin).get('rehearsal',''))" 2>/dev/null)
 EPOCH_AFTER=$($PSQL -c "SELECT COALESCE(MAX(epoch),1) FROM ckp.kernel_epoch;" 2>/dev/null | tr -d ' ')
-if [[ "$GOV_STATE" != "applied" ]]; then
-  echo "✗ governance apply failed: $GOV_APPLY"
-  exit 1
+if [[ "$DEC_STATE" != "applied" ]]; then
+  echo "✗ quorum-2 governance apply failed: $GOV_DECIDE"; exit 1
 fi
-if [[ "$EPOCH_AFTER" -le "$EPOCH_BEFORE" ]]; then
-  echo "✗ governance apply did not advance the kernel epoch (before=$EPOCH_BEFORE after=$EPOCH_AFTER)"
-  exit 1
+if [[ "$DEC_FLAG" != "False" ]]; then
+  echo "✗ a 2-identity quorum was still labelled a rehearsal — the decision/rehearsal distinction has collapsed: $GOV_DECIDE"; exit 1
 fi
-echo "[ck-allinone] ✓ governance plane OK (proposal sealed → quorum met → applied; epoch $EPOCH_BEFORE → $EPOCH_AFTER)"
+if [[ "$EPOCH_AFTER" -le "$EPOCH_MID" ]]; then
+  echo "✗ a real quorum-2 DECISION did not advance the kernel epoch (before=$EPOCH_MID after=$EPOCH_AFTER): $GOV_DECIDE"; exit 1
+fi
+echo "[ck-allinone] ✓ governance plane OK (rehearsal held epoch $EPOCH_BEFORE; decision advanced $EPOCH_MID → $EPOCH_AFTER)"
 
 echo "[ck-allinone] ⑤f native outbox drain — a seal emits event.kernel.demo.<class>.sealed (NO host bridge)"
 # v0.7.18+ : every seal enqueues a ckp.outbox row; pgCK's in-.so native drain

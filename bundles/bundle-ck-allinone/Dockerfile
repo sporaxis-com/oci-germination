@@ -5,9 +5,9 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.10
+ARG PG_BASE_VERSION=v0.2.12
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.5.15
+ARG CKLIB_VERSION=1.6.3
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
@@ -17,33 +17,39 @@ ARG BUNDLE_VERSION=dev
 # "amd64 and arm64 came from one commit" is enforced, not asserted.
 ARG GIT_SHA=unknown
 
-# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.87-nats + NATS) ───
-# v0.2.10 carries pgRDF 0.6.34 + pgCK 0.4.87-nats. pgCK 0.4.82 made v3.12 FINAL
+# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS) ──
+# v0.2.12 carries pgRDF 0.6.34 + pgCK 0.4.109-nats. pgCK 0.4.82 made v3.12 FINAL
 # ckp.boot()'s default root on both install roads, and the artifact ships BOTH
 # trees (v3.11 core/wave/lexicon/recon + v3.12 core/wave/recon) — the micro base
 # pins all seven by digest, so a byte that moved upstream stops the build instead
-# of grounding an unvouched root. 0.4.83-0.4.87 add the typed refusal registry
-# (~52 codes via surface.refusals), ckp._stamped (the four write stamps declared,
-# camelCase), and module_not_adopted as a typed refusal. 0.4.87 also changed the
-# v3.11 lexicon bytes, which the init contract's Adoption cites. pgRDF 0.6.34 is
-# the vacuity-refusal release: validating against an empty graph now refuses
-# rather than conforming vacuously. The -nats build still owns the in-extension
-# inbound dispatch and the auth-callout, so the Go relay stays deleted.
+# of grounding an unvouched root. 0.4.89..0.4.109 is a 21-version wave closing
+# pgCK's obligation ledger (C-1..C-17, D-1, E-1..E-5, L-8). Load-bearing here:
+# 0.4.91 rebuilds the engine ON pgRDF's surface rather than beside it; 0.4.94
+# requires a stored digest to carry its METHOD (D-1) and 0.4.101 puts D-1 + E-1
+# on the INSTALL FLOOR — both bear on the two-Adoption pin ledger init.sql seals
+# at first boot; 0.4.97 makes an epoch record its surface; 0.4.100 reconciles the
+# roster populations; 0.4.106 types the last 89 untyped refusal sites. It changes
+# the v3.12 core bytes (97f97cb2… → 2e90a651…); the v3.11 tree is byte-stable, so
+# the init contract's Adoptions still cite unchanged module digests.
+# pgRDF 0.6.34 is the vacuity-refusal release: validating against an empty graph
+# now refuses rather than conforming vacuously. The -nats build still owns the
+# in-extension inbound dispatch and the auth-callout, so the Go relay stays deleted.
 # Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.11 AS pg_base
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.5.15 — the version pgck.localhost itself serves from /cklib/, so the browser
-# and the door run one library. Adds tokenProvider (#14 Mode A): the app owns the
-# bearer and cklib forwards it into the CONNECT frame, parsing claims for display
-# but never validating — admission stays the substrate's call.
-# Ships: LICENSE, README.md, ck.js (the L2 dispatch facade — CK/ConceptKernel/ckOn,
-# the instance.*/kernel.* op→verb table), ck-client.js (vendored transport,
-# grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance
-# cache), vendor/{msgpack,nats.ws}.js. No index.html.
-# The smoke ⑤± gate asserts this file set BYTE-FOR-BYTE; re-measured against
-# 1.5.15 on 2026-08-27 — identical 7-file set, the 1.5.5-era list still holds.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.6.1 AS cklib_source
+# 1.6.3 — follows the 1.6.1 determinism release, built to SPEC.CK-DOOR.v1.6.1. Refusals THROW
+# verbatim (refused/sqlstate/reply) instead of collapsing to []/null; `kernel` is
+# required at construction and unknown options throw naming the key; the retired
+# options (dispatchMode, claimSub, stateEndpoint, dictVersion, topicDefs) are
+# refused rather than ignored; id-form is the only publish and an admitted-but-
+# unverified connection throws at connect() — there is no anonymous tier.
+# Ships: LICENSE, ck.js (the L2 facade), ck-client.js (vendored transport),
+# ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js.
+# NOTE: 1.6.x DROPS README.md — SIX files, not the seven 1.5.x shipped. The smoke
+# ⑤± gate asserts this file set BYTE-FOR-BYTE; 1.6.3 re-measured 2026-09-02 as
+# the identical six-file set, so the gate's list is unchanged from 1.6.1.
+FROM ghcr.io/conceptkernel/ck-lib-js:1.6.3 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -109,7 +115,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.87-nats + NATS + cklib 1.5.15, supervised by s6-overlay, web served by busybox httpd. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout)."
+LABEL org.opencontainers.image.description="CKP v3.12 all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS + cklib 1.6.3, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout), no /ontology HTTP mount."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"

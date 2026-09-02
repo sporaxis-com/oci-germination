@@ -41,28 +41,27 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.88-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.109-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.88.sql; \
+  test -s /work/share/extension/pgck--0.4.109.sql; \
   # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
   # modules a kernel adopts through a sealed core#Adoption naming each module's
   # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
   # digests below are LOAD-BEARING: they must equal versions.yaml `modules:`
   # (the smoke pin-ledger gate compares what sealed against that same source).
   # 0.4.82 ships BOTH trees: v3.11 (core/wave/lexicon byte-stable since 0.4.77,
-  # plus the NEW recon module) and v3.12 FINAL (boot's default root). 0.4.88
-  # changes v3.12/core.ttl ONLY (wave-3.12-pass-1 adds ckp:transportSegment,
-  # MinCount 1, to ckp:KernelShape) — v3.11 and v3.12 wave/recon are
-  # byte-stable through this bump. All seven measured from
-  # pgck:0.4.88-pg18-nats-{amd64,arm64} 2026-08-29, byte-identical across
+  # plus the NEW recon module) and v3.12 FINAL (boot's default root). 0.4.109
+  # changes v3.12/core.ttl ONLY — v3.11 and v3.12 wave/recon are byte-stable
+  # through the whole 0.4.89..0.4.109 wave. All seven measured from
+  # pgck:0.4.109-pg18-nats-{amd64,arm64} 2026-09-02, byte-identical across
   # arches; a mismatch here means upstream shipped different bytes than we
   # pinned, and the build MUST die rather than seal or ground an unvouched root.
   echo "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d  /work/ontology/v3.11/core.ttl" | sha256sum -c -; \
   echo "f4ad27cec4417e2ed5b566adb7f7ee200b3c3fbfddf25adf840d267fd57e417b  /work/ontology/v3.11/modules/wave.ttl" | sha256sum -c -; \
   echo "5def86bacfe3d2a8a6a85e9c81f8f9d77c3cfeee72509a360b2b00433d3cf21c  /work/ontology/v3.11/modules/lexicon.ttl" | sha256sum -c -; \
   echo "b2b11f1b76e22f7bfac10be3eba7b5104ff0d5d0a1d92147ec3dc392f1475d7d  /work/ontology/v3.11/modules/recon.ttl" | sha256sum -c -; \
-  echo "97f97cb22baa6e710bd088226728aef693c32ff33d0380105c4a9174f3f4857e  /work/ontology/v3.12/core.ttl" | sha256sum -c -; \
+  echo "2e90a6512c7aae567714be69b92b37af4393e8da8d65a05c047c5d51e1bed07b  /work/ontology/v3.12/core.ttl" | sha256sum -c -; \
   echo "ad887db28c6e0ea04c7cbd835c40dc5441f073be988475a9634c76e9131db727  /work/ontology/v3.12/modules/wave.ttl" | sha256sum -c -; \
   echo "6a7c199e7ad19580b5e975624d15a9d4823e20dee9946cd20600b04c509100ea  /work/ontology/v3.12/modules/recon.ttl" | sha256sum -c -
 
