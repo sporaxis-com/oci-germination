@@ -1,6 +1,6 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.42
+version: v0.7.43
 role: prod
 never_prod: false
 description: "CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 18 (trixie, glibc 2.41) + pgRDF 0.6.20 + pgCK 0.4.24-pg18-nats + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python, no postgres client. The Go ociger-pgck-relay is DELETED: pgCK 0.4.24-nats owns the in-extension inbound dispatch (F1-inbound, hop 4 — ckp.requester from the broker-enforced verified identity), the NATS auth-callout responder, and the ckp.outbox drain in-process, activated by pgck.nats_url (+ pgck.nats_account_seed for the callout)."

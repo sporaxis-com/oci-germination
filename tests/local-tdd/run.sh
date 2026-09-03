@@ -32,8 +32,13 @@ rm -rf "$DATA_DIR"; mkdir -p "$DATA_DIR"
 echo "og-local-tdd · image: $IMAGE"
 docker network create "$OG_TDD_NETWORK" >/dev/null
 # Bind-mounted PGDATA on purpose: the deployment shape. og- prefix: ours.
+# v0.7.43 ships the door CLOSED (OCIGER_CK_ADMIT_ANONYMOUS=off) and refuses to
+# boot without a realm. This harness exercises the ANONYMOUS tier deliberately,
+# so it declares that rather than inheriting it — the posture under test is now
+# visible at the call site instead of being whatever the image happened to default to.
 docker run -d --name "$OG_TDD_CONTAINER" --network "$OG_TDD_NETWORK" \
   -e POSTGRES_PASSWORD=ogtdd \
+  -e OCIGER_CK_ADMIT_ANONYMOUS=on \
   -e OCIGER_CK_PARTICIPANT_PASSWORD=ogtdd-part \
   -v "$DATA_DIR:/var/lib/postgresql/data" \
   "$IMAGE" >/dev/null

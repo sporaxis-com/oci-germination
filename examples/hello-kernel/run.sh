@@ -48,7 +48,12 @@ trap cleanup EXIT
 
 say "① Starting the substrate — $IMAGE"
 docker network create "$NET" >/dev/null 2>&1 || true
+# This walkthrough runs WITHOUT identity, so it declares the anonymous tier
+# explicitly: since v0.7.43 the image ships closed and refuses to boot without a
+# realm. Seals made here carry no identity — that is the point of the contrast
+# with a real door, and it is now stated rather than assumed.
 docker run -d --name "$NAME" --network "$NET" \
+  -e OCIGER_CK_ADMIT_ANONYMOUS=on \
   -e OCIGER_CK_PARTICIPANT_PASSWORD="$PW" "$IMAGE" >/dev/null
 note "waiting for postgres + the dispatch bridge…"
 for i in $(seq 1 60); do

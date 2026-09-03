@@ -41,7 +41,7 @@ We don't describe these images as "a Dockerfile that COPYs some stuff." Every ar
 | `bin:StaticArtifact` | a binary / library / static asset, built in-tree or copied from upstream | 4 |
 | `svc:Process` | a supervised runtime process | 4 |
 
-Everything below is the **currently-shipping wave** (`ck-allinone v0.7.42` on `pg-base v0.2.12`). `LATEST.md` is the auto-rendered, attestation-verified authority for exact live tags; this table is the human-readable map.
+Everything below is the **currently-shipping wave** (`ck-allinone v0.7.43` on `pg-base v0.2.12`). `LATEST.md` is the auto-rendered, attestation-verified authority for exact live tags; this table is the human-readable map.
 
 ### `ext:DBExtension` — the graph + governance surface (3)
 
@@ -84,7 +84,7 @@ All multi-arch (`linux/amd64`, `linux/arm64`), all SLSA Build Provenance v1 atte
 
 | Image | Head | Role |
 |---|---|---|
-| **`ociger-ck-allinone`** | `v0.7.42` | Marketplace-minimal CKP v3.12 runtime — the full stack. **Default for prod.** |
+| **`ociger-ck-allinone`** | `v0.7.43` | Marketplace-minimal CKP v3.12 runtime — the full stack. **Default for prod.** |
 | `ociger-pg18-pgrdf-pgck-nats-micro` | `v0.2.12` | The **`pg-base`** `ck-allinone` inherits — pg18/trixie + pgRDF + pgCK + NATS, scratch. |
 | `ociger-pg17-*` (5 images) | — | **RETIRED** at the pg18 move (og#9). |
 | `ociger-core-pg17-{nats,nats-micro,micro,min}` | — | pg17 cores, no extensions. Not on the wave. |
@@ -101,7 +101,7 @@ All non-frozen bundles share **one** set of component pins via [`versions.yaml`]
 
 ```mermaid
 graph TD
-  ck["ck-allinone · v0.7.42<br/><i>oci:FleetImage</i>"]:::fleet
+  ck["ck-allinone · v0.7.43<br/><i>oci:FleetImage</i>"]:::fleet
   base["pg-base · v0.2.12<br/><i>oci:FleetImage</i>"]:::fleet
   pgrdf["pgrdf 0.6.34<br/><i>ext:DBExtension</i>"]:::ext
   pgck["pgck 0.4.109-nats<br/><i>ext:DBExtension</i>"]:::ext
@@ -197,14 +197,17 @@ The ontology view above is *what* is composed. This is *how many bytes*, and it 
 ```bash
 docker run --rm -d --name ck-allinone \
   -v "$PWD/ck-allinone-data:/var/lib/postgresql/data" \
-  -p 15432:5432 -p 18000:8000 -p 14222:4222 -p 19222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.42
+  -e OCIGER_CK_ADMIT_ANONYMOUS=on \
+  -p 18000:8000 -p 19222:9222 \
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.43
 ```
 
 The image is **ready-to-use** on a fresh volume: extensions are auto-created, the kernel's module Adoptions are sealed, and `pgck.nats_url` is set on first boot — no consumer SQL. Verify:
 
 ```bash
 # extensions already present (NOT created by you) at the expected versions
+# 5432 is an OPERATOR plane and is no longer in EXPOSE — add `-p 15432:5432` to the
+# run above if you want it. The consumer surface is 8000 (/cklib) + 9222 (/wss).
 docker run --rm --network host postgres:18-trixie psql -h 127.0.0.1 -p 15432 -U postgres -d postgres \
   -c "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pgrdf','pgck','pgcrypto');"
 
@@ -212,13 +215,94 @@ curl -I http://127.0.0.1:18000/cklib/ck-client.js        # busybox httpd serving
 nc -zv 127.0.0.1 19222                                    # NATS WSS listening
 
 # supply-chain: verify the build attestation
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.42 \
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.43 \
   --repo sporaxis-com/oci-germination
 ```
 
 > `busybox httpd` serves **static files only** — GET/HEAD. It is started with no CGI config, so POST/PUT/DELETE return `501 Not Implemented` by design. All kernel data flows over `/wss`, never HTTP. There is no REST path and no `/ontology` HTTP mount (retracted in v0.7.41 — law confirmation is wire-native).
 
 Browser smoke: open `http://127.0.0.1:18000/` — the landing page opens NATS over WSS and renders **✓ WSS round-trip OK**.
+
+---
+
+## Configuration — the fifteen variables
+
+Every variable the artifact reads. All are read through `strings.TrimSpace(x) != ""`,
+so **empty is exactly equivalent to unset**. Defaults are the image's.
+
+### Identity posture — **the image ships CLOSED**
+
+| variable | image default | effect |
+|---|---|---|
+| `OCIGER_CK_ADMIT_ANONYMOUS` | **`off`** *(baked `ENV`)* | `on` \| `off`. **`off` = unverified connections are REFUSED**, not downgraded. Read from the environment and **never derived** — the default is this ENV and nowhere else, so `docker inspect` tells you what the image will do. Emptying it is refused, not defaulted. |
+| `OCIGER_OIDC_ISSUER` | — | your realm's issuer |
+| `OCIGER_OIDC_AUDIENCE` | — | a token whose `aud` does not carry this is **refused** |
+| `OCIGER_OIDC_JWKS_FILE` | — | path to the JWKS **document**; preferred, **takes precedence** over `_JWKS` |
+| `OCIGER_OIDC_JWKS` | — | the document inline. **A URL is refused by name** — this bundle never fetches (no egress in the live path) |
+| `OCIGER_NATS_ACCOUNT_SEED` | *(minted per boot)* | an `SA…` seed makes the callout account stable across restarts |
+| `OCIGER_NATS_WORKER_PASSWORD` | *(generated per boot)* | worker credential for the in-extension relay |
+
+**A bare `docker run` does not boot — by design.** Closed with no realm means
+nothing can ever be verified, so `ociger-ck-identity` (an s6 **oneshot before
+postgres**) refuses and names the way out. **Deliver a JWKS:**
+
+```bash
+docker run -d --name ck-allinone \
+  -e POSTGRES_PASSWORD=… \
+  -e OCIGER_OIDC_ISSUER=<your realm issuer> \
+  -e OCIGER_OIDC_AUDIENCE=<the audience your tokens carry> \
+  -e OCIGER_OIDC_JWKS_FILE=/run/jwks.json \
+  -v /path/to/realm-jwks.json:/run/jwks.json:ro \
+  -p 18000:8000 -p 19222:9222 \
+  ghcr.io/sporaxis-com/ociger-ck-allinone:latest
+```
+
+The JWKS must be the **document, never a URL**, and must carry at least one
+**Ed25519** key — pgCK verifies EdDSA only, so an RSA-only realm (e.g. RS256)
+cannot ground this bundle and is refused at boot rather than degrading silently
+at admission.
+
+**For local development without identity**, opt in explicitly — every connection
+is then unverified and seals carry no identity:
+
+```bash
+-e OCIGER_CK_ADMIT_ANONYMOUS=on
+```
+
+`on` alongside a configured realm is the **mixed tier**: verified clients
+publish, unverified are downgraded to subscribe-only rather than refused. That
+is a supported pgCK capability, not a fallback.
+
+**Boot refusals** — named clause, non-zero exit, before postgres starts:
+
+| condition | why |
+|---|---|
+| closed (`off`) + no realm | nothing can ever be verified → every connection refused |
+| realm materials set but not resolving (incl. a JWKS with **zero usable Ed25519 keys**) | closed → deny-all even for valid tokens; open → every token silently downgraded |
+| `OCIGER_CK_ADMIT_ANONYMOUS` emptied | the declaration was removed; this bundle will not guess one |
+
+The boot log prints one posture block carrying the **expected audience** and the
+**usable key count + kids**, so a mismatch costs a `grep` rather than a wire probe.
+
+### Kernel and bootstrap
+
+| variable | default | effect |
+|---|---|---|
+| `OCIGER_CK_PROJECT` | `demo` | the seal plane; **always prepended to the roster**. Must be canonical: lowercase, dashes optional, one segment |
+| `OCIGER_CK_KERNELS` | *(the project alone)* | extra roster members. **Routing, not existence** — a rostered name still has to germinate |
+| `OCIGER_INITDB_SQL_FILE` | `/etc/ck-allinone/init.sql` | empty → **no bootstrap at all** |
+| `OCIGER_POSTGRES_CONF_EXTRA` | the `include_if_exists` line | arbitrary `postgresql.conf` lines, **first initdb only**. ⚠️ **the include line is load-bearing** — drop it and issuer, audience, JWKS *and* the account seed all disappear, with the container still booting |
+| `OCIGER_CK_PARTICIPANT_PASSWORD` | — | makes `ck_participant` a login role. Deploys **MUST** set it before external exposure |
+| `OCIGER_CK_PARTICIPANT_HBA` | `1` | non-empty → scram required **before** the trust catch-all (pg_hba is first-match-wins; the order is load-bearing) |
+| `OCIGER_SHARED_PRELOAD_LIBRARIES` | `pgrdf,pgck` | both required — pgCK's bgworker is relay **and** auth-callout responder |
+| `POSTGRES_PASSWORD` | — | superuser |
+
+> **Roster is not existence.** The callout builds a client's publish grants by iterating
+> the roster, so an empty roster grants a verified bot *nothing* — it connects, verifies,
+> and can publish on no subject, so it cannot even germinate. The GUC is the seed; the
+> ledger is the fire. Since pgCK 0.4.100 the effective roster is `pgck.kernels` **∪** every
+> sealed `ckp:Kernel`, refreshed ~5s and minted **per CONNECT** — so a newly germinated
+> name reaches a *new* connection without a restart.
 
 ---
 

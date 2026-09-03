@@ -76,15 +76,73 @@ func main() {
 	pgckConf := getenv("OCIGER_PGCK_CONF", defaultPgckConf)
 
 	oidc, realm := resolveOIDC()
+	oidcSet := oidcVarsSet()
+
+	admitAnon, err := resolveAdmitAnonymous()
+	if err != nil {
+		log.Fatalf("ociger-ck-identity: %v", err)
+	}
+
+	// ── BOOT REFUSALS (v0.7.43) ─────────────────────────────────────────────
+	// This process is an s6 ONESHOT before postgres and nats — the cheap place
+	// to refuse. A bad posture caught here costs a failed boot with a named
+	// clause; the same posture SERVED costs a door that is silently open or
+	// silently dead, diagnosable only from a broker log no consumer can read.
+	//
+	// The posture is expressed by exactly two facts, and neither is derived:
+	// the tier is OCIGER_CK_ADMIT_ANONYMOUS (shipped `off`), and whether a
+	// verifier exists is whether the realm resolves. There is no third
+	// declaration to disagree with them.
+	switch {
+	// The door is closed and there is nothing to open it with. Since the image
+	// ships admit_anonymous=off, THIS is what a bare `docker run` now hits, and
+	// the message is the documentation: it names the intended path first.
+	case !realm && admitAnon == "off":
+		log.Fatalf("ociger-ck-identity: REFUSED — this door is closed to unverified connections " +
+			"(OCIGER_CK_ADMIT_ANONYMOUS=off, the shipped default) but NO REALM IS CONFIGURED, so " +
+			"nothing can ever be verified and every connection would be refused.\n" +
+			"  DELIVER A JWKS — this is the intended path:\n" +
+			"    -e OCIGER_OIDC_ISSUER=<your realm issuer>\n" +
+			"    -e OCIGER_OIDC_AUDIENCE=<the audience your tokens carry>\n" +
+			"    -e OCIGER_OIDC_JWKS_FILE=/run/jwks.json  -v /path/to/jwks.json:/run/jwks.json:ro\n" +
+			"  The JWKS must be the DOCUMENT, never a URL (this bundle never fetches), and must\n" +
+			"  carry at least one Ed25519 key — pgCK verifies EdDSA only.\n" +
+			"  For local development WITHOUT identity, opt in explicitly: " +
+			"-e OCIGER_CK_ADMIT_ANONYMOUS=on (every connection is then UNVERIFIED and seals carry " +
+			"no identity).")
+
+	// Realm materials were supplied and did not ground a verifier. Serving this
+	// with the tier closed is the deny-all quadrant — even a valid token is
+	// refused — and serving it with the tier open silently downgrades every
+	// token. Neither is a door, so refuse and name what is missing.
+	case len(oidcSet) > 0 && !realm:
+		missing := []string{}
+		if strings.TrimSpace(oidc.issuer) == "" {
+			missing = append(missing, "OCIGER_OIDC_ISSUER")
+		}
+		if strings.TrimSpace(oidc.audience) == "" {
+			missing = append(missing, "OCIGER_OIDC_AUDIENCE")
+		}
+		if oidc.jwks == "" {
+			missing = append(missing, "a USABLE JWKS document (see the JWKS UNUSABLE line above)")
+		}
+		log.Fatalf("ociger-ck-identity: REFUSED — %s set, but the realm does not ground a verifier; "+
+			"missing: %s. A partially configured realm is not a door: with the anonymous tier closed "+
+			"every connection is refused, and with it open every token is silently downgraded.",
+			strings.Join(oidcSet, ", "), strings.Join(missing, ", "))
+	}
 
 	if !realm {
 		if err := writeFileMode(natsConf, anonNatsServerConf(), 0o644); err != nil {
 			log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
 		}
-		if err := writePgckConf(pgckConf, anonPgckConf()); err != nil {
+		if err := writePgckConf(pgckConf, anonPgckConf(admitAnon)); err != nil {
 			log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
 		}
-		log.Printf("ociger-ck-identity: no OIDC realm (OCIGER_OIDC_*) → ANONYMOUS mode (callout off); wrote %s + %s", natsConf, pgckConf)
+		log.Printf("ociger-ck-identity: POSTURE anonymous — callout off, token verify OFF, "+
+			"pgck.admit_anonymous=%s (OCIGER_CK_ADMIT_ANONYMOUS). Every connection is admitted UNVERIFIED and seals "+
+			"carry no identity. To run a door, set OCIGER_OIDC_ISSUER + _AUDIENCE + _JWKS_FILE. "+
+			"Wrote %s + %s", admitAnon, natsConf, pgckConf)
 		return
 	}
 
@@ -105,7 +163,7 @@ func main() {
 	if err := writeFileMode(natsConf, natsServerConf(pub, workerPass), 0o644); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", natsConf, err)
 	}
-	if err := writePgckConf(pgckConf, pgckSecretsConf(seed, workerPass, oidc)); err != nil {
+	if err := writePgckConf(pgckConf, pgckSecretsConf(seed, workerPass, oidc, admitAnon)); err != nil {
 		log.Fatalf("ociger-ck-identity: write %s: %v", pgckConf, err)
 	}
 
@@ -113,12 +171,30 @@ func main() {
 	if strings.TrimSpace(os.Getenv("OCIGER_NATS_ACCOUNT_SEED")) != "" {
 		source = "operator-supplied"
 	}
-	verify := "OFF (anonymous tier) — pgck.oidc_jwks omitted"
-	if oidc.jwks != "" {
-		verify = fmt.Sprintf("ON — JWKS document from %s (%d bytes, never fetched)", oidc.jwksSource, len(oidc.jwks))
+	// ONE posture block. The audience and the usable-key census are printed
+	// because they are the two facts every identity diagnosis on this fleet has
+	// needed and neither was ever in the log: an audience mismatch previously
+	// cost several wire probes plus a JWKS decode, and a token refused for the
+	// wrong key looks identical to one refused for the wrong audience.
+	usable, kids := keyCensus(oidc.jwks)
+	kidList := "none"
+	if len(kids) > 0 {
+		kidList = strings.Join(kids, ", ")
 	}
-	log.Printf("ociger-ck-identity: OIDC realm %q → auth-callout ACTIVE; account %s [%s]; token verify: %s; wrote %s + %s",
-		oidc.issuer, pub, source, verify, natsConf, pgckConf)
+	tier := "unverified connections are REFUSED, not downgraded"
+	if admitAnon == "on" {
+		tier = "MIXED TIER: unverified connections are DOWNGRADED to anonymous (subscribe-only, no publish), not refused"
+	}
+	log.Printf("ociger-ck-identity: POSTURE realm — auth-callout ACTIVE, "+
+		"pgck.admit_anonymous=%s (OCIGER_CK_ADMIT_ANONYMOUS) — %s\n"+
+		"  issuer   : %s\n"+
+		"  audience : %s   ← a token whose aud does not carry this is REFUSED\n"+
+		"  jwks     : %d usable Ed25519 key(s) [kid: %s] from %s (%d bytes, never fetched)\n"+
+		"  account  : %s [%s]\n"+
+		"  wrote    : %s + %s",
+		admitAnon, tier,
+		oidc.issuer, oidc.audience, usable, kidList, oidc.jwksSource, len(oidc.jwks),
+		pub, source, natsConf, pgckConf)
 }
 
 // resolveOIDC reads the realm config. All three fields are required — a partial
@@ -329,7 +405,97 @@ no_auth_user: anon
 // pgckSecretsConf renders the postgresql.conf fragment for REALM mode: the
 // account seed, worker-cred nats_url, and the pgck.oidc_* verifier config. Values
 // are single-quoted; embedded single quotes are doubled (postgresql.conf escaping).
-func pgckSecretsConf(seed, workerPass string, oidc oidcConfig) string {
+// ── POSTURE ──────────────────────────────────────────────────────────────
+//
+// pgCK has six identity GUCs. Five are SAFE-BY-EMPTINESS: absent means inert.
+// pgck.admit_anonymous is UNSAFE-BY-ABSENCE — its built-in default is `true`,
+// so a provisioner written the only sane way (emit every key that needs a
+// value) emits the five and leaves the door OPEN under a fully configured
+// realm. The sixth key is structurally invisible to that method, which is why
+// this was a design gap rather than an oversight.
+//
+// It is emitted EXPLICITLY in both branches from v0.7.43. pgck.conf lives on
+// tmpfs and is regenerated at every container start, so the value is owned by
+// the delivery chain and cannot be reverted by a volume wipe — unlike an
+// operator's ALTER SYSTEM, which lands in PGDATA/postgresql.auto.conf and dies
+// with the next `down -v`.
+// resolveAdmitAnonymous reads the posture from the environment. It DERIVES
+// NOTHING.
+//
+// The image bakes ENV OCIGER_CK_ADMIT_ANONYMOUS=off, so the default is visible
+// in `docker inspect` rather than living here. An earlier revision computed the
+// value from whether a realm resolved — which put the default back in code, the
+// exact shape this work exists to remove (`source: default` is an unowned
+// value; a default in Go is an unreadable one).
+//
+// ⚠ THE ANONYMOUS TIER IS A CAPABILITY, NOT A DEFECT. pgCK documents it:
+//
+//	Admission::Anonymous => pub_allow: []                    // deny all publish
+//	                        sub_allow: event.kernel.<k>.>    // read-only subscriber
+//
+// A deployment running a realm PLUS a public read-only tier sets `on` and keeps
+// it. What v0.7.43 changed is only which way the SHIPPED default points: closed,
+// so an operator who configures nothing gets a door that refuses rather than one
+// that admits everyone.
+//
+// Empty is refused rather than defaulted: if the baked ENV has been cleared, the
+// operator removed the declaration and must restate it.
+func resolveAdmitAnonymous() (string, error) {
+	switch v := strings.ToLower(strings.TrimSpace(os.Getenv("OCIGER_CK_ADMIT_ANONYMOUS"))); v {
+	case "on", "true", "1", "yes":
+		return "on", nil
+	case "off", "false", "0", "no":
+		return "off", nil
+	case "":
+		return "", fmt.Errorf("REFUSED — OCIGER_CK_ADMIT_ANONYMOUS is empty. The image ships it as `off`; " +
+			"clearing it removes the posture declaration entirely, and this bundle will not guess " +
+			"one. Set it to off (a door: unverified connections refused) or on (the mixed tier: " +
+			"unverified downgraded to subscribe-only)")
+	default:
+		return "", fmt.Errorf("REFUSED — OCIGER_CK_ADMIT_ANONYMOUS=%q is not a boolean: expected on|off", v)
+	}
+}
+
+// oidcVarsSet reports which OCIGER_OIDC_* variables carry a value. Used by the
+// coherence refusals: an operator who declared `anonymous` while setting realm
+// variables believes they configured a realm and has not.
+func oidcVarsSet() []string {
+	var set []string
+	for _, k := range []string{"OCIGER_OIDC_ISSUER", "OCIGER_OIDC_AUDIENCE", "OCIGER_OIDC_JWKS_FILE", "OCIGER_OIDC_JWKS"} {
+		if strings.TrimSpace(os.Getenv(k)) != "" {
+			set = append(set, k)
+		}
+	}
+	return set
+}
+
+// keyCensus counts the keys pgCK can actually VERIFY with and returns their
+// kids. Printed at boot so an audience or key mismatch costs a grep rather than
+// a wire probe: the two most expensive identity diagnoses on this fleet were
+// both "which key / which audience", and neither was in the log.
+func keyCensus(doc string) (usable int, kids []string) {
+	var parsed struct {
+		Keys []struct {
+			Kty string `json:"kty"`
+			Crv string `json:"crv"`
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	if json.Unmarshal([]byte(doc), &parsed) != nil {
+		return 0, nil
+	}
+	for _, k := range parsed.Keys {
+		if k.Kty == "OKP" && k.Crv == "Ed25519" {
+			usable++
+			if k.Kid != "" {
+				kids = append(kids, k.Kid)
+			}
+		}
+	}
+	return usable, kids
+}
+
+func pgckSecretsConf(seed, workerPass string, oidc oidcConfig, admitAnon string) string {
 	u := url.URL{
 		Scheme: "nats",
 		User:   url.UserPassword(workerUser, workerPass),
@@ -349,15 +515,27 @@ func pgckSecretsConf(seed, workerPass string, oidc oidcConfig) string {
 	}
 	fmt.Fprintf(b, "pgck.oidc_issuer = '%s'\n", sqlQuote(oidc.issuer))
 	fmt.Fprintf(b, "pgck.oidc_audience = '%s'\n", sqlQuote(oidc.audience))
+	// THE SEVENTH KEY. A door that verifies tokens must not also admit
+	// unverified ones: with this absent, pgCK's default `true` silently
+	// DOWNGRADES a token that fails verification (wrong audience, expired,
+	// foreign realm) to the anonymous tier, and the client sees an open socket
+	// and no error. Emitted here so `source` is `configuration file`, not
+	// `default` — an unowned value is one volume wipe from reverting.
+	fmt.Fprintf(b, "pgck.admit_anonymous = %s\n", admitAnon)
 	return b.String()
 }
 
 // anonPgckConf renders the no-realm fragment: an anonymous nats_url and NO
 // account seed, so pgCK's callout responder is not started.
-func anonPgckConf() string {
+func anonPgckConf(admitAnon string) string {
+	// Explicit `on`, not merely pgCK's default: this is the DECLARED anonymous
+	// tier, and declaring it is what makes the realm branch's `off` meaningful.
+	// A bare `docker run` is correct to be anonymous — with no realm there is no
+	// other coherent posture — but it should say so in a file, not by omission.
 	return fmt.Sprintf(`# GENERATED by ociger-ck-identity at boot — DO NOT EDIT.
 %spgck.nats_url = 'nats://127.0.0.1:%d'
-`, resolveKernelPins(), natsCorePort)
+pgck.admit_anonymous = %s
+`, resolveKernelPins(), natsCorePort, admitAnon)
 }
 
 const defaultProject = "demo"

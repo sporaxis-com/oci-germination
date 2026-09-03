@@ -121,7 +121,7 @@ func TestRenderedConfigs(t *testing.T) {
 		t.Fatal("REALM nats-server.conf must NOT have no_auth_user (callout admits everyone)")
 	}
 
-	pg := pgckSecretsConf("SATESTSEED", "wpass", testOIDC)
+	pg := pgckSecretsConf("SATESTSEED", "wpass", testOIDC, "off")
 	for _, want := range []string{
 		"pgck.nats_account_seed = 'SATESTSEED'",
 		"nats://pgck_worker:wpass@127.0.0.1:4222",
@@ -138,7 +138,7 @@ func TestRenderedConfigs(t *testing.T) {
 // A worker password with URL-reserved characters must stay well-formed in the
 // nats_url (operators may supply their own).
 func TestPgckSecretsConf_EncodesReservedPassword(t *testing.T) {
-	pg := pgckSecretsConf("SATESTSEED", "p@ss:w/rd", testOIDC)
+	pg := pgckSecretsConf("SATESTSEED", "p@ss:w/rd", testOIDC, "off")
 	if strings.Contains(pg, "p@ss:w/rd") {
 		t.Fatalf("reserved chars not encoded in nats_url:\n%s", pg)
 	}
@@ -149,7 +149,7 @@ func TestPgckSecretsConf_EncodesReservedPassword(t *testing.T) {
 
 // A JWKS containing a single quote must be doubled for postgresql.conf.
 func TestPgckSecretsConf_EscapesSingleQuote(t *testing.T) {
-	pg := pgckSecretsConf("S", "w", oidcConfig{jwks: `a'b`, issuer: "i", audience: "a"})
+	pg := pgckSecretsConf("S", "w", oidcConfig{jwks: `a'b`, issuer: "i", audience: "a"}, "off")
 	if !strings.Contains(pg, "pgck.oidc_jwks = 'a''b'") {
 		t.Fatalf("single quote not doubled:\n%s", pg)
 	}
@@ -184,7 +184,7 @@ func TestAnonModeConfigs(t *testing.T) {
 	if strings.Contains(nats, "auth_callout") {
 		t.Fatalf("anon nats-server.conf must NOT have auth_callout:\n%s", nats)
 	}
-	pg := anonPgckConf()
+	pg := anonPgckConf("on")
 	if strings.Contains(pg, "nats_account_seed") {
 		t.Fatalf("anon pgck.conf must NOT set an account seed (responder stays off):\n%s", pg)
 	}
@@ -294,7 +294,7 @@ func TestResolveJWKS_MissingFileIsRefusedNotSilent(t *testing.T) {
 // never a partial value — while the realm stays ACTIVE so the responder starts
 // and pgCK degrades to the anonymous tier.
 func TestPgckSecretsConf_OmitsJWKSWhenUnusable(t *testing.T) {
-	out := pgckSecretsConf("SEED", "pw", oidcConfig{issuer: "iss", audience: "aud"})
+	out := pgckSecretsConf("SEED", "pw", oidcConfig{issuer: "iss", audience: "aud"}, "off")
 	if strings.Contains(out, "pgck.oidc_jwks") {
 		t.Fatalf("an unusable JWKS MUST omit the GUC entirely, got:\n%s", out)
 	}
@@ -306,7 +306,7 @@ func TestPgckSecretsConf_OmitsJWKSWhenUnusable(t *testing.T) {
 }
 
 func TestPgckSecretsConf_WritesJWKSDocumentWhenUsable(t *testing.T) {
-	out := pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"})
+	out := pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"}, "off")
 	if !strings.Contains(out, "pgck.oidc_jwks = '"+goodJWKS+"'") {
 		t.Fatalf("the document must be written verbatim, got:\n%s", out)
 	}
@@ -316,9 +316,50 @@ func TestPgckSecretsConf_WritesJWKSDocumentWhenUsable(t *testing.T) {
 	if !strings.Contains(out, "ckp.project = 'demo'") || !strings.Contains(out, "pgck.kernels = 'demo'") {
 		t.Fatalf("both kernel pins must be written and must name the same kernel, got:\n%s", out)
 	}
-	// header + project + kernels + seed + nats_url + jwks + issuer + audience
-	if got := strings.Count(out, "\n"); got != 8 {
-		t.Fatalf("expected 8 lines (header + 7 settings), got %d:\n%s", got, out)
+	// THE SEVENTH KEY (v0.7.43). pgck.admit_anonymous is unsafe-by-absence:
+	// pgCK's built-in default is `true`, so omitting it leaves a fully
+	// configured realm door ALSO admitting unverified connections, and a token
+	// that fails verification is downgraded to anonymous rather than refused.
+	// Asserted on the VALUE, not merely the key: `on` here would be the defect.
+	if !strings.Contains(out, "pgck.admit_anonymous = off") {
+		t.Fatalf("the realm branch must close the anonymous tier explicitly, got:\n%s", out)
+	}
+	// header + project + kernels + seed + nats_url + jwks + issuer + audience + admit_anonymous
+	if got := strings.Count(out, "\n"); got != 9 {
+		t.Fatalf("expected 9 lines (header + 8 settings), got %d:\n%s", got, out)
+	}
+}
+
+// The anonymous branch must DECLARE its posture too. Emitting nothing would
+// leave pgck.admit_anonymous reading `source: default` — an unowned value, which
+// is what allowed a hand-typed ALTER SYSTEM to masquerade as configuration and
+// then vanish with the next volume wipe.
+func TestAnonPgckConf_DeclaresTheAnonymousTier(t *testing.T) {
+	out := anonPgckConf("on")
+	if !strings.Contains(out, "pgck.admit_anonymous = on") {
+		t.Fatalf("the anonymous branch must declare the tier it runs, got:\n%s", out)
+	}
+	// A no-realm door must never carry realm materials.
+	for _, forbidden := range []string{"pgck.oidc_", "pgck.nats_account_seed"} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("anonymous conf must not carry %s, got:\n%s", forbidden, out)
+		}
+	}
+}
+func TestKeyCensusCountsOnlyUsableKeys(t *testing.T) {
+	mixed := `{"keys":[` +
+		`{"kty":"OKP","crv":"Ed25519","kid":"ed1","x":"AAAA"},` +
+		`{"kty":"RSA","alg":"RS256","kid":"rsa1","n":"x","e":"AQAB"},` +
+		`{"kty":"OKP","crv":"Ed25519","kid":"ed2","x":"BBBB"}]}`
+	n, kids := keyCensus(mixed)
+	if n != 2 {
+		t.Fatalf("expected 2 usable Ed25519 keys, got %d", n)
+	}
+	if strings.Join(kids, ",") != "ed1,ed2" {
+		t.Fatalf("census must name the usable kids, got %v", kids)
+	}
+	if n, _ := keyCensus("not json"); n != 0 {
+		t.Fatalf("an unparseable document has no usable keys, got %d", n)
 	}
 }
 
@@ -332,8 +373,8 @@ func TestKernelPinsAgreeAcrossPlanesAndModes(t *testing.T) {
 		mode string
 		conf string
 	}{
-		{"realm", pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"})},
-		{"anon", anonPgckConf()},
+		{"realm", pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "iss", audience: "aud"}, "off")},
+		{"anon", anonPgckConf("on")},
 	} {
 		for _, want := range []string{"ckp.project = '" + kernel + "'", "pgck.kernels = '" + kernel + "'"} {
 			if !strings.Contains(tc.conf, want) {
@@ -437,6 +478,67 @@ func TestNoEgressInThisPackage(t *testing.T) {
 	for _, banned := range []string{`"net/http"`, "http.Get(", "http.Client{"} {
 		if strings.Contains(string(src), banned) {
 			t.Fatalf("ociger-ck-identity MUST NOT perform egress; found %s", banned)
+		}
+	}
+}
+func TestAdmitAnonymousAlwaysReachesTheConf(t *testing.T) {
+	for _, v := range []string{"on", "off"} {
+		if got := pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "i", audience: "a"}, v); !strings.Contains(got, "pgck.admit_anonymous = "+v) {
+			t.Fatalf("realm conf must carry admit_anonymous=%s, got:\n%s", v, got)
+		}
+		if got := anonPgckConf(v); !strings.Contains(got, "pgck.admit_anonymous = "+v) {
+			t.Fatalf("anon conf must carry admit_anonymous=%s, got:\n%s", v, got)
+		}
+	}
+}
+
+// THE POSTURE IS READ, NEVER DERIVED.
+//
+// v0.7.43 moved the default out of this package and into `ENV
+// OCIGER_CK_ADMIT_ANONYMOUS=off` in the Dockerfile, so that an operator can read
+// what the image will do with `docker inspect` instead of from Go. These cases
+// hold that line: if anyone reintroduces a fallback here, the empty case starts
+// returning a value instead of an error and this fails.
+func TestAdmitAnonymousIsReadFromEnvNotDerived(t *testing.T) {
+	for _, tc := range []struct {
+		env, want string
+		wantErr   bool
+	}{
+		{"off", "off", false},
+		{"on", "on", false},
+		{"OFF", "off", false},
+		{"  on  ", "on", false},
+		{"true", "on", false},
+		{"false", "off", false},
+		{"", "", true},      // no fallback: an absent declaration is refused
+		{"maybe", "", true}, // not a boolean: refused by name
+	} {
+		t.Setenv("OCIGER_CK_ADMIT_ANONYMOUS", tc.env)
+		got, err := resolveAdmitAnonymous()
+		if tc.wantErr {
+			if err == nil {
+				t.Fatalf("OCIGER_CK_ADMIT_ANONYMOUS=%q must be refused, got %q", tc.env, got)
+			}
+			continue
+		}
+		if err != nil || got != tc.want {
+			t.Fatalf("OCIGER_CK_ADMIT_ANONYMOUS=%q: got (%q,%v), want (%q,nil)", tc.env, got, err, tc.want)
+		}
+	}
+}
+
+// Whatever the env said must reach pgck.conf verbatim, in BOTH branches — that
+// is what makes pg_settings report `source: configuration file` rather than
+// `default`, which was the original finding.
+func TestPostureReachesTheConfInBothBranches(t *testing.T) {
+	for _, v := range []string{"on", "off"} {
+		realm := pgckSecretsConf("SEED", "pw", oidcConfig{jwks: goodJWKS, issuer: "i", audience: "a"}, v)
+		if !strings.Contains(realm, "pgck.admit_anonymous = "+v) {
+			t.Fatalf("realm conf must carry admit_anonymous=%s, got:\n%s", v, realm)
+		}
+		anon := anonPgckConf(v)
+		if !strings.Contains(anon, "pgck.admit_anonymous = "+v) {
+			t.Fatalf("anon conf must carry admit_anonymous=%s, got:\n%s", v, anon)
 		}
 	}
 }

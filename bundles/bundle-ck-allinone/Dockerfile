@@ -115,7 +115,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.12 all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS + cklib 1.6.3, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout), no /ontology HTTP mount."
+LABEL org.opencontainers.image.description="CKP v3.12 all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS + cklib 1.6.3, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Identity posture is DECLARED, not defaulted: ociger-ck-identity emits pgck.admit_anonymous explicitly in both branches (off under a realm, on when anonymous) and REFUSES at boot on an incoherent posture rather than serving a door that is open or dead. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout), no /ontology HTTP mount."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
@@ -204,6 +204,18 @@ ENV OCIGER_INITDB_SQL_FILE=/etc/ck-allinone/init.sql
 # OCIGER_CK_PARTICIPANT_PASSWORD before external exposure; without it,
 # ck_participant exists but cannot log in (no default password — a default
 # would make the role floor cosmetic per pgCK v3.9 §7).
+# ── IDENTITY POSTURE — the default is HERE, visible in `docker inspect`, and
+# nowhere else. Not in Go, not in a config file, not in a script: an operator
+# must be able to read what this image will do before running it.
+#
+# SHIPPED CLOSED. `off` means unverified connections are REFUSED, not downgraded
+# to the anonymous tier. With no realm configured that combination cannot serve
+# anyone, so ociger-ck-identity REFUSES AT BOOT and names the path out — which is
+# deliberate: a bundle whose whole point is attributable, sealed writes should
+# ask for a JWKS rather than quietly accept everyone. Anonymous remains fully
+# supported and is one explicit variable away (`=on`), which is the right cost
+# for a door that verifies nothing.
+ENV OCIGER_CK_ADMIT_ANONYMOUS=off
 ENV OCIGER_CK_PARTICIPANT_HBA=1
 # (v0.7.30) OCIGER_DISABLE_OUTBOX_DRAIN removed — it only gated the deleted Go
 # relay's drain. pgCK 0.4.24-nats owns the ckp.outbox drain in-process.
@@ -211,7 +223,12 @@ ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1
 
-EXPOSE 5432 8000 4222 9222
+# The CONSUMER surface only: busybox httpd (/cklib, the landing page) and the
+# NATS websocket the client speaks. EXPOSE is metadata — it publishes nothing —
+# but `docker run -P` publishes everything listed, and tooling reads it as
+# intent. PostgreSQL (5432) and NATS core (4222) are OPERATOR planes: still
+# reachable with an explicit `-p`, no longer offered by default.
+EXPOSE 8000 9222
 VOLUME ["/var/lib/postgresql/data"]
 
 ENTRYPOINT ["/init"]

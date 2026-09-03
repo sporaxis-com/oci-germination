@@ -46,9 +46,15 @@ mkdir -p "$DATA_DIR"
 # Start container
 echo "[ck-allinone] Starting container..."
 docker network create "$NETWORK_NAME" >/dev/null
+# v0.7.43 ships the door CLOSED (OCIGER_CK_ADMIT_ANONYMOUS=off) and refuses to boot
+# without a realm. This harness exercises the ANONYMOUS tier deliberately, so it
+# DECLARES that — the posture under test is visible at the call site rather than
+# inherited from whatever the image happens to default to. verify-callout.sh is the
+# script that exercises the realm tier; it builds its own realm and sets off.
 docker run --rm -d \
   --name "$CONTAINER_NAME" \
   --network "$NETWORK_NAME" \
+  -e OCIGER_CK_ADMIT_ANONYMOUS=on \
   -e POSTGRES_PASSWORD=smoketest \
   -e OCIGER_CK_PARTICIPANT_PASSWORD=smoke-participant \
   -p 35432:5432 -p 38000:8000 -p 34222:4222 -p 39222:9222 \
