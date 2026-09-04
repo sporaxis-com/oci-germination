@@ -33,17 +33,17 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + pgcrypto + N
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-**Version composition** — **test-confirmed** against this digest at `2026-09-04T13:25:22Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
+**Version composition** — **test-confirmed** against this digest at `2026-09-04T13:29:45Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
 
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12` | `FROM` | gate-before-push | ✓ gated |
-| `postgresql` | engine | `18` | `server` | `Unable to find image 'postgres:17-bookworm' locally` | ✗ |
+| `postgresql` | engine | `18` | `server` | `18.6 (Debian 18.6-1.pgdg13+2)` | ✓ |
 | `pgcrypto` | extension | `builtin` | `CREATE EXTENSION` | gate-before-push | ✓ gated |
-| `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
-| `pgrdf.version()` | native | `0.6.34` | `self-report` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
-| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
-| `pgck.version()` | native | `0.4.109` | `self-report` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
+| `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `0.6.34` | ✓ |
+| `pgrdf.version()` | native | `0.6.34` | `self-report` | `0.6.34` | ✓ |
+| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `0.4.109` | ✓ |
+| `pgck.version()` | native | `0.4.109` | `self-report` | `pgck 0.4.109` | ✓ |
 | `s6-overlay` | component | `3.2.3.0` | `—` | gate-before-push | ✓ gated |
 | `busybox` | component | `1.36.1` | `httpd :8000` | gate-before-push | ✓ gated |
 | `cklib` | component | `1.6.4` | `/app/cklib` | gate-before-push | ✓ gated |
