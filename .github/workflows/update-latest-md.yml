@@ -54,6 +54,18 @@ jobs:
           # re-probe its native .version() surfaces, and re-stamp the JSON. Best-
           # effort — a flaky probe leaves the committed JSON and falls back to the
           # expected layer map; it never fails the render. See PROVENANCE.md.
+          #
+          # ⚠ KNOWN LIMIT, measured 2026-09-04. The trigger is "digest CHANGED",
+          # so a record that is WRONG but carries the CURRENT digest is invisible
+          # to this refresh: re-running the workflow will not repair it, because
+          # from here it looks already-current. That is exactly what happened for
+          # v0.7.43 and v0.7.44 — a broken probe wrote error strings into the
+          # `Confirmed (real)` column with all_match:false, stamped them with the
+          # right digest, and then no amount of re-running could correct it.
+          # Repairing such a record means regenerating it with
+          # tools/version_composition.py --probe and committing the result.
+          # A freshness check that only asks "did the subject change" cannot
+          # notice that its own last answer was wrong.
           PROBE_COMPOSITION: "1"
         run: |
           set -euo pipefail

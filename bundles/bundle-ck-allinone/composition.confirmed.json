@@ -1,7 +1,7 @@
 {
   "bundle": "bundle-ck-allinone",
   "index_digest": "sha256:549bb95a009ac862f712c07f63209b9ccc16df45a49e3d2b73eb1088c7e7ce4f",
-  "all_match": false,
+  "all_match": true,
   "layers": [
     {
       "layer": "base image",
@@ -18,8 +18,8 @@
       "expected": "18",
       "mapping": "server",
       "probe": "postgres",
-      "confirmed": "Unable to find image 'postgres:17-bookworm' locally",
-      "verdict": "✗"
+      "confirmed": "18.6 (Debian 18.6-1.pgdg13+2)",
+      "verdict": "✓"
     },
     {
       "layer": "pgcrypto",
@@ -36,8 +36,8 @@
       "expected": "0.6.34",
       "mapping": "CREATE EXTENSION",
       "probe": "pgrdf_ext",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
-      "verdict": "✗"
+      "confirmed": "0.6.34",
+      "verdict": "✓"
     },
     {
       "layer": "pgrdf.version()",
@@ -45,8 +45,8 @@
       "expected": "0.6.34",
       "mapping": "self-report",
       "probe": "pgrdf_fn",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
-      "verdict": "✗"
+      "confirmed": "0.6.34",
+      "verdict": "✓"
     },
     {
       "layer": "pgck",
@@ -54,8 +54,8 @@
       "expected": "0.4.109",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
-      "verdict": "✗"
+      "confirmed": "0.4.109",
+      "verdict": "✓"
     },
     {
       "layer": "pgck.version()",
@@ -63,8 +63,8 @@
       "expected": "0.4.109",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
-      "verdict": "✗"
+      "confirmed": "pgck 0.4.109",
+      "verdict": "✓"
     },
     {
       "layer": "s6-overlay",
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44",
-  "confirmed_at": "2026-09-04T13:25:22Z"
+  "confirmed_at": "2026-09-04T13:29:45Z",
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44"
 }
