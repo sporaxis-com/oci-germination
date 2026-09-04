@@ -13,40 +13,40 @@ The active **CKP v3.12** wave: the `ociger-ck-allinone` all-in-one and the `ocig
 > **Policy.** Per [`PROVENANCE.md`](./PROVENANCE.md) Rule 2, only bundle releases that pass `gh attestation verify` for their published digest are advertised here.
 
 
-## ociger-ck-allinone — `v0.7.43`
+## ociger-ck-allinone — `v0.7.44`
 
 PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + pgcrypto + NATS core (4222) + NATS WSS (9222) + CK.Lib.Js at `/cklib/`. s6-overlay supervises; postgres runs as uid 999, and NATS + busybox httpd (`/app` on :8000) drop to non-root users. Scratch base. No Python, no postgres client — bootstrap runs through `postgres --single`. pgCK's `-nats` build owns the in-extension inbound dispatch, the `$SYS.REQ.USER.AUTH` auth-callout responder, and the `ckp.outbox` drain in-process (no Go relay). `ociger-ck-identity` boot-provisions the OIDC-gated auth-callout; the account seed is never baked into the image.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:64347fa100b999a4552f8c6ec7da7201f7d192e44d72e88dafb60a1408efb291`  | 2026-09-03 09:26:21 |
-| arm64 | `sha256:62aa9ead25654a6a63fbd3059650fa73173a07c381ce58042e27c533cc362fb7`  | 2026-09-03 09:26:21 |
+| amd64 | `sha256:7e5a3fe3d85f756d6391046ea19ecf110641847c48105629b1c5bc4ebbdc011d`  | 2026-09-04 13:22:47 |
+| arm64 | `sha256:61f90a29d51c088f48bb3dbabb02a263b3fc38033045a38df99b62e584fbad86`  | 2026-09-04 13:22:47 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.43`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:db49d8e5b788a10c5c0a9190be753ef898bd61a4ca3ff6de603f74e0fa6ed33a`                                                         |
+| Index digest       | `sha256:549bb95a009ac862f712c07f63209b9ccc16df45a49e3d2b73eb1088c7e7ce4f`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
 | Source bundle      | [`bundles/bundle-ck-allinone/`](./bundles/bundle-ck-allinone/)                                          |
 | Repo packages view | https://github.com/orgs/sporaxis-com/packages/container/package/ociger-ck-allinone |
 
-**Version composition** — **test-confirmed** against this digest at `2026-09-03T09:28:30Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
+**Version composition** — **test-confirmed** against this digest at `2026-09-04T13:25:22Z` — every probed native version was read back from the running image; the rest are gated by the bundle's gate-before-push smoke.
 
 | Layer | Kind | Expected | Mapping | Confirmed (real) | Verdict |
 |-------|------|----------|---------|------------------|---------|
 | `base image` | base | `ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12` | `FROM` | gate-before-push | ✓ gated |
 | `postgresql` | engine | `18` | `server` | `Unable to find image 'postgres:17-bookworm' locally` | ✗ |
 | `pgcrypto` | extension | `builtin` | `CREATE EXTENSION` | gate-before-push | ✓ gated |
-| `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788427633" to address: Temporary failure in name resolution` | ✗ |
-| `pgrdf.version()` | native | `0.6.34` | `self-report` | `psql: error: could not translate host name "vercomp-1788427633" to address: Temporary failure in name resolution` | ✗ |
-| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788427633" to address: Temporary failure in name resolution` | ✗ |
-| `pgck.version()` | native | `0.4.109` | `self-report` | `psql: error: could not translate host name "vercomp-1788427633" to address: Temporary failure in name resolution` | ✗ |
+| `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
+| `pgrdf.version()` | native | `0.6.34` | `self-report` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
+| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
+| `pgck.version()` | native | `0.4.109` | `self-report` | `psql: error: could not translate host name "vercomp-1788528245" to address: Temporary failure in name resolution` | ✗ |
 | `s6-overlay` | component | `3.2.3.0` | `—` | gate-before-push | ✓ gated |
 | `busybox` | component | `1.36.1` | `httpd :8000` | gate-before-push | ✓ gated |
-| `cklib` | component | `1.6.3` | `/app/cklib` | gate-before-push | ✓ gated |
+| `cklib` | component | `1.6.4` | `/app/cklib` | gate-before-push | ✓ gated |
 | `nats-server` | component | `2.14.2` | `—` | gate-before-push | ✓ gated |
 | `ociger-pg-launcher` | component | `in-tree` | `—` | gate-before-push | ✓ gated |
 | `ociger-ck-identity` | component | `in-tree` | `boot-provisioner` | gate-before-push | ✓ gated |

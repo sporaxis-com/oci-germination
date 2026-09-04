@@ -1,6 +1,6 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:db49d8e5b788a10c5c0a9190be753ef898bd61a4ca3ff6de603f74e0fa6ed33a",
+  "index_digest": "sha256:549bb95a009ac862f712c07f63209b9ccc16df45a49e3d2b73eb1088c7e7ce4f",
   "all_match": false,
   "layers": [
     {
@@ -36,7 +36,7 @@
       "expected": "0.6.34",
       "mapping": "CREATE EXTENSION",
       "probe": "pgrdf_ext",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788427633\" to address: Temporary failure in name resolution",
+      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
       "verdict": "✗"
     },
     {
@@ -45,7 +45,7 @@
       "expected": "0.6.34",
       "mapping": "self-report",
       "probe": "pgrdf_fn",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788427633\" to address: Temporary failure in name resolution",
+      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
       "verdict": "✗"
     },
     {
@@ -54,7 +54,7 @@
       "expected": "0.4.109",
       "mapping": "CREATE EXTENSION",
       "probe": "pgck_ext",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788427633\" to address: Temporary failure in name resolution",
+      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
       "verdict": "✗"
     },
     {
@@ -63,7 +63,7 @@
       "expected": "0.4.109",
       "mapping": "self-report",
       "probe": "pgck_fn",
-      "confirmed": "psql: error: could not translate host name \"vercomp-1788427633\" to address: Temporary failure in name resolution",
+      "confirmed": "psql: error: could not translate host name \"vercomp-1788528245\" to address: Temporary failure in name resolution",
       "verdict": "✗"
     },
     {
@@ -87,7 +87,7 @@
     {
       "layer": "cklib",
       "kind": "component",
-      "expected": "1.6.3",
+      "expected": "1.6.4",
       "mapping": "/app/cklib",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.43",
-  "confirmed_at": "2026-09-03T09:28:30Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44",
+  "confirmed_at": "2026-09-04T13:25:22Z"
 }
