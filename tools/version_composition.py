@@ -108,8 +108,20 @@ def probe(image_ref: str) -> dict:
     suf = str(int(time.time()))
     net, name = f"vercomp-{suf}", f"vercomp-{suf}"
     sh(["docker", "network", "create", net])
+    # OCIGER_CK_ADMIT_ANONYMOUS=on IS REQUIRED, and its absence was a silent
+    # publishing defect. v0.7.43 made the image ship CLOSED: a container with no
+    # realm REFUSES TO BOOT. This prober boots a bare container, so from v0.7.43
+    # it never started — every probe then failed with "could not translate host
+    # name", and those error strings were written into composition.confirmed.json
+    # and PUBLISHED as the `Confirmed (real)` column of LATEST.md's composition
+    # table, with all_match:false, for v0.7.43 and v0.7.44.
+    #
+    # This is a version probe, not an identity test: the anonymous tier is the
+    # right posture for it, and declaring it is what the rest of the repo's
+    # harnesses do since v0.7.43. Do not remove it to "simplify" the call.
     sh(["docker", "run", "-d", "--name", name, "--network", net,
         "-e", "POSTGRES_PASSWORD=vercomp", "-e", "OCIGER_CK_PARTICIPANT_PASSWORD=vercomp",
+        "-e", "OCIGER_CK_ADMIT_ANONYMOUS=on",
         image_ref])
     try:
         for _ in range(60):
@@ -121,7 +133,7 @@ def probe(image_ref: str) -> dict:
         results = {}
         for key, q in PSQL_PROBES.items():
             r = sh(["docker", "run", "--rm", "--network", net, "-e", "PGPASSWORD=vercomp",
-                    "postgres:17-bookworm", "psql", "-h", name, "-U", "postgres",
+                    "postgres:18-trixie", "psql", "-h", name, "-U", "postgres",
                     "-d", "postgres", "-At", "-c", q])
             results[key] = (r.stdout.strip() or r.stderr.strip().splitlines()[0] if r.stderr else r.stdout.strip())
         results["_index_digest"] = index_digest(image_ref)
