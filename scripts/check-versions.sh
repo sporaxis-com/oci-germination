@@ -44,6 +44,33 @@ echo "── canonical (versions.yaml): pgrdf=$WANT_PGRDF pgck=$WANT_PGCK cklib=
 printf '%-40s %-12s %-12s %-10s %-12s %s\n' "bundle" "pgrdf" "pgck" "cklib" "bundle.yaml" "status"
 printf '%-40s %-12s %-12s %-10s %-12s %s\n' "──────" "─────" "────" "─────" "───────────" "──────"
 
+# ── PROSE GATE ───────────────────────────────────────────────────────────────
+# A bundle.yaml `description` is PUBLISHED — version_composition.py and
+# render-latest-md.py read this file to build the composition table in
+# LATEST.md — but nothing ever compared it, so it rotted: ck-allinone's spent
+# ~85 pgCK releases advertising pgRDF 0.6.20 / pgCK 0.4.24 / cklib 1.5.5 while
+# the structured fields beside it were current, because THOSE are gated.
+#
+# The fix is not to compare the prose (a description is not a manifest) but to
+# forbid version numbers in it: a claim that cannot be made cannot go stale.
+# Structured `version:` keys carry versions; the description carries meaning.
+prose=0
+prose_details=""
+for df in bundles/*/bundle.yaml; do
+  bundle=$(basename "$(dirname "$df")" | sed 's/^bundle-//')
+  desc=$(grep -m1 '^description:' "$df" 2>/dev/null | sed 's/^description: *//')
+  [ -n "$desc" ] || continue
+  # A frozen bundle's prose is stale ON PURPOSE, exactly like its pins: it
+  # describes the artifact that was actually cut. Reporting it as a risk would
+  # train the reader to ignore this section.
+  is_frozen "$bundle" && continue
+  bad=$(printf '%s' "$desc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+|v3\.[0-9]+|0\.[46]\.[0-9]+' | sort -u | tr '\n' ' ')
+  if [ -n "$bad" ]; then
+    prose=1
+    prose_details="${prose_details}    ${bundle}: description carries version string(s): ${bad}— move them to the extensions:/components: blocks, which are gated\n"
+  fi
+done
+
 drift=0
 details=""
 # EVERY bundle dir carrying a Dockerfile — not just `bundle-*`. The old glob
@@ -109,4 +136,5 @@ if [ "$drift" -gt 0 ]; then
   [ "$REPORT_ONLY" = 1 ] && exit 0
   exit 1
 fi
-echo "✓ all non-frozen bundles match versions.yaml"
+[ "$prose" = 0 ] || { printf "\n  PROSE DRIFT RISK (descriptions are published but ungated):\n"; printf "$prose_details"; echo "✗ version numbers in a bundle.yaml description"; exit 1; }
+echo "✓ all non-frozen bundles match versions.yaml; no version strings in any description"

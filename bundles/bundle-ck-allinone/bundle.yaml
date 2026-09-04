@@ -1,9 +1,19 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.43
+version: v0.7.44
 role: prod
 never_prod: false
-description: "CKP v3.9 Critical Isolation ENFORCED — PostgreSQL 18 (trixie, glibc 2.41) + pgRDF 0.6.20 + pgCK 0.4.24-pg18-nats + pgcrypto + NATS 2.14.2 (core+WSS) + cklib 1.5.5, supervised by s6-overlay, web served by busybox httpd. Scratch base. No Python, no postgres client. The Go ociger-pgck-relay is DELETED: pgCK 0.4.24-nats owns the in-extension inbound dispatch (F1-inbound, hop 4 — ckp.requester from the broker-enforced verified identity), the NATS auth-callout responder, and the ckp.outbox drain in-process, activated by pgck.nats_url (+ pgck.nats_account_seed for the callout)."
+# ── NO VERSION NUMBERS IN `description` ──────────────────────────────────
+# They belong in the extensions:/components: blocks below, which
+# scripts/check-versions.sh compares against versions.yaml and fails CI on.
+# Prose is gated by nothing and therefore rots: this line spent ~85 pgCK
+# releases claiming pgRDF 0.6.20 / pgCK 0.4.24 / cklib 1.5.5 / CKP v3.9 while
+# the bundle actually shipped 0.6.34 / 0.4.109 / 1.6.3 / v3.12, and it is
+# published — version_composition.py and render-latest-md.py read this file to
+# build the composition table in LATEST.md. The sibling base bundle records the
+# same lesson under its image: block ("bound to nothing until the strict loader
+# landed"). Keep this text version-free and it cannot drift.
+description: "CKP all-in-one: PostgreSQL 18 (trixie) + pgRDF + pgCK (-nats build) + pgcrypto + NATS core and WSS + CK.Lib.Js at /cklib/, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Scratch base; no Python, no postgres client, no Go relay — pgCK's -nats build owns in-extension inbound dispatch, the auth-callout responder and the ckp.outbox drain in-process. Identity posture is DECLARED, never defaulted: OCIGER_CK_ADMIT_ANONYMOUS ships `off`, so a container with no realm REFUSES AT BOOT rather than admitting everyone."
 
 # Hand-crafted bundle: layers s6-overlay + busybox httpd + cklib + two
 # in-tree Go binaries on top of pg18-pgrdf-pgck-nats-micro. Generator
@@ -46,7 +56,7 @@ components:
     port: 8000
     description: Single static binary; httpd applet serves /app on :8000.
   cklib:
-    version: 1.6.3
+    version: 1.6.4
     source: https://github.com/ConceptKernel/CK.Lib.Js
     mount_path: /app/cklib
     description: Browser JavaScript client library for CKP v3.9 kernel dispatch + NATS WSS, served at /cklib/ over HTTP. v1.5.3 — the dispatch-only client, verified TYPED-SEALED live against the v0.7.17 convergence cut (the consumer half of the three-repo v3.9 loop). Ships ck.js (the L2 dispatch facade / entry point — CK/ConceptKernel/ckOn + the instance.*/kernel.* op→verb table), ck-client.js (vendored transport, grammar-agnostic result.kernel.<K>.> subscription), ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js. No index.html, no RDF tier, no esm.sh fetch. The smoke ⑤± gate asserts this exact attested file set (the byte-set packaging contract adopted by both sides).
@@ -67,7 +77,7 @@ components:
     source: ./cmd/ociger-ck-identity
     runs_as: s6 oneshot (before nats + postgres)
     description: >-
-      Boot-time NATS auth-callout provisioner (v0.7.30), GATED on an OIDC realm. When OCIGER_OIDC_JWKS + OCIGER_OIDC_ISSUER + OCIGER_OIDC_AUDIENCE are supplied it activates the callout: resolves the callout ACCOUNT nkey (OCIGER_NATS_ACCOUNT_SEED if supplied → stable, else minted per boot) + the pgck_worker bypass password, then writes /etc/nats/nats-server.conf (auth_callout issuer = account pubkey, pgck_worker the sole auth_user) and /run/ck-identity/pgck.conf (pgck.nats_account_seed + worker-cred pgck.nats_url + pgck.oidc_*) from ONE account, so the seed pgCK signs admittance with always matches the issuer the broker verifies. With no realm it writes an anonymous config (no callout, no seed → pgCK responder not started), so adopters without an IdP still dispatch. postgres pulls the fragment via include_if_exists; v0.7.31 hardening writes pgck.conf 0640 and chowns it to postgres(999) so the dropped-to-non-root nats/httpd services cannot read the seed. The seed is NEVER baked into the image.
+      Boot-time NATS auth-callout provisioner (v0.7.30), GATED on an OIDC realm. When OCIGER_OIDC_JWKS + OCIGER_OIDC_ISSUER + OCIGER_OIDC_AUDIENCE are supplied it activates the callout: resolves the callout ACCOUNT nkey (OCIGER_NATS_ACCOUNT_SEED if supplied → stable, else minted per boot) + the pgck_worker bypass password, then writes /etc/nats/nats-server.conf (auth_callout issuer = account pubkey, pgck_worker the sole auth_user) and /run/ck-identity/pgck.conf (pgck.nats_account_seed + worker-cred pgck.nats_url + pgck.oidc_*) from ONE account, so the seed pgCK signs admittance with always matches the issuer the broker verifies. With no realm it writes an anonymous config (no callout, no seed → pgCK responder not started). SINCE v0.7.43 THAT PATH IS NOT THE DEFAULT: the image bakes OCIGER_CK_ADMIT_ANONYMOUS=off, so a container with no realm REFUSES AT BOOT with a named clause pointing at the JWKS. Adopters without an IdP opt in explicitly with OCIGER_CK_ADMIT_ANONYMOUS=on, and every connection is then unverified. postgres pulls the fragment via include_if_exists; v0.7.31 hardening writes pgck.conf 0640 and chowns it to postgres(999) so the dropped-to-non-root nats/httpd services cannot read the seed. The seed is NEVER baked into the image.
     security: >-
       The account seed is the admittance-signing secret — anyone holding it can forge verified identities. It lives only in tmpfs (/run) + process memory; per-boot ephemeral by default. Operators wanting a stable account set OCIGER_NATS_ACCOUNT_SEED (delivered like the OIDC config); it is honored verbatim.
 
@@ -98,7 +108,7 @@ runtime_inputs:
       and every connection in the anonymous tier (og#29). ociger-ck-identity refuses a
       URL by name, and on any failure OMITS pgck.oidc_jwks entirely rather than writing
       a value that cannot verify: an absent GUC degrades to anonymous-but-alive, while
-      an unusable one combined with strict admittance would refuse every connection.
+      an unusable one combined with strict admittance would refuse every connection — which since v0.7.43 is refused AT BOOT by ociger-ck-identity rather than served as a dead door.
     gate: >-
       SELECT current_setting('pgck.oidc_jwks') begins with '{' and parses as a JWKS
       carrying at least one kty:OKP / crv:Ed25519 key; the boot log reads

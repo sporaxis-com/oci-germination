@@ -7,7 +7,7 @@
 
 ARG PG_BASE_VERSION=v0.2.12
 ARG S6_OVERLAY_VERSION=3.2.3.0
-ARG CKLIB_VERSION=1.6.3
+ARG CKLIB_VERSION=1.6.4
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
 # `docker build` without --build-arg lands a clearly-distinguished image.
 ARG BUNDLE_VERSION=dev
@@ -38,7 +38,12 @@ ARG GIT_SHA=unknown
 FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
-# 1.6.3 — follows the 1.6.1 determinism release, built to SPEC.CK-DOOR.v1.6.1. Refusals THROW
+# 1.6.4 — the measured release, built to SPEC.CK-DOOR.v1.6.4 §13 (R-26..R-33).
+# Adds adoption.check + adoption.loadable (a structural verdict verified/refused/
+# unknown, never a boolean) and capabilities() -> {declared,routed,unsealed,gap}.
+# Consumer-visible: an empty affordances[] is NOT "no capabilities" — 0 sealed vs
+# 40 routed is the normal shape on a fresh bundle, so nothing may gate on
+# declared.length. Follows the 1.6.1 determinism line. Refusals THROW
 # verbatim (refused/sqlstate/reply) instead of collapsing to []/null; `kernel` is
 # required at construction and unknown options throw naming the key; the retired
 # options (dispatchMode, claimSub, stateEndpoint, dictVersion, topicDefs) are
@@ -47,9 +52,9 @@ FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12 AS pg_base
 # Ships: LICENSE, ck.js (the L2 facade), ck-client.js (vendored transport),
 # ck-store.js (typed-instance cache), vendor/{msgpack,nats.ws}.js.
 # NOTE: 1.6.x DROPS README.md — SIX files, not the seven 1.5.x shipped. The smoke
-# ⑤± gate asserts this file set BYTE-FOR-BYTE; 1.6.3 re-measured 2026-09-02 as
+# ⑤± gate asserts this file set BYTE-FOR-BYTE; 1.6.4 re-measured 2026-09-04 as
 # the identical six-file set, so the gate's list is unchanged from 1.6.1.
-FROM ghcr.io/conceptkernel/ck-lib-js:1.6.3 AS cklib_source
+FROM ghcr.io/conceptkernel/ck-lib-js:1.6.4 AS cklib_source
 
 # ─── Stage 3: busybox (provides /bin/busybox; httpd applet inside) ────────
 FROM busybox:1.36.1-musl AS busybox_src
@@ -115,7 +120,7 @@ ARG BUNDLE_VERSION
 ARG GIT_SHA
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 LABEL org.opencontainers.image.source="https://github.com/sporaxis-com/oci-germination"
-LABEL org.opencontainers.image.description="CKP v3.12 all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS + cklib 1.6.3, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Identity posture is DECLARED, not defaulted: ociger-ck-identity emits pgck.admit_anonymous explicitly in both branches (off under a realm, on when anonymous) and REFUSES at boot on an incoherent posture rather than serving a door that is open or dead. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout), no /ontology HTTP mount."
+LABEL org.opencontainers.image.description="CKP v3.12 all-in-one minimal (ships v3.11 + v3.12 FINAL ontology trees; pgCK boots the v3.12 root) — PG18 (trixie) + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS + cklib 1.6.4, supervised by s6-overlay, web served by busybox httpd (static GET/HEAD only, no CGI). Identity posture is DECLARED, not defaulted: ociger-ck-identity emits pgck.admit_anonymous explicitly in both branches (off under a realm, on when anonymous) and REFUSES at boot on an incoherent posture rather than serving a door that is open or dead. Scratch base, no Python, no postgres client, no Go relay (pgCK owns in-extension inbound dispatch + auth-callout), no /ontology HTTP mount."
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.version="${BUNDLE_VERSION}"
 LABEL ck.bundle.role="prod"
@@ -223,11 +228,22 @@ ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_VERBOSITY=1
 
-# The CONSUMER surface only: busybox httpd (/cklib, the landing page) and the
-# NATS websocket the client speaks. EXPOSE is metadata — it publishes nothing —
-# but `docker run -P` publishes everything listed, and tooling reads it as
-# intent. PostgreSQL (5432) and NATS core (4222) are OPERATOR planes: still
-# reachable with an explicit `-p`, no longer offered by default.
+# The CONSUMER surface: busybox httpd (/cklib, the landing page) and the NATS
+# websocket the client speaks.
+#
+# ⚠ THIS DOES NOT REMOVE THE INHERITED PORTS, AND CANNOT.
+# `EXPOSE` is ADDITIVE: a child image cannot un-expose what its base declared.
+# pg_base declares 5432, 4222 and 9222, so the published image's ExposedPorts is
+# the UNION — {4222, 5432, 8000, 9222} — measured on v0.7.43. An earlier revision
+# of this comment, and the v0.7.43 commit message, claimed the set had been
+# trimmed to two. THAT CLAIM WAS FALSE: it was read off this line instead of off
+# `docker image inspect --format '{{json .Config.ExposedPorts}}'`, which is the
+# only thing that answers.
+#
+# `EXPOSE` publishes nothing on its own, so this is metadata rather than
+# exposure; the real control is the port map. The consumer plane is expressed
+# where it is actually enforced — each compose publishes 8000 and 9222 only, and
+# PostgreSQL/NATS-core stay on an explicit `-p` when an operator wants them.
 EXPOSE 8000 9222
 VOLUME ["/var/lib/postgresql/data"]
 
