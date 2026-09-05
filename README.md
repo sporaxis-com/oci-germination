@@ -41,21 +41,21 @@ We don't describe these images as "a Dockerfile that COPYs some stuff." Every ar
 | `bin:StaticArtifact` | a binary / library / static asset, built in-tree or copied from upstream | 4 |
 | `svc:Process` | a supervised runtime process | 4 |
 
-Everything below is the **currently-shipping wave** (`ck-allinone v0.7.44` on `pg-base v0.2.12`). `LATEST.md` is the auto-rendered, attestation-verified authority for exact live tags; this table is the human-readable map.
+Everything below is the **currently-shipping wave** (`ck-allinone v0.7.45` on `pg-base v0.2.13`). `LATEST.md` is the auto-rendered, attestation-verified authority for exact live tags; this table is the human-readable map.
 
 ### `ext:DBExtension` — the graph + governance surface (3)
 
 | Extension | Version | Source | Attestation |
 |---|---|---|---|
 | `pgrdf` | `0.6.34` — the vacuity-refusal release: validating against an empty/unseeded graph now REFUSES instead of returning `conforms:true` | [`styk-tv/pgRDF`](https://github.com/styk-tv/pgRDF) → `ghcr.io/styk-tv/pgrdf-bundle` | **gh-SLSA ✓** verified both arches |
-| `pgck` | `0.4.109` — CKP v3.12; the wave that closed pgCK's obligation ledger (C-1…C-17, D-1, E-1…E-5): a stored digest must carry its method, the engine builds on pgRDF's surface, and every refusal site is typed | [`styk-tv/pgCK`](https://github.com/styk-tv/pgCK) → `ghcr.io/styk-tv/pgck` | **gh-SLSA ✓** verified both arches |
+| `pgck` | `0.4.112` — CKP v3.12; the substrate rungs (PRE/AT) of the digest-validation ladder cklib 1.6.5 is written against. 0.4.111 added the `orphaned` flag to `fleet.adoptions` — an Adoption naming a graphless project, previously reported `malformed:false` and called healthy. Reports, never gates | [`styk-tv/pgCK`](https://github.com/styk-tv/pgCK) → `ghcr.io/styk-tv/pgck` | **gh-SLSA ✓** verified both arches |
 | `pgcrypto` | builtin (pg18) | PostgreSQL `contrib` | inherited from the postgres image |
 
 ### `bin:StaticArtifact` — libraries + in-tree tooling (4)
 
 | Artifact | Version | Source | Attestation |
 |---|---|---|---|
-| `cklib` (→ `/app/cklib/`) | `1.6.4` — the determinism line, plus `adoption.check`/`adoption.loadable` (a structural verdict, never a boolean) and `capabilities()` → `{declared, routed, unsealed, gap}` | [`ConceptKernel/CK.Lib.Js`](https://github.com/ConceptKernel/CK.Lib.Js) → `ghcr.io/conceptkernel/ck-lib-js` | **gh-SLSA ✓** |
+| `cklib` (→ `/app/cklib/`) | `1.6.5` — the client rung of the digest-validation ladder: **derive, never transcribe**, so a wrong digest cannot leave the seat. **Paired with pgCK 0.4.112** — do not serve this client from an older substrate | [`ConceptKernel/CK.Lib.Js`](https://github.com/ConceptKernel/CK.Lib.Js) → `ghcr.io/conceptkernel/ck-lib-js` | **gh-SLSA ✓** |
 | `s6-overlay` (PID 1) | `3.2.3.0` | [`just-containers/s6-overlay`](https://github.com/just-containers/s6-overlay) release tarball, `curl`'d in the build | **⚠ NONE** — no upstream attestation, no checksum pin (see below) |
 | `ociger-pg-launcher` | rolls with bundle | this repo → `cmd/ociger-pg-launcher` (Go) | fleet-CI, transitive via the FleetImage attestation |
 | `ociger-ck-identity` | rolls with bundle | this repo → `cmd/ociger-ck-identity` (Go); boot-time auth-callout provisioner — mints/derives the callout account, writes `nats-server.conf` + `pgck.conf`. The account seed is **never baked into the image** | fleet-CI, transitive |
@@ -84,14 +84,14 @@ All multi-arch (`linux/amd64`, `linux/arm64`), all SLSA Build Provenance v1 atte
 
 | Image | Head | Role |
 |---|---|---|
-| **`ociger-ck-allinone`** | `v0.7.44` | Marketplace-minimal CKP v3.12 runtime — the full stack. **Default for prod.** |
-| `ociger-pg18-pgrdf-pgck-nats-micro` | `v0.2.12` | The **`pg-base`** `ck-allinone` inherits — pg18/trixie + pgRDF + pgCK + NATS, scratch. |
+| **`ociger-ck-allinone`** | `v0.7.45` | Marketplace-minimal CKP v3.12 runtime — the full stack. **Default for prod.** |
+| `ociger-pg18-pgrdf-pgck-nats-micro` | `v0.2.13` | The **`pg-base`** `ck-allinone` inherits — pg18/trixie + pgRDF + pgCK + NATS, scratch. |
 | `ociger-pg17-*` (5 images) | — | **RETIRED** at the pg18 move (og#9). |
 | `ociger-core-pg17-{nats,nats-micro,micro,min}` | — | pg17 cores, no extensions. Not on the wave. |
 | `ociger-pg17-pgrdf-pgck-static-cklib` | `v0.6.7` | as `ck-allinone` but in-tree static server. **Frozen** — needs a coordinated re-cut, not a pin bump. |
 | `ociger-pgck-bench` | `v0.1.1` | **devel/benchmark sibling** (Python/FastAPI). `never-prod=true`; runs *beside* prod, never inside. **Frozen.** |
 
-All non-frozen bundles share **one** set of component pins via [`versions.yaml`](./versions.yaml) (the single source of truth — pgRDF 0.6.34 · pgCK 0.4.109 · cklib 1.6.4); `scripts/check-versions.sh` fails CI if any Dockerfile or `bundle.yaml` disagrees. It also carries the **ontology module digests** the init Adoptions seal — a pin that is compared, not merely carried.
+All non-frozen bundles share **one** set of component pins via [`versions.yaml`](./versions.yaml) (the single source of truth — pgRDF 0.6.34 · pgCK 0.4.112 · cklib 1.6.5); `scripts/check-versions.sh` fails CI if any Dockerfile or `bundle.yaml` disagrees. It also carries the **ontology module digests** the init Adoptions seal — a pin that is compared, not merely carried.
 
 ---
 
@@ -101,11 +101,11 @@ All non-frozen bundles share **one** set of component pins via [`versions.yaml`]
 
 ```mermaid
 graph TD
-  ck["ck-allinone · v0.7.44<br/><i>oci:FleetImage</i>"]:::fleet
-  base["pg-base · v0.2.12<br/><i>oci:FleetImage</i>"]:::fleet
+  ck["ck-allinone · v0.7.45<br/><i>oci:FleetImage</i>"]:::fleet
+  base["pg-base · v0.2.13<br/><i>oci:FleetImage</i>"]:::fleet
   pgrdf["pgrdf 0.6.34<br/><i>ext:DBExtension</i>"]:::ext
-  pgck["pgck 0.4.109-nats<br/><i>ext:DBExtension</i>"]:::ext
-  cklib["cklib 1.6.4<br/><i>bin:StaticArtifact</i>"]:::art
+  pgck["pgck 0.4.112-nats<br/><i>ext:DBExtension</i>"]:::ext
+  cklib["cklib 1.6.5<br/><i>bin:StaticArtifact</i>"]:::art
   s6["s6-overlay 3.2.3.0<br/><i>bin:StaticArtifact</i>"]:::warn
   bb["busybox 1.36.1<br/><i>oci:UpstreamImage</i>"]:::up
   pg["postgres 18-trixie<br/><i>oci:UpstreamImage</i>"]:::up
@@ -199,7 +199,7 @@ docker run --rm -d --name ck-allinone \
   -v "$PWD/ck-allinone-data:/var/lib/postgresql/data" \
   -e OCIGER_CK_ADMIT_ANONYMOUS=on \
   -p 18000:8000 -p 19222:9222 \
-  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44
+  ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.45
 ```
 
 The image is **ready-to-use** on a fresh volume: extensions are auto-created, the kernel's module Adoptions are sealed, and `pgck.nats_url` is set on first boot — no consumer SQL. Verify:
@@ -215,7 +215,7 @@ curl -I http://127.0.0.1:18000/cklib/ck-client.js        # busybox httpd serving
 nc -zv 127.0.0.1 19222                                    # NATS WSS listening
 
 # supply-chain: verify the build attestation
-gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.44 \
+gh attestation verify oci://ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.45 \
   --repo sporaxis-com/oci-germination
 ```
 

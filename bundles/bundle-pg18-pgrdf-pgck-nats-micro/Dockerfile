@@ -41,10 +41,10 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.109-pg18-nats-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgck:0.4.112-pg18-nats-${TARGETARCH}"; \
   test -s /work/lib/pgck.so; \
   test -s /work/share/extension/pgck.control; \
-  test -s /work/share/extension/pgck--0.4.109.sql; \
+  test -s /work/share/extension/pgck--0.4.112.sql; \
   # CKP v3.11 ships a versioned ontology tree — core plus the wave: and lex:
   # modules a kernel adopts through a sealed core#Adoption naming each module's
   # sourceDigest. ck-allinone's init.sql seals exactly those Adoptions, so the
@@ -53,8 +53,10 @@ RUN set -eux; \
   # 0.4.82 ships BOTH trees: v3.11 (core/wave/lexicon byte-stable since 0.4.77,
   # plus the NEW recon module) and v3.12 FINAL (boot's default root). 0.4.109
   # changes v3.12/core.ttl ONLY — v3.11 and v3.12 wave/recon are byte-stable
-  # through the whole 0.4.89..0.4.109 wave. All seven measured from
-  # pgck:0.4.109-pg18-nats-{amd64,arm64} 2026-09-02, byte-identical across
+  # through the whole 0.4.89..0.4.109 wave, AND unchanged again by 0.4.111 —
+  # which is behaviour-only, as is 0.4.112 (the digest-ladder PRE/AT rungs).
+  # All seven re-measured from pgck:0.4.112-pg18-nats-{amd64,arm64} 2026-09-05, identical
+  # to 0.4.109's and byte-identical across
   # arches; a mismatch here means upstream shipped different bytes than we
   # pinned, and the build MUST die rather than seal or ground an unvouched root.
   echo "e5f7d1e54b32fa0ba2d41ba248e0909b96ee1ebb4344e2d9e9ccdf4e0b25348d  /work/ontology/v3.11/core.ttl" | sha256sum -c -; \
