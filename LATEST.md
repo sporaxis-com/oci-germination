@@ -79,8 +79,8 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + NATS (4222) 
 | `postgresql` | engine | `18` | `server` | `—` | ? unprobed |
 | `pgrdf` | extension | `0.6.34` | `CREATE EXTENSION` | `—` | ? unprobed |
 | `pgrdf.version()` | native | `0.6.34` | `self-report` | `—` | ? unprobed |
-| `pgck` | extension | `0.4.109` | `CREATE EXTENSION` | `—` | ? unprobed |
-| `pgck.version()` | native | `0.4.109` | `self-report` | `—` | ? unprobed |
+| `pgck` | extension | `0.4.112` | `CREATE EXTENSION` | `—` | ? unprobed |
+| `pgck.version()` | native | `0.4.112` | `self-report` | `—` | ? unprobed |
 
 ## Pin policy
 
