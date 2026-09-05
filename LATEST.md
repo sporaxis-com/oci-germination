@@ -51,20 +51,20 @@ PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + pgcrypto + N
 | `ociger-pg-launcher` | component | `in-tree` | `—` | gate-before-push | ✓ gated |
 | `ociger-ck-identity` | component | `in-tree` | `boot-provisioner` | gate-before-push | ✓ gated |
 
-## ociger-pg18-pgrdf-pgck-nats-micro — `v0.2.12`
+## ociger-pg18-pgrdf-pgck-nats-micro — `v0.2.13`
 
 PostgreSQL 18 (trixie, glibc 2.41) + pgRDF + pgCK (`-nats` build) + NATS (4222) + NATS WSS (9222). Scratch base, both arches built consistently on trixie. The canonical base `ck-allinone` builds `FROM`.
 
 | arch  | Platform digest                                                            | Created (UTC)       |
 |-------|----------------------------------------------------------------------------|---------------------|
-| amd64 | `sha256:93c98259c4fc57fbf103e435760919325b98813966820eb3d0003f0144b4991f`  | 2026-09-02 22:35:11 |
-| arm64 | `sha256:acb98f070989d8eb21a34c2574a9b54a7c7222851e93a633e3023b5dd3720a59`  | 2026-09-02 22:35:11 |
+| amd64 | `sha256:80352f54b84ccc45711ae82e8b446cba6d667f2575c150c2228bb9d8a90280d3`  | 2026-09-05 06:45:13 |
+| arm64 | `sha256:0a160054fce9f77fd8ff2e2254f40d53ca635308c0e4ca666c765ac7a4374a31`  | 2026-09-05 06:45:13 |
 
 |                    |                                                                          |
 |--------------------|--------------------------------------------------------------------------|
-| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.12`                                                            |
+| Pull URI           | `ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.13`                                                            |
 | Also tagged        | `latest`                                                                  |
-| Index digest       | `sha256:0fc60324f9f22a65a688afad1633f578b9f8e1e6d8e96fe0943de9daa2d47e13`                                                         |
+| Index digest       | `sha256:bad56a98040684a28870c6b87ef5fe7b46d945251957359517e127394c664631`                                                         |
 | Role               | `prod`                                                                |
 | Production use     | Production-ready                                                              |
 | Attestation        | SLSA Build Provenance v1 ✓ verified via `gh attestation verify`           |
