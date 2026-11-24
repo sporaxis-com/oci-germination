@@ -137,7 +137,17 @@ if [[ "$PGCK_NATIVE" != "$EXPECTED_PGCK_NATIVE" ]]; then
   echo "✗ wrong-version: pgck_version()=$PGCK_NATIVE expected=$EXPECTED_PGCK_NATIVE" >&2
   exit 1
 fi
-echo "[ck-allinone] ✓ pgrdf=$PGRDF_INSTALLED pgck=$PGCK_INSTALLED ($PGCK_NATIVE)"
+# The server's own version against the versions.yaml postgres pin (inherited
+# from the base, re-asserted here because THIS is the image adopters run).
+# pgRDF 0.6.41 does not load below 18.7, so a base silently built on an older
+# minor must fail here rather than at an adopter's first boot.
+EXPECTED_POSTGRES_SERVER_VERSION="${POSTGRES_EXPECTED_SERVER_VERSION:-$OCIGER_POSTGRES_SERVER_VERSION}"
+POSTGRES_SERVER_VERSION=$($PSQL -c "SHOW server_version;" 2>&1 | head -1)
+if [[ "${POSTGRES_SERVER_VERSION%% *}" != "$EXPECTED_POSTGRES_SERVER_VERSION" ]]; then
+  echo "✗ wrong-version: postgres server_version=$POSTGRES_SERVER_VERSION expected=$EXPECTED_POSTGRES_SERVER_VERSION (versions.yaml postgres pin)" >&2
+  exit 1
+fi
+echo "[ck-allinone] ✓ pgrdf=$PGRDF_INSTALLED pgck=$PGCK_INSTALLED ($PGCK_NATIVE) postgres=${POSTGRES_SERVER_VERSION%% *}"
 
 echo "[ck-allinone] ②a pgRDF actually parses Turtle + stores quads (real round-trip, not just presence)"
 # Inline Turtle fixture — 3 triples, deterministic. parse_turtle returns the

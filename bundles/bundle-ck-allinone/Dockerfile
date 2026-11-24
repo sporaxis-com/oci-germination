@@ -5,7 +5,7 @@
 # init.sql through `postgres --single` from inside ociger-pg-launcher,
 # so the final image carries no postgres client (psql) and no client libs.
 
-ARG PG_BASE_VERSION=v0.2.13
+ARG PG_BASE_VERSION=v0.2.14
 ARG S6_OVERLAY_VERSION=3.2.3.0
 ARG CKLIB_VERSION=1.6.5
 # Build-arg supplied by CI from the git tag. Default `dev` means a local
@@ -17,8 +17,11 @@ ARG BUNDLE_VERSION=dev
 # "amd64 and arm64 came from one commit" is enforced, not asserted.
 ARG GIT_SHA=unknown
 
-# ─── Stage 1: pg base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.109-nats + NATS) ──
-# v0.2.13 carries pgRDF 0.6.34 + pgCK 0.4.112-nats. pgCK 0.4.82 made v3.12 FINAL
+# ─── Stage 1: pg base (pg18.7/trixie + pgRDF 0.6.41 + pgCK 0.4.112-nats + NATS) ──
+# v0.2.14 carries pgRDF 0.6.41 + pgCK 0.4.112-nats on PostgreSQL 18.7 (v0.2.13
+# carried pgRDF 0.6.34 on whatever 18-trixie floated to — 18.6). pgCK is unchanged:
+# it has no compile-time dependency on pgRDF and 0.4.112 passes every gate here on
+# 0.6.41. pgCK 0.4.82 made v3.12 FINAL
 # ckp.boot()'s default root on both install roads, and the artifact ships BOTH
 # trees (v3.11 core/wave/lexicon/recon + v3.12 core/wave/recon) — the micro base
 # pins all seven by digest, so a byte that moved upstream stops the build instead
@@ -31,11 +34,19 @@ ARG GIT_SHA=unknown
 # roster populations; 0.4.106 types the last 89 untyped refusal sites. It changes
 # the v3.12 core bytes (97f97cb2… → 2e90a651…); the v3.11 tree is byte-stable, so
 # the init contract's Adoptions still cite unchanged module digests.
-# pgRDF 0.6.34 is the vacuity-refusal release: validating against an empty graph
-# now refuses rather than conforming vacuously. The -nats build still owns the
-# in-extension inbound dispatch and the auth-callout, so the Go relay stays deleted.
-# Base remains postgres:18-trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
-FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.13 AS pg_base
+# pgRDF 0.6.41 makes a graph a SET of triples (a UNIQUE (s,p,o) index per graph
+# partition, one writer path, digests that depend only on the set) and REQUIRES
+# PostgreSQL >= 18.7: on 18.6 the server dies at preload with `undefined symbol:
+# heap_datum_check` (measured with a control build). The base therefore pins
+# postgres:18.7-trixie instead of the floating 18-trixie, and both smokes assert
+# the running server's version. The -nats build still owns the in-extension
+# inbound dispatch and the auth-callout, so the Go relay stays deleted.
+# EXISTING VOLUMES: this image over a PGDATA initialised by an older one starts,
+# reads answer, and every seal is REFUSED ("the installed extension SQL is older
+# than the loaded library") until an operator runs ALTER EXTENSION pgrdf UPDATE.
+# The launcher does not run it. Disclosed in CHANGELOG; not yet gated.
+# Base stays trixie (glibc 2.41; the pgRDF arm64 .so needs GLIBC_2.39).
+FROM ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro:v0.2.14 AS pg_base
 
 # ─── Stage 2: cklib browser library (Shape A static layer) ────────────────
 # 1.6.5 — the ladder release, built to SPEC.CK-DOOR.v1.6.5 §14 (R-34..R-39) and

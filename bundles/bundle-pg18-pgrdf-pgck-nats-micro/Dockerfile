@@ -28,12 +28,12 @@ ARG TARGETARCH
 WORKDIR /work
 RUN set -eux; \
   case "$TARGETARCH" in amd64|arm64) ;; *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; esac; \
-  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.34-pg18-${TARGETARCH}"; \
+  /bin/oras pull --output /work "ghcr.io/styk-tv/pgrdf-bundle:0.6.41-pg18-${TARGETARCH}"; \
   mkdir -p /out; \
-  tar -xzf "pgrdf-0.6.34-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
+  tar -xzf "pgrdf-0.6.41-pg18-glibc-${TARGETARCH}.tar.gz" -C /out --strip-components=1; \
   test -s /out/lib/pgrdf.so; \
   test -s /out/share/extension/pgrdf.control; \
-  test -s /out/share/extension/pgrdf--0.6.34.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
+  test -s /out/share/extension/pgrdf--0.6.41.sql  # pgRDF v0.5.25+ aligned the SQL filename with the release tag (Cargo.toml + control + META.json all bumped together)
 
 
 FROM --platform=$BUILDPLATFORM ghcr.io/oras-project/oras:v1.2.2 AS pgck_fetch
@@ -71,7 +71,7 @@ RUN set -eux; \
 FROM nats:2.14.2-scratch AS nats_source
 
 
-FROM postgres:18-trixie AS postgres_source
+FROM postgres:18.7-trixie AS postgres_source
 RUN set -eux; \
   mkdir -p /out/bin /out/etc /out/usr/lib/postgresql/18/bin /out/usr/lib/postgresql/18/lib /out/usr/share/postgresql /out/usr/share/postgresql/18/extension /out/usr/share/postgresql/18/tsearch_data /out/usr/share/postgresql/18/timezonesets /out/var/lib/postgresql /out/var/run/postgresql; \
   cp -L /bin/sh /out/bin/sh; \

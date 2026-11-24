@@ -13,15 +13,15 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
   pg_major: 18
   # The postgres binaries/share are COPYed from this stage (Dockerfile
-  # `FROM postgres:18-trixie AS postgres_source`); the shipped image is scratch.
+  # `FROM postgres:18.7-trixie AS postgres_source`); the shipped image is scratch.
   # These four lines read as authoritative and were bound to nothing until the
   # strict loader landed — they declared pg17/bookworm for a pg18/trixie build.
-  base_image: postgres:18-trixie
+  base_image: postgres:18.7-trixie
   final_image: scratch
   runtime_profile: micro
 extensions:
   pgrdf:
-    version: 0.6.34
+    version: 0.6.41
   pgck:
     version: 0.4.112
 platforms:

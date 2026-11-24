@@ -18,6 +18,7 @@ EXPECTED_PGRDF_VERSION="${PGRDF_EXPECTED_VERSION:-$OCIGER_PGRDF_VERSION}"
 EXPECTED_PGCK_VERSION="${PGCK_EXPECTED_VERSION:-$OCIGER_PGCK_VERSION}"
 EXPECTED_PGCK_NATIVE_VERSION="${PGCK_EXPECTED_NATIVE_VERSION:-$OCIGER_PGCK_NATIVE}"
 EXPECTED_NATS_VERSION="${NATS_EXPECTED_VERSION:-$OCIGER_NATS_VERSION}"
+EXPECTED_POSTGRES_SERVER_VERSION="${POSTGRES_EXPECTED_SERVER_VERSION:-$OCIGER_POSTGRES_SERVER_VERSION}"
 RELATIVE_PATH=""
 RELATION_PROOF_METHOD=""
 INFO_LINE=""
@@ -281,6 +282,13 @@ fi
 
 require_equal "pgrdf.version()" "$PGRDF_NATIVE" "$EXPECTED_PGRDF_VERSION"
 require_equal "pgck_version()" "$PGCK_NATIVE" "$EXPECTED_PGCK_NATIVE_VERSION"
+
+# The server's own version against the versions.yaml postgres pin. pgRDF 0.6.41
+# does not load below 18.7 (undefined symbol: heap_datum_check), and the base
+# used to build FROM a floating tag — so the minor this image actually carries
+# is asserted, not assumed. server_version reads "18.7 (Debian 18.7-1.pgdg13+5)".
+POSTGRES_SERVER_VERSION="$(psql_query postgres "SHOW server_version;")"
+require_equal "server_version" "${POSTGRES_SERVER_VERSION%% *}" "$EXPECTED_POSTGRES_SERVER_VERSION"
 
 RELATIVE_PATH="$(psql_query ociger_demo "SELECT pg_relation_filepath('public.demo_rows'::regclass);")"
 HOST_PATH="$DATA_DIR/$RELATIVE_PATH"

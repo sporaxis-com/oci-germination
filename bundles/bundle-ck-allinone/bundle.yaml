@@ -1,6 +1,6 @@
 spec_version: 0.4
 name: bundle-ck-allinone
-version: v0.7.45
+version: v0.7.46
 role: prod
 never_prod: false
 # ── NO VERSION NUMBERS IN `description` ──────────────────────────────────
@@ -25,7 +25,7 @@ image:
   registry: ghcr.io/sporaxis-com/ociger-ck-allinone
   pg_major: 18
   base_image: ghcr.io/sporaxis-com/ociger-pg18-pgrdf-pgck-nats-micro
-  base_image_version: v0.2.13
+  base_image_version: v0.2.14
   final_image: scratch
   runtime_profile: micro
 
@@ -35,7 +35,7 @@ extensions:
     source: https://www.postgresql.org/docs/18/pgcrypto.html
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgcrypto;
   pgrdf:
-    version: 0.6.34
+    version: 0.6.41
     source: https://github.com/styk-tv/pgRDF
     bootstrap: CREATE EXTENSION IF NOT EXISTS pgrdf;
   pgck:

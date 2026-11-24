@@ -24,12 +24,12 @@ components:
   # Latest consumable upstream pins. Each verified pullable at the EXACT oras tag
   # the Dockerfiles consume, both arches, 2026-08-16 (GHCR manifest HTTP 200 for
   # pgck:<v>-pg18-nats-{amd64,arm64} and pgrdf-bundle:<v>-pg18-{amd64,arm64}).
-  pgrdf:      "0.6.34"         # published 2026-08-26 (styk-tv/pgRDF v0.6.34) — the vacuity-refusal release (a validation against an empty/unseeded graph now REFUSES instead of returning conforms:true; it root-caused pgck#134 as a consumer defect). gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.34-pg18-{amd64,arm64}), 2026-08-26. Unchanged by this bump.
+  pgrdf:      "0.6.41"         # published 2026-11-24 (styk-tv/pgRDF v0.6.41) — "a graph is a set of triples": every graph partition carries a UNIQUE (subject, predicate, object) index and every writer goes through one path; digests depend only on the set; typed refusals replace XX000 on the query path; shmem_reset/shmem_cache_prewarm/stats are no longer PUBLIC; graph owner + the act record. REQUIRES PostgreSQL >= 18.7 — on 18.6 the server dies at preload (undefined symbol: heap_datum_check), measured 2026-11-24 with a control build. gh attestation verify exit 0 both arches (pgrdf-bundle:0.6.41-pg18-{amd64,arm64}), 2026-11-24. Seven releases forward from 0.6.34; pgCK 0.4.112 runs on it unchanged (it has no compile-time dependency on pgRDF).
   pgck:       "0.4.112"        # published 2026-09-04 (styk-tv/pgck v0.4.112) — ships the substrate half of the four-rung digest-validation ladder (the PRE/AT rungs), which cklib 1.6.5 is written against; 0.4.111 before it added the ORPHANED flag to fleet.adoptions (an Adoption whose intoProject names a graphless project — previously reported malformed:false, calling a broken install healthy). Reports, never gates: a seal-time refusal would turn a silent orphan into a hard boot failure on every deployment that names a project. ONTOLOGY BYTE-STABLE: all seven TTLs identical to 0.4.109/0.4.111, re-measured both arches 2026-09-05. gh attestation verify exit 0 both arches.
   pgck_native: "pgck 0.4.112"  # pgck_version() derives from CARGO_PKG_VERSION (RESOLVED in 0.4.15). Self-report == extversion.
   cklib:      "1.6.5"          # published 2026-09-04 (ConceptKernel/CK.Lib.Js v1.6.5) — "the ladder release": the client rung of the digest-validation ladder, DERIVE NEVER TRANSCRIBE, so a wrong digest cannot leave the seat. Built against SPEC.CK-DOOR.v1.6.5 §14 (R-34..R-39) and pgCK PASS-15/16 — paired with pgCK 0.4.112, whose PRE/AT rungs it relies on; do not ship this client against an older substrate. 14 suites, 361 passed / 0 failed, RED-first, and no test in the release types a digest — every one is read off the door in the same run. gh attestation verify exit 0; ck.js self-reports VERSION 1.6.5 (75,619 B, up from 54,229); SAME six-file set as 1.6.1/1.6.3/1.6.4, so the smoke byte-set list is unchanged — re-measured 2026-09-05.
   nats:       "2.14.2"
-  postgres:   "18-trixie"
+  postgres:   "18.7-trixie"    # PINNED TO THE MINOR since pgRDF 0.6.41: the patch level is load-bearing (see pgrdf above). The floating 18-trixie resolved to 18.6 when base v0.2.13 was built and to 18.7 on 2026-11-24 — a pin that moves by itself is consulted by nothing. Both smokes now assert the server's version against this value.
   s6_overlay: "3.2.3.0"
   busybox:    "1.36.1-musl"
 
@@ -54,7 +54,7 @@ modules:
 bases:
   # In-repo base images other bundles derive FROM. These move when their own
   # components bump; keep them at the head their Dockerfiles consume.
-  pg18-pgrdf-pgck-nats-micro: "v0.2.13"  # the ck-allinone base (pg18/trixie + pgRDF 0.6.34 + pgCK 0.4.112-nats). v0.2.13 = 0.4.112 (digest-ladder PRE/AT rungs; 0.4.111 added the fleet.adoptions orphaned flag; ontology byte-stable vs 0.4.109). v0.2.12 = 0.4.109 ledger-closing wave. v0.2.11 = 0.4.88. v0.2.10 = 0.4.87. v0.2.9 = 0.6.34/0.4.82 (v3.12 FINAL). v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
+  pg18-pgrdf-pgck-nats-micro: "v0.2.14"  # the ck-allinone base (pg18.7/trixie + pgRDF 0.6.41 + pgCK 0.4.112-nats). v0.2.14 = pgRDF 0.6.34 -> 0.6.41 + postgres pinned 18.7-trixie, pgCK unchanged. v0.2.13 = 0.4.112 (digest-ladder PRE/AT rungs; 0.4.111 added the fleet.adoptions orphaned flag; ontology byte-stable vs 0.4.109). v0.2.12 = 0.4.109 ledger-closing wave. v0.2.11 = 0.4.88. v0.2.10 = 0.4.87. v0.2.9 = 0.6.34/0.4.82 (v3.12 FINAL). v0.2.8 = 0.4.81. v0.2.7 = 0.4.79/0.4.80. v0.2.6 = 0.4.78. v0.2.5 = 0.6.33/0.4.77. v0.2.4 = 0.6.32/0.4.76; v0.2.3 never cut.
 
 # Bundles intentionally NOT held to the canonical component pins (and why).
 # check-versions.sh skips drift-failure for these; they still appear in the
