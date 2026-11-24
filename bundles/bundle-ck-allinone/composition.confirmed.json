@@ -1,12 +1,12 @@
 {
   "bundle": "bundle-ck-allinone",
-  "index_digest": "sha256:9d18e2b0d6ae1646f22582dbdd25e8e5c1cd9e99862b741e7a6d04f73092707d",
+  "index_digest": "sha256:dffcbc71986fbe4d85130dd39a5a1b553cad99b0f74bf3a54704794316b9334d",
   "all_match": true,
   "layers": [
     {
       "layer": "base image",
       "kind": "base",
-      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.13",
+      "expected": "ociger-pg18-pgrdf-pgck-nats-micro:v0.2.14",
       "mapping": "FROM",
       "probe": null,
       "confirmed": "gate-before-push",
@@ -18,7 +18,7 @@
       "expected": "18",
       "mapping": "server",
       "probe": "postgres",
-      "confirmed": "18.6 (Debian 18.6-1.pgdg13+2)",
+      "confirmed": "18.7 (Debian 18.7-1.pgdg13+5)",
       "verdict": "✓"
     },
     {
@@ -33,19 +33,19 @@
     {
       "layer": "pgrdf",
       "kind": "extension",
-      "expected": "0.6.34",
+      "expected": "0.6.41",
       "mapping": "CREATE EXTENSION",
       "probe": "pgrdf_ext",
-      "confirmed": "0.6.34",
+      "confirmed": "0.6.41",
       "verdict": "✓"
     },
     {
       "layer": "pgrdf.version()",
       "kind": "native",
-      "expected": "0.6.34",
+      "expected": "0.6.41",
       "mapping": "self-report",
       "probe": "pgrdf_fn",
-      "confirmed": "0.6.34",
+      "confirmed": "0.6.41",
       "verdict": "✓"
     },
     {
@@ -121,6 +121,6 @@
       "verdict": "✓ gated"
     }
   ],
-  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.45",
-  "confirmed_at": "2026-09-05T06:51:20Z"
+  "image": "ghcr.io/sporaxis-com/ociger-ck-allinone:v0.7.46",
+  "confirmed_at": "2026-11-24T17:31:02Z"
 }
